@@ -7461,6 +7461,51 @@ test("applies live autonomous events and preserves usage omitted from completion
   expect(lifecycleUpdates).toContain("idle");
 });
 
+test("publishes the live background task set on the agent snapshot", async () => {
+  const workdir = mkdtempSync(join(tmpdir(), "agent-manager-background-tasks-"));
+  const storage = new AgentStorage(join(workdir, "agents"), logger);
+  let capturedSession: TestAgentSession | null = null;
+
+  class LiveEventClient extends TestAgentClient {
+    override async createSession(config: AgentSessionConfig): Promise<AgentSession> {
+      capturedSession = new TestAgentSession(config);
+      return capturedSession;
+    }
+  }
+
+  const manager = new AgentManager({
+    clients: { codex: new LiveEventClient() },
+    registry: storage,
+    logger,
+    idFactory: () => "00000000-0000-4000-8000-000000000126",
+  });
+  const snapshot = await manager.createAgent({ provider: "codex", cwd: workdir }, undefined, {
+    workspaceId: undefined,
+  });
+  const payload = () => {
+    const agent = manager.getAgent(snapshot.id);
+    return agent ? toAgentPayload(agent) : null;
+  };
+
+  expect(payload()?.backgroundTasks).toEqual([]);
+
+  capturedSession!.pushEvent({
+    type: "background_tasks_changed",
+    provider: "codex",
+    tasks: [{ id: "b-shell", description: "Sleep for 15 seconds" }],
+  });
+  await vi.waitFor(() => {
+    expect(payload()?.backgroundTasks).toEqual([
+      { id: "b-shell", description: "Sleep for 15 seconds" },
+    ]);
+  });
+
+  capturedSession!.pushEvent({ type: "background_tasks_changed", provider: "codex", tasks: [] });
+  await vi.waitFor(() => {
+    expect(payload()?.backgroundTasks).toEqual([]);
+  });
+});
+
 test("ignores stale autonomous terminals without lowering the active turn lifecycle", async () => {
   const workdir = mkdtempSync(join(tmpdir(), "agent-manager-stale-autonomous-terminal-"));
   const storage = new AgentStorage(join(workdir, "agents"), logger);

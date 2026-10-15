@@ -2058,6 +2058,11 @@ export const ptBR: TranslationResources = {
   menu: {
     backdrop: "Fundo do menu",
   },
+  backgroundTasks: {
+    title: "Tarefas em segundo plano",
+    pillLabelOne: "1 tarefa em segundo plano",
+    pillLabelMany: "{{count}} tarefas em segundo plano",
+  },
   subagents: {
     title: "Subagentes",
     pillLabelOne: "1 subagente",

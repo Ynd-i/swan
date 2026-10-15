@@ -2025,6 +2025,11 @@ export const ar: TranslationResources = {
   menu: {
     backdrop: "خلفية القائمة",
   },
+  backgroundTasks: {
+    title: "المهام في الخلفية",
+    pillLabelOne: "مهمة واحدة في الخلفية",
+    pillLabelMany: "{{count}} مهام في الخلفية",
+  },
   subagents: {
     title: "الوكلاء الفرعيون",
     pillLabelOne: "وكيل فرعي واحد",

@@ -198,6 +198,12 @@ export interface AgentUsage {
   contextWindowUsedTokens?: number;
 }
 
+/** Work the agent left running in the background, such as a shell command or a monitor. */
+export interface AgentBackgroundTask {
+  id: string;
+  description: string;
+}
+
 export interface AgentContextUsageCategory {
   name: string;
   tokens: number;

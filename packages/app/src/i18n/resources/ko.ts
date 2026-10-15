@@ -2036,6 +2036,11 @@ export const ko: TranslationResources = {
   menu: {
     backdrop: "메뉴 배경",
   },
+  backgroundTasks: {
+    title: "백그라운드 작업",
+    pillLabelOne: "백그라운드 작업 1개",
+    pillLabelMany: "백그라운드 작업 {{count}}개",
+  },
   subagents: {
     title: "하위 에이전트",
     pillLabelOne: "하위 에이전트 1개",

@@ -51,6 +51,7 @@ import {
   type AgentStreamEvent,
   type AgentTimelineItem,
   type AgentUsage,
+  type AgentBackgroundTask,
   type AgentRuntimeInfo,
   type ImportedTimelineEntry,
   type ImportableProviderSession,
@@ -454,6 +455,8 @@ interface ManagedAgentBase {
   activeTurnId: string | null;
   activeTurnStartedAt: Date | null;
   lastUsage?: AgentUsage;
+  /** Live provider process state: never persisted, and gone when the process is. */
+  backgroundTasks?: AgentBackgroundTask[];
   lastError?: string;
   attention: AttentionState;
   foregroundTurnWaiters: Set<ForegroundTurnWaiter>;
@@ -3853,6 +3856,7 @@ export class AgentManager {
       foregroundTurnWaiters: new Set(),
       finalizedForegroundTurnIds: new Set(),
       unsubscribeSession: null,
+      backgroundTasks: [],
     };
   }
 
@@ -3969,6 +3973,12 @@ export class AgentManager {
     if (event.type === "provider_subagent") {
       const update = this.providerSubagents.apply(agent.id, event.provider, event.event);
       this.dispatch({ type: "provider_subagent", event: update });
+      return;
+    }
+    if (event.type === "background_tasks_changed") {
+      if (event.tasks.length === 0 && !agent.backgroundTasks?.length) return;
+      agent.backgroundTasks = event.tasks;
+      this.emitState(agent, { persist: false });
       return;
     }
     const turnId = getAgentStreamEventTurnId(event);

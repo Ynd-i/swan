@@ -226,6 +226,12 @@ export interface AgentUsage {
   contextWindowUsedTokens?: number;
 }
 
+/** Work the agent left running in the background, such as a shell command or a monitor. */
+export interface AgentBackgroundTask {
+  id: string;
+  description: string;
+}
+
 export const TOOL_CALL_ICON_NAMES = [
   "wrench",
   "square_terminal",
@@ -462,6 +468,12 @@ export type AgentStreamEvent =
       type: "provider_subagent";
       provider: AgentProvider;
       event: import("./provider-subagents/store.js").ProviderSubagentInputEvent;
+    }
+  | {
+      /** Every live background task after a change. Replaces the previous set. */
+      type: "background_tasks_changed";
+      provider: AgentProvider;
+      tasks: AgentBackgroundTask[];
     };
 
 export function getAgentStreamEventTurnId(event: AgentStreamEvent): string | undefined {

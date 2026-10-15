@@ -248,6 +248,7 @@ import type {
   ToolCallDetail,
   ToolCallTimelineItem,
   AgentUsage,
+  AgentBackgroundTask,
   AgentContextUsage,
   JsonValue,
 } from "./agent-types.js";
@@ -392,6 +393,11 @@ const AgentUsageSchema: z.ZodType<AgentUsage> = z.object({
   totalCostUsd: z.number().optional(),
   contextWindowMaxTokens: z.number().optional(),
   contextWindowUsedTokens: z.number().optional(),
+});
+
+const AgentBackgroundTaskSchema: z.ZodType<AgentBackgroundTask> = z.object({
+  id: z.string(),
+  description: z.string(),
 });
 
 const AgentContextUsageSchema: z.ZodType<AgentContextUsage> = z.object({
@@ -839,6 +845,8 @@ export const AgentSnapshotPayloadSchema = z.object({
   persistence: AgentPersistenceHandleSchema.nullable(),
   runtimeInfo: AgentRuntimeInfoSchema.optional(),
   lastUsage: AgentUsageSchema.optional(),
+  /** The live set, empty included. Absent from daemons that predate it and from stored agents. */
+  backgroundTasks: z.array(AgentBackgroundTaskSchema).optional(),
   lastError: z.string().optional(),
   title: z.string().nullable(),
   labels: z.record(z.string(), z.string()).default({}),
