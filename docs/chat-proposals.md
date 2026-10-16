@@ -3,11 +3,12 @@
 An agent can propose a follow-up chat at the end of its reply. The app shows the proposal as a
 card under the reply: a title, a Start button, and collapsed Task and Context rows. Nothing runs
 until the user presses Start. The started chat opens with "Started from <source chat>" and the same
-Task and Context rows, and the Mac sidebar lists it under the chat it came from. This copies
-Claude Desktop's linked sessions.
+Task and Context rows, and the Mac sidebar lists it under the chat it came from. When the started
+chat ends a turn, its source gets a short report. This copies Claude Desktop's linked sessions.
 
-The feature lives in the app (`packages/app/src/chat-proposals/`). The daemon, the protocol and the
-providers are unchanged, so it works with every provider.
+The feature lives in the app (`packages/app/src/chat-proposals/`), except report back, which is the
+built-in plugin `plugins/started-chat-report/`. The protocol and the providers are unchanged, so it
+works with every provider.
 
 ## The proposal block
 
@@ -98,8 +99,46 @@ that now shows its source (`foldStartedChats` in `components/desktop/desktop-cha
 - Started chats are always shown, one level deeper per link, and keep their own pin and archive
   actions.
 
+## Report back
+
+When a started chat ends a turn, the plugin sends its source one message: a lead line that tells the
+model what the note is, then one block per started chat with the first 400 characters of its final
+reply. The source chat shows each block as a "Report from <chat>" row with the reply collapsed
+(`parseStartedChatReports`), not as a user bubble.
+
+```text
+<paseo_started_chat_report>
+<chat>agent ID of the started chat</chat>
+<title>Fix login</title>
+<outcome>completed</outcome>
+<reply>
+Login fixed. Tests pass.
+</reply>
+</paseo_started_chat_report>
+```
+
+The plugin finds the source through `codex-ui.started-from-agent-id` and repeats that label and the
+block format, so a change to either touches the plugin and `chat-proposals/proposal.ts`.
+
+Every note starts a turn on the source, so each turn of a started chat costs its source a turn.
+
+- A send interrupts a running turn. A source that is running, starting or waiting on a permission
+  gets its notes when its own turn ends. Waiting notes keep the latest per started chat and go out
+  as one message.
+- A turn that answered notes reports nothing. The source's reply never flows back to the started
+  chat, and a chain of started chats does not cascade turns up to the first source. An auto handoff
+  briefing turn reports nothing either.
+- Either side may hand off, as in the sidebar. A chat that auto handoff started reports through
+  the started-from label of the first chat of its chain, and reports go to the newest live chat of
+  the source's chain.
+- At a source's turn end, its waiting reports and an auto handoff briefing request can go out
+  together, and one interrupts the other. Auto handoff asks again at the next turn end; an
+  interrupted report stays in the chat unanswered.
+- A canceled turn reports nothing. Notes for a source whose turn was canceled wait for its next turn
+  end or the next report.
+- An archived source gets nothing. Waiting notes live in daemon memory and are lost when the daemon
+  stops.
+
 ## Not built
 
-- **Report back.** Claude Desktop sends the source a note when the started chat ends a turn. That
-  needs a server-side `agent.turn_ended` hook, so it is not part of this app-only feature.
 - **Worktree isolation.** Start always uses the source's workspace.

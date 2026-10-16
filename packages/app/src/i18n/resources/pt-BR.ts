@@ -56,6 +56,9 @@ export const ptBR: TranslationResources = {
     task: "Tarefa",
     context: "Contexto",
     startedFrom: "Iniciado a partir de",
+    reportFrom: "Relatório de",
+    reportFailed: "Turno com falha em",
+    reply: "Resposta",
   },
   desktopChat: {
     handoffs: { toggle: "Transferências anteriores ({{count}})" },

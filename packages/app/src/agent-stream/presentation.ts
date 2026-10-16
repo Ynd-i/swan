@@ -4,6 +4,7 @@ import { projectPluginTimelineItems } from "@/plugins/timeline/projection";
 import { splitMarkdownBlocksWithKinds } from "@/utils/split-markdown-blocks";
 import {
   parseStartedChatPrompt,
+  parseStartedChatReports,
   splitChatProposals,
   type ChatProposal,
 } from "@/chat-proposals/proposal";
@@ -100,9 +101,15 @@ export function createStreamPresentation() {
         item.text,
       );
     const startedChat = spokenInput ? null : parseStartedChatPrompt(item.text);
+    const startedChatReports =
+      spokenInput || startedChat ? null : parseStartedChatReports(item.text);
     let projected = item;
     if (spokenInput) projected = { ...item, text: spokenInput[1].trim() };
     else if (startedChat) projected = { ...item, text: startedChat.task, startedChat };
+    else if (startedChatReports) {
+      const text = startedChatReports.map((report) => report.reply).join("\n\n");
+      projected = { ...item, text, startedChatReports };
+    }
     userMessageCache.set(item, projected);
     return projected;
   }

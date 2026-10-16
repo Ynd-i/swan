@@ -108,3 +108,40 @@ export function parseStartedChatPrompt(text: string): ChatBrief | null {
   const task = tagged(body, "task");
   return task ? { task, context: tagged(body, "context") } : null;
 }
+
+/** A started chat's latest reply, which the started-chat-report plugin sends its source. */
+export interface StartedChatReport {
+  chatId: string;
+  title: string;
+  outcome: "completed" | "failed";
+  /** The reply's first 400 characters; empty when the turn ended without one. */
+  reply: string;
+}
+
+const REPORT_BLOCK = /^<paseo_started_chat_report>\n([\s\S]*?)\n<\/paseo_started_chat_report>$/gm;
+
+function parseReportBody(body: string): StartedChatReport | null {
+  const chatId = tagged(body, "chat");
+  const outcome = tagged(body, "outcome");
+  const reply = /<reply>\n([\s\S]*)\n<\/reply>/.exec(body)?.[1];
+  if (!chatId || (outcome !== "completed" && outcome !== "failed") || reply === undefined) {
+    return null;
+  }
+  return { chatId, title: tagged(body, "title") ?? "", outcome, reply: reply.trim() };
+}
+
+/**
+ * Reads a note from `plugins/started-chat-report`: one lead line for the model, then one block per
+ * started chat. Anything else around the blocks keeps the message a user bubble.
+ */
+export function parseStartedChatReports(text: string): StartedChatReport[] | null {
+  if (!text.includes("<paseo_started_chat_report>")) return null;
+  const reports: StartedChatReport[] = [];
+  for (const match of text.matchAll(REPORT_BLOCK)) {
+    const report = parseReportBody(match[1]!);
+    if (!report) return null;
+    reports.push(report);
+  }
+  const outside = text.replace(REPORT_BLOCK, "").trim();
+  return reports.length > 0 && !outside.includes("\n") ? reports : null;
+}

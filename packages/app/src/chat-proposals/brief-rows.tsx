@@ -12,7 +12,7 @@ const ChevronDownIcon = withUnistyles(ChevronDown);
 const ChevronRightIcon = withUnistyles(ChevronRight);
 const mutedIcon = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
 
-function BriefSection({
+export function BriefSection({
   label,
   text,
   bordered,

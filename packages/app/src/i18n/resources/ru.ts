@@ -56,6 +56,9 @@ export const ru: TranslationResources = {
     task: "Задача",
     context: "Контекст",
     startedFrom: "Начат из",
+    reportFrom: "Отчёт из",
+    reportFailed: "Ход не удался в",
+    reply: "Ответ",
   },
   desktopChat: {
     handoffs: { toggle: "Предыдущие передачи ({{count}})" },

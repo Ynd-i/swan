@@ -56,6 +56,9 @@ export const ar: TranslationResources = {
     task: "المهمة",
     context: "السياق",
     startedFrom: "بدأت من",
+    reportFrom: "تقرير من",
+    reportFailed: "فشل الدور في",
+    reply: "الرد",
   },
   desktopChat: {
     handoffs: { toggle: "عمليات التسليم السابقة ({{count}})" },

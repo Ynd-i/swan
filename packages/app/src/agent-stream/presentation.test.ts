@@ -655,4 +655,62 @@ describe("chat proposals in the stream presentation", () => {
       { kind: "user_message", text: "Fix it.", startedChat: { task: "Fix it.", context: "Why." } },
     ]);
   });
+
+  describe("report notes from started chats", () => {
+    const report = (chat: string, title: string, outcome: string, reply: string) =>
+      `<paseo_started_chat_report>\n<chat>${chat}</chat>\n<title>${title}</title>\n<outcome>${outcome}</outcome>\n<reply>\n${reply}\n</reply>\n</paseo_started_chat_report>`;
+    const sendNote = (text: string) =>
+      streamHarness().send({
+        type: "timeline",
+        provider: "claude",
+        item: { type: "user_message", messageId: "user-1", text },
+      });
+
+    it("shows every report of one note as its own row", () => {
+      const text = [
+        "Chats started from your proposals ended a turn.",
+        report("chat-1", "Fix login", "completed", "Login fixed.\n\nTests pass."),
+        report("chat-2", "Docs", "failed", ""),
+      ].join("\n");
+      expect(rows(sendNote(text))).toMatchObject([
+        {
+          kind: "user_message",
+          startedChatReports: [
+            {
+              chatId: "chat-1",
+              title: "Fix login",
+              outcome: "completed",
+              reply: "Login fixed.\n\nTests pass.",
+            },
+            { chatId: "chat-2", title: "Docs", outcome: "failed", reply: "" },
+          ],
+        },
+      ]);
+    });
+
+    it("keeps the row of a report whose chat ended its turn without a reply", () => {
+      const text = `Lead.\n${report("chat-1", "Fix login", "completed", "")}`;
+      const presented = sendNote(text);
+      for (const platform of ["web", "native"] as const) {
+        const model = buildAgentStreamRenderModel({
+          tail: presented.tail,
+          head: presented.head,
+          isTurnActive: false,
+          activeTurnStartedAt: null,
+          platform,
+          isMobileBreakpoint: platform === "native",
+        });
+        expect([...model.history, ...model.segments.liveHead]).toContainEqual(
+          expect.objectContaining({ startedChatReports: [expect.objectContaining({ reply: "" })] }),
+        );
+      }
+    });
+
+    it("keeps a message that only quotes a report a user bubble", () => {
+      const text = `What does this mean?\n\nI got it twice:\n${report("chat-1", "Fix login", "completed", "Done.")}`;
+      const [row] = rows(sendNote(text));
+      expect(row).toMatchObject({ kind: "user_message", text });
+      expect(row).not.toHaveProperty("startedChatReports");
+    });
+  });
 });

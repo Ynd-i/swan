@@ -56,6 +56,9 @@ export const ko: TranslationResources = {
     task: "작업",
     context: "컨텍스트",
     startedFrom: "시작한 채팅",
+    reportFrom: "보고한 채팅",
+    reportFailed: "실패한 채팅",
+    reply: "답장",
   },
   desktopChat: {
     handoffs: { toggle: "이전 인계 ({{count}})" },

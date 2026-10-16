@@ -56,6 +56,9 @@ export const zhCN: TranslationResources = {
     task: "任务",
     context: "上下文",
     startedFrom: "启动自",
+    reportFrom: "汇报来自",
+    reportFailed: "失败于",
+    reply: "回复",
   },
   desktopChat: {
     handoffs: { toggle: "更早的交接（{{count}}）" },

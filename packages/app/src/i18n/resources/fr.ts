@@ -56,6 +56,9 @@ export const fr: TranslationResources = {
     task: "Tâche",
     context: "Contexte",
     startedFrom: "Démarré depuis",
+    reportFrom: "Rapport de",
+    reportFailed: "Tour échoué dans",
+    reply: "Réponse",
   },
   desktopChat: {
     handoffs: { toggle: "Passations précédentes ({{count}})" },

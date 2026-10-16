@@ -56,6 +56,9 @@ export const ja: TranslationResources = {
     task: "タスク",
     context: "コンテキスト",
     startedFrom: "開始元",
+    reportFrom: "報告元",
+    reportFailed: "失敗したチャット",
+    reply: "返信",
   },
   desktopChat: {
     handoffs: { toggle: "以前の引き継ぎ（{{count}}）" },

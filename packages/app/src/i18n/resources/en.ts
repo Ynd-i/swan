@@ -53,6 +53,9 @@ export const en = {
     task: "Task",
     context: "Context",
     startedFrom: "Started from",
+    reportFrom: "Report from",
+    reportFailed: "Turn failed in",
+    reply: "Reply",
   },
   desktopChat: {
     handoffs: { toggle: "Earlier handoffs ({{count}})" },
