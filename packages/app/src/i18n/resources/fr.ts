@@ -47,6 +47,16 @@ export const fr: TranslationResources = {
     problemRunToRefresh: "Exécutez {{command}} pour l’actualiser.",
     problemSignInAgain: "Reconnectez-vous.",
   },
+  chatProposals: {
+    suggested: "Chat suggéré",
+    start: "Démarrer",
+    startFailed: "Impossible de démarrer : {{error}}",
+    open: "Ouvrir {{title}}",
+    archived: "Archivé",
+    task: "Tâche",
+    context: "Contexte",
+    startedFrom: "Démarré depuis",
+  },
   desktopChat: {
     handoffs: { toggle: "Passations précédentes ({{count}})" },
     activity: "Activité",

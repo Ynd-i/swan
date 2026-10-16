@@ -47,6 +47,16 @@ export const es: TranslationResources = {
     problemRunToRefresh: "Ejecuta {{command}} para actualizarlo.",
     problemSignInAgain: "Vuelve a iniciar sesión.",
   },
+  chatProposals: {
+    suggested: "Chat sugerido",
+    start: "Iniciar",
+    startFailed: "No se pudo iniciar: {{error}}",
+    open: "Abrir {{title}}",
+    archived: "Archivado",
+    task: "Tarea",
+    context: "Contexto",
+    startedFrom: "Iniciado desde",
+  },
   desktopChat: {
     handoffs: { toggle: "Traspasos anteriores ({{count}})" },
     activity: "Actividad",

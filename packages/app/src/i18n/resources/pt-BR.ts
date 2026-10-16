@@ -47,6 +47,16 @@ export const ptBR: TranslationResources = {
     problemRunToRefresh: "Execute {{command}} para atualizá-lo.",
     problemSignInAgain: "Entre novamente.",
   },
+  chatProposals: {
+    suggested: "Chat sugerido",
+    start: "Iniciar",
+    startFailed: "Não foi possível iniciar: {{error}}",
+    open: "Abrir {{title}}",
+    archived: "Arquivado",
+    task: "Tarefa",
+    context: "Contexto",
+    startedFrom: "Iniciado a partir de",
+  },
   desktopChat: {
     handoffs: { toggle: "Transferências anteriores ({{count}})" },
     activity: "Atividade",

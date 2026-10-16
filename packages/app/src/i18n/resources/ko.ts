@@ -47,6 +47,16 @@ export const ko: TranslationResources = {
     problemRunToRefresh: "{{command}}을(를) 실행해 갱신하세요.",
     problemSignInAgain: "다시 로그인하세요.",
   },
+  chatProposals: {
+    suggested: "제안된 채팅",
+    start: "시작",
+    startFailed: "시작할 수 없음: {{error}}",
+    open: "{{title}} 열기",
+    archived: "보관됨",
+    task: "작업",
+    context: "컨텍스트",
+    startedFrom: "시작한 채팅",
+  },
   desktopChat: {
     handoffs: { toggle: "이전 인계 ({{count}})" },
     activity: "활동",

@@ -47,6 +47,16 @@ export const ar: TranslationResources = {
     problemRunToRefresh: "شغّل {{command}} لتحديثه.",
     problemSignInAgain: "سجّل الدخول مرة أخرى.",
   },
+  chatProposals: {
+    suggested: "محادثة مقترحة",
+    start: "بدء",
+    startFailed: "تعذّر البدء: {{error}}",
+    open: "فتح {{title}}",
+    archived: "مؤرشف",
+    task: "المهمة",
+    context: "السياق",
+    startedFrom: "بدأت من",
+  },
   desktopChat: {
     handoffs: { toggle: "عمليات التسليم السابقة ({{count}})" },
     activity: "النشاط",

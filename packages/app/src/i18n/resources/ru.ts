@@ -47,6 +47,16 @@ export const ru: TranslationResources = {
     problemRunToRefresh: "Выполните {{command}}, чтобы обновить его.",
     problemSignInAgain: "Войдите снова.",
   },
+  chatProposals: {
+    suggested: "Предложенный чат",
+    start: "Начать",
+    startFailed: "Не удалось начать: {{error}}",
+    open: "Открыть {{title}}",
+    archived: "В архиве",
+    task: "Задача",
+    context: "Контекст",
+    startedFrom: "Начат из",
+  },
   desktopChat: {
     handoffs: { toggle: "Предыдущие передачи ({{count}})" },
     activity: "Действия",

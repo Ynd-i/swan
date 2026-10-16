@@ -44,6 +44,16 @@ export const en = {
     problemRunToRefresh: "Run {{command}} to refresh it.",
     problemSignInAgain: "Sign in again.",
   },
+  chatProposals: {
+    suggested: "Suggested chat",
+    start: "Start",
+    startFailed: "Couldn't start: {{error}}",
+    open: "Open {{title}}",
+    archived: "Archived",
+    task: "Task",
+    context: "Context",
+    startedFrom: "Started from",
+  },
   desktopChat: {
     handoffs: { toggle: "Earlier handoffs ({{count}})" },
     activity: "Activity",

@@ -596,3 +596,63 @@ describe("timeline presentation", () => {
     expect(projectTimelineItems([source], () => [])).toEqual([]);
   });
 });
+
+describe("chat proposals in the stream presentation", () => {
+  const proposal =
+    "<paseo_chat_proposal>\n<title>Fix the gate</title>\n<task>\nGate tools/list.\n\nAdd a test.\n</task>\n</paseo_chat_proposal>";
+
+  it("streams a proposal as cards on the message's last block, never as raw tags", () => {
+    const harness = streamHarness();
+    harness.send(assistant("Root cause found.\n\n"));
+    const partial = harness.send(assistant(proposal.slice(0, 40)));
+    expect(
+      rows(partial).map((item) => (item.kind === "assistant_message" ? item.text : "")),
+    ).toEqual(["Root cause found."]);
+    const closed = harness.send(assistant(`${proposal.slice(40)}\n\nKept the docs here.`));
+    const live = rows(closed).filter((item) => item.kind === "assistant_message");
+    expect(live.map((item) => item.text)).toEqual(["Root cause found.", "Kept the docs here."]);
+    expect(live[0]).not.toHaveProperty("proposals");
+    const card = { title: "Fix the gate", task: "Gate tools/list.\n\nAdd a test.", context: null };
+    expect(live[1]).toMatchObject({ proposals: [card] });
+    const completed = harness.send({ type: "turn_completed", provider: "claude" });
+    expect(completed.tail.at(-1)).toMatchObject({ text: "Kept the docs here.", proposals: [card] });
+    expect(rows(harness.source())[0]).toMatchObject({ text: expect.stringContaining(proposal) });
+  });
+
+  it("keeps the row of a reply that is only a proposal, so its card renders", () => {
+    const harness = streamHarness();
+    harness.send(assistant(proposal));
+    const completed = harness.send({ type: "turn_completed", provider: "claude" });
+    const card = { title: "Fix the gate", task: "Gate tools/list.\n\nAdd a test.", context: null };
+    expect(completed.tail).toMatchObject([
+      { kind: "assistant_message", text: "", proposals: [card] },
+    ]);
+    for (const platform of ["web", "native"] as const) {
+      const model = buildAgentStreamRenderModel({
+        tail: completed.tail,
+        head: completed.head,
+        isTurnActive: false,
+        activeTurnStartedAt: null,
+        platform,
+        isMobileBreakpoint: platform === "native",
+      });
+      expect([...model.history, ...model.segments.liveHead]).toContainEqual(
+        expect.objectContaining({ proposals: [card] }),
+      );
+    }
+  });
+
+  it("shows a started chat's first prompt as its brief", () => {
+    const harness = streamHarness();
+    const text =
+      "<paseo_started_chat>\n<task>\nFix it.\n</task>\n<context>\nWhy.\n</context>\n</paseo_started_chat>";
+    const result = harness.send({
+      type: "timeline",
+      provider: "claude",
+      item: { type: "user_message", messageId: "user-1", text },
+    });
+    expect(rows(result)).toMatchObject([
+      { kind: "user_message", text: "Fix it.", startedChat: { task: "Fix it.", context: "Why." } },
+    ]);
+  });
+});
