@@ -67,6 +67,13 @@ export function createMarkdownStyles(theme: Theme) {
       overflowWrap: "anywhere" as const,
     },
 
+    // A paragraph's text run is a flex item; without this, one unbreakable inline
+    // (a truncating pull request chip) widens it past the message column.
+    textgroup: {
+      flexShrink: 1,
+      minWidth: 0,
+    },
+
     paragraph,
     paragraphWithoutBottomMargin: { ...paragraph, marginBottom: 0 },
 

@@ -26,7 +26,7 @@ export async function runAgentDeepLinksRegression({
     return { name: app.getName(), packaged: app.isPackaged, userData: app.getPath('userData'), windows: BrowserWindow.getAllWindows().map(win => win.webContents.id) };
   })()`);
   const initial = await appState();
-  expect(initial.name).toBe("Paseo Custom");
+  expect(initial.name).toBe("Swan");
   expect(initial.packaged).toBe(true);
   expect(initial.userData).toBe(userData);
   expect(initial.windows).toHaveLength(1);
@@ -84,8 +84,13 @@ export async function runAgentDeepLinksRegression({
   await expect(composer).toHaveValue(draft);
 
   await page.getByTestId("workspace-explorer-toggle").click();
-  await expect(page.getByTestId("explorer-sidebar-tab-files")).toHaveCSS("height", "32px");
-  await page.getByTestId("explorer-sidebar-tab-files").click();
+  await page
+    .getByTestId("workspace-explorer-sidebar")
+    .getByTestId("workspace-new-tab-files")
+    .click();
+  // A tab launched from the launcher keeps the launcher's id, so find Files by its label.
+  const filesTab = page.getByRole("button", { name: "Browse workspace files", exact: true });
+  await expect(filesTab).toHaveCSS("height", "32px");
   const files = page.getByTestId("workspace-explorer-sidebar");
   await expect(files.getByTestId("file-tool-toolbar").filter({ visible: true })).toBeVisible();
   await expect(files.getByTestId("files-empty-editor").filter({ visible: true })).toBeVisible();
@@ -114,7 +119,7 @@ export async function runAgentDeepLinksRegression({
   if (!closeBrowserId) throw new Error("New browser tab has no UI identity");
   await page.getByTestId(closeBrowserId).click();
   await expect(address).toHaveCount(0);
-  await page.getByTestId("explorer-sidebar-tab-files").click();
+  await filesTab.click();
   await expect(files.getByTestId("files-empty-editor").filter({ visible: true })).toBeVisible();
   await page.evaluate(async () => {
     window.__agentLinkEvents = [];

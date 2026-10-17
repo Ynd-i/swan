@@ -1,4 +1,7 @@
-import { getParentAgentIdFromLabels } from "@getpaseo/protocol/agent-labels";
+import {
+  getParentAgentIdFromLabels,
+  HANDOFF_FROM_AGENT_ID_LABEL,
+} from "@getpaseo/protocol/agent-labels";
 import type { AggregatedAgent } from "@/hooks/use-aggregated-agents";
 import type {
   SidebarProjectEntry,
@@ -40,6 +43,52 @@ export interface DesktopChatProject {
   emptyWorkspaces: SidebarWorkspacePlacement[];
 }
 
+/** The earlier chats an auto handoff continued, keyed by the chat that continues them. */
+export type HandoffChains = ReadonlyMap<string, AggregatedAgent[]>;
+
+/**
+ * Folds auto-handoff chains: the newest visible chat of a chain is its head, and the earlier
+ * visible ones nest under it, newest first. Archived links are walked through, not shown.
+ * `visible` is newest first, so a source handed off twice belongs to its newest successor.
+ */
+function foldHandoffChains(
+  visible: readonly AggregatedAgent[],
+  agentByKey: ReadonlyMap<string, AggregatedAgent>,
+): { heads: AggregatedAgent[]; chains: Map<string, AggregatedAgent[]> } {
+  const visibleKeys = new Set(visible.map(desktopChatKey));
+  const claimed = new Set<string>();
+  const chains = new Map<string, AggregatedAgent[]>();
+  for (const agent of visible) {
+    const head = desktopChatKey(agent);
+    if (claimed.has(head)) continue;
+    const chain: AggregatedAgent[] = [];
+    const seen = new Set([head]);
+    let sourceId = agent.labels[HANDOFF_FROM_AGENT_ID_LABEL];
+    while (sourceId) {
+      const key = `${agent.serverId}:${sourceId}`;
+      const source = agentByKey.get(key);
+      if (!source || seen.has(key)) break;
+      seen.add(key);
+      if (visibleKeys.has(key) && !claimed.has(key)) {
+        claimed.add(key);
+        chain.push(source);
+      }
+      sourceId = source.labels[HANDOFF_FROM_AGENT_ID_LABEL];
+    }
+    if (chain.length > 0) chains.set(head, chain);
+  }
+  return { heads: visible.filter((agent) => !claimed.has(desktopChatKey(agent))), chains };
+}
+
+/** A chain is pinned while any of its chats is, so a handoff keeps the chat in Pinned. */
+export function chainPinnedAt(
+  agent: Pick<AggregatedAgent, "labels">,
+  chain: readonly Pick<AggregatedAgent, "labels">[] = [],
+): number | null {
+  const pins = [agent, ...chain].flatMap((member) => desktopChatPinnedAt(member) ?? []);
+  return pins.length > 0 ? Math.max(...pins) : null;
+}
+
 export function buildDesktopChatSidebar({
   projects,
   agents,
@@ -50,6 +99,7 @@ export function buildDesktopChatSidebar({
   projects: DesktopChatProject[];
   pinned: AggregatedAgent[];
   recent: AggregatedAgent[];
+  handoffs: HandoffChains;
 } {
   const projectByWorkspace = new Map<string, string>();
   for (const project of projects) {
@@ -74,9 +124,12 @@ export function buildDesktopChatSidebar({
         right.lastActivityAt.getTime() - left.lastActivityAt.getTime() ||
         desktopChatKey(left).localeCompare(desktopChatKey(right)),
     );
+  const { heads, chains } = foldHandoffChains(visible, agentByKey);
+  const pinnedAt = (agent: AggregatedAgent) =>
+    chainPinnedAt(agent, chains.get(desktopChatKey(agent)));
   const chatsByProject = new Map<string, AggregatedAgent[]>();
   const workspacesWithChats = new Set<string>();
-  for (const agent of visible) {
+  for (const agent of heads) {
     const workspaceKey = `${agent.serverId}:${agent.workspaceId}`;
     const projectKey = projectByWorkspace.get(workspaceKey)!;
     const chats = chatsByProject.get(projectKey) ?? [];
@@ -88,17 +141,26 @@ export function buildDesktopChatSidebar({
     // A chat without a project lives in a chat folder project; it shows in Recent only.
     projects: projects
       .filter((project) => !isChatFolderPath(project.iconWorkingDir))
-      .map((project) => ({
-        project,
-        chats: chatsByProject.get(project.viewKey) ?? [],
-        emptyWorkspaces: project.workspaces.filter(
-          (workspace) => !workspacesWithChats.has(workspace.workspaceKey),
-        ),
-      })),
-    pinned: visible
-      .filter((agent) => desktopChatPinnedAt(agent) !== null)
-      .sort((left, right) => desktopChatPinnedAt(right)! - desktopChatPinnedAt(left)!),
-    recent: visible.filter((agent) => desktopChatPinnedAt(agent) === null),
+      .map((project) => {
+        const chats = chatsByProject.get(project.viewKey) ?? [];
+        return {
+          project,
+          chats,
+          // A project without chats keeps its last workspace only so the daemon keeps the project
+          // (see selectEmptiedWorkspaces); its row would repeat the header. Worktrees stay listed
+          // because they can hold uncommitted work.
+          emptyWorkspaces: project.workspaces.filter(
+            (workspace) =>
+              !workspacesWithChats.has(workspace.workspaceKey) &&
+              (chats.length > 0 || workspace.workspaceKind === "worktree"),
+          ),
+        };
+      }),
+    pinned: heads
+      .filter((agent) => pinnedAt(agent) !== null)
+      .sort((left, right) => pinnedAt(right)! - pinnedAt(left)!),
+    recent: heads.filter((agent) => pinnedAt(agent) === null),
+    handoffs: chains,
   };
 }
 
@@ -159,7 +221,7 @@ export interface CustomChatSection {
 /**
  * Moves pinned projects to Pinned, then chats and projects assigned to a custom section out of
  * Recent and Projects. Pinned chats stay pinned, and an assignment to a section that no longer
- * exists is ignored.
+ * exists is ignored. A handoff chat without its own assignment follows its chain's.
  */
 export function partitionChatSections({
   recent,
@@ -168,6 +230,7 @@ export function partitionChatSections({
   chatSection,
   projectSection,
   pinnedProjects,
+  handoffs = new Map(),
 }: {
   recent: AggregatedAgent[];
   projects: DesktopChatProject[];
@@ -175,6 +238,7 @@ export function partitionChatSections({
   chatSection: Readonly<Record<string, string>>;
   projectSection: Readonly<Record<string, string>>;
   pinnedProjects: readonly string[];
+  handoffs?: HandoffChains;
 }): {
   recent: AggregatedAgent[];
   projects: DesktopChatProject[];
@@ -186,7 +250,11 @@ export function partitionChatSections({
   );
   const remainingRecent: AggregatedAgent[] = [];
   for (const agent of recent) {
-    const section = custom.get(chatSection[desktopChatKey(agent)] ?? "");
+    const key = desktopChatKey(agent);
+    const sectionId = [key, ...(handoffs.get(key) ?? []).map(desktopChatKey)]
+      .map((member) => chatSection[member])
+      .find((id) => id !== undefined);
+    const section = custom.get(sectionId ?? "");
     if (section) section.chats.push(agent);
     else remainingRecent.push(agent);
   }

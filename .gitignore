@@ -95,3 +95,6 @@ app.json
 *.heapsnapshot
 /codex-extracted/
 /context-images/
+
+# Project-local Serena configuration and memories.
+.serena/

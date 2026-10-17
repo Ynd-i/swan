@@ -96,7 +96,11 @@ import {
   registerExternalQuitSignals,
   stopDesktopManagedDaemonOnQuitIfNeeded,
 } from "./daemon/quit-lifecycle.js";
-import { configureDesktopDaemonEnvironment, runDesktopStartup } from "./desktop-startup.js";
+import {
+  configureDesktopDaemonEnvironment,
+  resolveCustomUserDataPath,
+  runDesktopStartup,
+} from "./desktop-startup.js";
 import { registerBrowserAutomationIpc } from "./features/browser-automation/ipc.js";
 import { BrowserKeyboard } from "./features/browser-keyboard/index.js";
 import { installAppUpdateOnQuit } from "./features/auto-updater.js";
@@ -303,9 +307,16 @@ function installBrowserWindowOpenHandler(input: {
 // Electron windows can run side-by-side (separate userData = separate lock).
 let devWorktreeName: string | null = null;
 const forcedUserDataDir = process.env.PASEO_ELECTRON_USER_DATA_DIR?.trim();
+const customUserDataPath = resolveCustomUserDataPath({
+  isPackaged: app.isPackaged,
+  appName: APP_NAME,
+  appDataPath: app.getPath("appData"),
+});
 if (forcedUserDataDir) {
   app.setPath("userData", forcedUserDataDir);
   log.info("[dev-user-data] forced userData dir:", forcedUserDataDir);
+} else if (customUserDataPath) {
+  app.setPath("userData", customUserDataPath);
 } else if (!app.isPackaged) {
   try {
     const topLevel = execFileSync("git", ["rev-parse", "--show-toplevel"], {

@@ -85,12 +85,14 @@ export async function ensureExplorerSidebar(page: Page): Promise<Locator> {
 /** Reveals the Explorer sidebar and selects one of its fixed navigation views. */
 async function openExplorerView(
   page: Page,
-  view: { tabTestId: string; contentTestId: string; timeout?: number },
+  view: { tabTestId: string; launcherTestId: string; contentTestId: string; timeout?: number },
 ): Promise<void> {
-  await ensureExplorerSidebar(page);
+  const explorer = await ensureExplorerSidebar(page);
   // macOS hosts this rail in the window titlebar; other platforms keep it in the dock.
-  const tab = page.getByTestId(view.tabTestId).filter({ visible: true }).first();
-  await tab.click();
+  const tab = page.getByTestId(view.tabTestId).filter({ visible: true });
+  // The macOS Explorer starts on the New Tab launcher instead of Files and Changes.
+  const launcherItem = explorer.getByTestId(view.launcherTestId);
+  await tab.or(launcherItem).first().click();
   await expect(visibleTestId(page, view.contentTestId).first()).toBeVisible({
     timeout: view.timeout ?? 30_000,
   });
@@ -99,6 +101,7 @@ async function openExplorerView(
 export async function openChangesTreePanel(page: Page): Promise<void> {
   await openExplorerView(page, {
     tabTestId: "workspace-tab-changes_tree",
+    launcherTestId: "workspace-new-tab-changes",
     contentTestId: "changes-tree-panel",
   });
 }
@@ -119,6 +122,7 @@ export async function openChangesPanel(page: Page, timeout = 30_000): Promise<vo
 export async function openFilesPanel(page: Page): Promise<void> {
   await openExplorerView(page, {
     tabTestId: "workspace-tab-files",
+    launcherTestId: "workspace-new-tab-files",
     contentTestId: "file-explorer-tree-scroll",
   });
 }

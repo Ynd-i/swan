@@ -1,10 +1,11 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AgentFeature, AgentMode } from "@getpaseo/protocol/agent-types";
+import * as platform from "@/constants/platform";
 import {
   adoptDraftBaseMode,
   DRAFT_PLAN_OWNER,
-  filterDesktopAgentModes,
   getDisplayedModeId,
+  getSelectableAgentModes,
   isPlanningAgentMode,
   rememberBaseMode,
   resolveNonPlanningModeId,
@@ -55,22 +56,22 @@ const CLAUDE_MODES = [
   { id: "bypassPermissions", label: "Bypass" },
 ] satisfies AgentMode[];
 
-describe("filterDesktopAgentModes", () => {
-  it("hides planning modes and Claude acceptEdits", () => {
-    expect(filterDesktopAgentModes(CLAUDE_MODES, "claude").map((mode) => mode.id)).toEqual([
-      "default",
-      "auto",
-      "bypassPermissions",
-    ]);
-  });
+describe("getSelectableAgentModes", () => {
+  afterEach(() => vi.restoreAllMocks());
 
-  it("keeps other providers' non-planning modes", () => {
-    expect(filterDesktopAgentModes(CLAUDE_MODES, "opencode").map((mode) => mode.id)).toEqual([
+  it("lists every non-planning provider mode on the Mac desktop", () => {
+    vi.spyOn(platform, "getIsElectronMac").mockReturnValue(true);
+    expect(getSelectableAgentModes(CLAUDE_MODES).map((mode) => mode.id)).toEqual([
       "default",
       "acceptEdits",
       "auto",
       "bypassPermissions",
     ]);
+  });
+
+  it("keeps planning modes elsewhere", () => {
+    vi.spyOn(platform, "getIsElectronMac").mockReturnValue(false);
+    expect(getSelectableAgentModes(CLAUDE_MODES)).toEqual(CLAUDE_MODES);
   });
 });
 

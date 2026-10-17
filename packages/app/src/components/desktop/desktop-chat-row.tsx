@@ -1,5 +1,5 @@
-import { memo, useCallback, useMemo, useState, type Ref } from "react";
-import { Archive, Pin, PinOff } from "lucide-react-native";
+import { createContext, memo, useCallback, useContext, useMemo, useState, type Ref } from "react";
+import { Archive, ChevronDown, ChevronRight, Pin, PinOff } from "lucide-react-native";
 import { Pressable, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
@@ -11,7 +11,7 @@ import type { AggregatedAgent } from "@/hooks/use-aggregated-agents";
 import type { Theme } from "@/styles/theme";
 import { navigateToAgent } from "@/utils/navigate-to-agent";
 import { deriveSidebarStateBucket } from "@/utils/sidebar-agent-state";
-import { desktopChatKey } from "./desktop-chat-model";
+import { desktopChatKey, type HandoffChains } from "./desktop-chat-model";
 import { DesktopChatMenuItems, useChatForkPage, useDesktopChatMenu } from "./desktop-chat-menu";
 import { useSectionMovePage } from "./desktop-chat-section-menus";
 import { useChatSectionsStore } from "./desktop-chat-sections-store";
@@ -21,16 +21,52 @@ import { DesktopSidebarTitle } from "./desktop-sidebar-title";
 const ArchiveIcon = withUnistyles(Archive);
 const PinIcon = withUnistyles(Pin);
 const UnpinIcon = withUnistyles(PinOff);
+const ChevronDownIcon = withUnistyles(ChevronDown);
+const ChevronRightIcon = withUnistyles(ChevronRight);
 const Progress = withUnistyles(DesktopProgressRing);
 const mutedIcon = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
+
+/** Auto-handoff chains of the sidebar, so a chat row can nest the chats it continues. */
+export const HandoffChainsContext = createContext<HandoffChains>(new Map());
 // The width each row action covers at the right edge of the title.
 // ponytail: the md+ button width; below 720pt buttons grow to 32 and the fade stops short. Measure
 // the actions if the compact sidebar matters.
 const ACTION_WIDTH = 26;
 
-/** Pin and archive over the title's right edge, so the title spans the row. */
+function ChatRowStatus({
+  agent,
+  status,
+  running,
+  unread,
+}: {
+  agent: AggregatedAgent;
+  status: string;
+  running: boolean;
+  unread: boolean;
+}) {
+  return (
+    <View style={styles.statusSlot}>
+      {running ? (
+        <Progress uniProps={mutedIcon} />
+      ) : (
+        <AgentStatusDot
+          status={status}
+          requiresAttention={unread}
+          attentionReason={agent.attentionReason}
+          pendingPermissionCount={agent.pendingPermissionCount}
+        />
+      )}
+    </View>
+  );
+}
+
+/**
+ * Pin and archive over the title's right edge, so the title spans the row. A nested chat of a
+ * handoff chain shows only its status: its chain is pinned and archived from the head row.
+ */
 function ChatRowActions({
   agent,
+  nested,
   chatKey,
   status,
   running,
@@ -44,6 +80,7 @@ function ChatRowActions({
   onBlur,
 }: {
   agent: AggregatedAgent;
+  nested: boolean | undefined;
   chatKey: string;
   status: string;
   running: boolean;
@@ -60,6 +97,16 @@ function ChatRowActions({
   const pinLabel = t(pinned ? "sidebar.workspace.actions.unpin" : "sidebar.workspace.actions.pin");
   const archiveLabel = t("agentList.archiveSheet.archive");
   const actionStyle = revealed ? undefined : styles.actionHidden;
+  const statusDot = (
+    <ChatRowStatus agent={agent} status={status} running={running} unread={unread} />
+  );
+  if (nested) {
+    return (
+      <View style={styles.actions}>
+        <View style={styles.statusOnly}>{statusDot}</View>
+      </View>
+    );
+  }
   return (
     <View style={styles.actions}>
       <HeaderToggleButton
@@ -98,45 +145,129 @@ function ChatRowActions({
           <ArchiveIcon size={16} uniProps={mutedIcon} />
         </HeaderToggleButton>
         {/* Shares the archive slot: hovering swaps the status for the row actions. */}
-        {revealed ? null : (
-          <View style={styles.statusSlot}>
-            {running ? (
-              <Progress uniProps={mutedIcon} />
-            ) : (
-              <AgentStatusDot
-                status={status}
-                requiresAttention={unread}
-                attentionReason={agent.attentionReason}
-                pendingPermissionCount={agent.pendingPermissionCount}
-              />
-            )}
-          </View>
-        )}
+        {revealed ? null : statusDot}
       </View>
     </View>
   );
+}
+
+/** The width the title keeps clear at the right edge: both actions, else the status. */
+function titleReserve(input: { showActions: boolean; busy: boolean; bucket: string }): number {
+  if (input.showActions) return 2 * ACTION_WIDTH;
+  // Done rows show no status, so their title runs to the row's edge.
+  return input.busy || input.bucket !== "done" ? ACTION_WIDTH : 0;
+}
+
+/** A collapsed chain shows its selected earlier chat on the head row. */
+function isChainSelected(input: {
+  key: string;
+  handoffs: readonly AggregatedAgent[] | undefined;
+  selectedKey: string | null;
+  open: boolean;
+}): boolean {
+  if (input.selectedKey === input.key) return true;
+  if (input.open || !input.handoffs) return false;
+  return input.handoffs.some((handoff) => desktopChatKey(handoff) === input.selectedKey);
+}
+
+/** A chain moves between sections as one chat. */
+function useChainSection(key: string, handoffs: readonly AggregatedAgent[] | undefined) {
+  const memberKeys = useMemo(() => [key, ...(handoffs ?? []).map(desktopChatKey)], [handoffs, key]);
+  const section = useChatSectionsStore((state) =>
+    memberKeys.map((member) => state.chatSection[member]).find((id) => id !== undefined),
+  );
+  const moveChat = useChatSectionsStore((state) => state.moveChat);
+  const move = useCallback(
+    (sectionId: string | null) => {
+      for (const member of memberKeys) moveChat(member, sectionId);
+    },
+    [memberKeys, moveChat],
+  );
+  return { section, move };
+}
+
+/** The chevron of a chat that continues earlier ones; nothing for any other chat. */
+function HandoffToggle({
+  chatKey,
+  handoffs,
+  open,
+  onToggle,
+}: {
+  chatKey: string;
+  handoffs: readonly AggregatedAgent[] | undefined;
+  open: boolean;
+  onToggle: () => void;
+}) {
+  const { t } = useTranslation();
+  const accessibilityState = useMemo(() => ({ expanded: open }), [open]);
+  if (!handoffs) return null;
+  return (
+    <Pressable
+      onPress={onToggle}
+      hitSlop={4}
+      style={styles.handoffToggle}
+      accessibilityRole="button"
+      accessibilityLabel={t("desktopChat.handoffs.toggle", { count: handoffs.length })}
+      accessibilityState={accessibilityState}
+      testID={`desktop-chat-handoffs-${chatKey}`}
+    >
+      {open ? (
+        <ChevronDownIcon size={14} uniProps={mutedIcon} />
+      ) : (
+        <ChevronRightIcon size={14} uniProps={mutedIcon} />
+      )}
+    </Pressable>
+  );
+}
+
+/** The earlier chats of a chain, newest first, greyed one level deeper. */
+function HandoffRows({
+  handoffs = [],
+  open,
+  selectedKey,
+  indented,
+}: {
+  handoffs?: readonly AggregatedAgent[];
+  open: boolean;
+  selectedKey: string | null;
+  indented: boolean;
+}) {
+  if (!open) return null;
+  return handoffs.map((handoff) => (
+    <ChatRow
+      key={desktopChatKey(handoff)}
+      agent={handoff}
+      selectedKey={selectedKey}
+      indented={indented}
+      superseded
+    />
+  ));
 }
 
 export const ChatRow = memo(function ChatRow({
   agent,
   selectedKey,
   indented = false,
+  superseded,
   dragHandleProps,
 }: {
   agent: AggregatedAgent;
   selectedKey: string | null;
   indented?: boolean;
+  /** An earlier chat of a handoff chain, nested and greyed under the chat that continues it. */
+  superseded?: boolean;
   dragHandleProps?: DraggableListDragHandleProps;
 }) {
   const { t } = useTranslation();
-  const { busy, unread, markRead, menuProps, renameModal } = useDesktopChatMenu(agent);
+  const key = desktopChatKey(agent);
+  const handoffs = useContext(HandoffChainsContext).get(key);
+  const { busy, unread, markRead, menuProps, renameModal } = useDesktopChatMenu(agent, handoffs);
   const [hovered, setHovered] = useState(false);
   const [contextOpen, setContextOpen] = useState(false);
-  const key = desktopChatKey(agent);
-  const selected = selectedKey === key;
-  const section = useChatSectionsStore((state) => state.chatSection[key]);
-  const moveChat = useChatSectionsStore((state) => state.moveChat);
-  const move = useCallback((sectionId: string | null) => moveChat(key, sectionId), [key, moveChat]);
+  const [handoffsOpen, setHandoffsOpen] = useState(false);
+  const selected = isChainSelected({ key, handoffs, selectedKey, open: handoffsOpen });
+  const { section, move } = useChainSection(key, handoffs);
+  const toggleHandoffs = useCallback(() => setHandoffsOpen((open) => !open), []);
   const sectionPage = useSectionMovePage(`chat-section-${key}`, section, move);
   const forkPage = useChatForkPage(agent);
   const pages = useMemo(
@@ -153,9 +284,8 @@ export const ChatRow = memo(function ChatRow({
     pendingPermissionCount: agent.pendingPermissionCount,
   });
   const running = bucket === "running";
-  // Done rows show no status, so their title runs to the row's edge.
-  const statusWidth = busy || bucket !== "done" ? ACTION_WIDTH : 0;
-  const reserve = revealed ? 2 * ACTION_WIDTH : statusWidth;
+  const showActions = revealed && !superseded;
+  const reserve = titleReserve({ showActions, busy, bucket });
   const enter = useCallback(() => setHovered(true), []);
   const leave = useCallback(() => setHovered(false), []);
   const open = useCallback(() => {
@@ -190,10 +320,17 @@ export const ChatRow = memo(function ChatRow({
             style={[
               styles.chatRow,
               indented && styles.indented,
+              superseded && styles.superseded,
               revealed && styles.rowHovered,
               selected && styles.rowSelected,
             ]}
           >
+            <HandoffToggle
+              chatKey={key}
+              handoffs={handoffs}
+              open={handoffsOpen}
+              onToggle={toggleHandoffs}
+            />
             <Pressable
               onPress={open}
               disabled={busy}
@@ -205,20 +342,25 @@ export const ChatRow = memo(function ChatRow({
             >
               <DesktopSidebarTitle
                 title={title}
-                style={[styles.chatTitle, unread && styles.unreadTitle]}
+                style={[
+                  styles.chatTitle,
+                  unread && styles.unreadTitle,
+                  superseded && styles.supersededTitle,
+                ]}
                 reserve={reserve}
                 scrolling={revealed}
               />
             </Pressable>
             <ChatRowActions
               agent={agent}
+              nested={superseded}
               chatKey={key}
               status={status}
               running={busy || running}
               unread={unread}
               busy={busy}
               pinned={menuProps.pinned}
-              revealed={revealed}
+              revealed={showActions}
               onPin={menuProps.onPin}
               onArchive={menuProps.onArchive}
               onFocus={enter}
@@ -230,11 +372,18 @@ export const ChatRow = memo(function ChatRow({
           <DesktopChatMenuItems
             {...menuProps}
             context
+            nested={superseded}
             sectionPage={sectionPage.id}
             forkPage={forkPage?.id}
           />
         </ContextMenuContent>
       </ContextMenu>
+      <HandoffRows
+        handoffs={handoffs}
+        open={handoffsOpen}
+        selectedKey={selectedKey}
+        indented={indented}
+      />
       {renameModal}
     </>
   );
@@ -250,6 +399,17 @@ const styles = StyleSheet.create((theme) => ({
     paddingRight: 4,
   },
   indented: { paddingLeft: 32 },
+  // Nested one chevron deeper than the chat that continues it.
+  superseded: { marginLeft: 22 },
+  supersededTitle: { color: theme.colors.foregroundMuted },
+  handoffToggle: {
+    width: 16,
+    height: 32,
+    marginLeft: -4,
+    marginRight: 2,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   rowHovered: { backgroundColor: theme.colors.surfaceSidebarHover },
   rowSelected: { backgroundColor: theme.colors.surfaceSidebarSelected },
   chatButton: {
@@ -275,6 +435,7 @@ const styles = StyleSheet.create((theme) => ({
     alignItems: "center",
   },
   actionHidden: { opacity: 0 },
+  statusOnly: { width: ACTION_WIDTH, height: ACTION_WIDTH },
   statusSlot: {
     position: "absolute",
     top: 0,

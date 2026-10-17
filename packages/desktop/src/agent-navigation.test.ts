@@ -3,8 +3,8 @@ import { AgentNavigationInbox, parseAgentDeepLinkFromArgv } from "./agent-naviga
 
 describe("desktop agent navigation", () => {
   it("accepts the custom agent scheme only for the custom desktop identity", () => {
-    const args = ["Paseo Custom", "paseo-custom://h/server%2Fmain/agent/agent%20123"];
-    expect(parseAgentDeepLinkFromArgv(args, "Paseo Custom")).toEqual({
+    const args = ["Swan", "paseo-custom://h/server%2Fmain/agent/agent%20123"];
+    expect(parseAgentDeepLinkFromArgv(args, "Swan")).toEqual({
       serverId: "server/main",
       agentId: "agent 123",
     });
@@ -14,7 +14,7 @@ describe("desktop agent navigation", () => {
   });
 
   it("preserves canonical agent links in official and custom launches", () => {
-    for (const appName of ["Paseo", "Paseo Custom"]) {
+    for (const appName of ["Paseo", "Swan"]) {
       expect(parseAgentDeepLinkFromArgv(["paseo://h/server-1/agent/agent-2"], appName)).toEqual({
         serverId: "server-1",
         agentId: "agent-2",
@@ -34,7 +34,7 @@ describe("desktop agent navigation", () => {
     "https://h/server/agent/agent-1",
     "paseo-custom-other://h/server/agent/agent-1",
   ])("rejects invalid or unrelated custom links: %s", (url) => {
-    expect(parseAgentDeepLinkFromArgv([url], "Paseo Custom")).toBeNull();
+    expect(parseAgentDeepLinkFromArgv([url], "Swan")).toBeNull();
   });
   it("finds an agent deep link among Electron launch arguments", () => {
     expect(

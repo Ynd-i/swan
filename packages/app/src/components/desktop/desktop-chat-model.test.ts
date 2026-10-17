@@ -1,5 +1,8 @@
 import { expect, it } from "vitest";
-import { PARENT_AGENT_ID_LABEL } from "@getpaseo/protocol/agent-labels";
+import {
+  HANDOFF_FROM_AGENT_ID_LABEL,
+  PARENT_AGENT_ID_LABEL,
+} from "@getpaseo/protocol/agent-labels";
 import type { AggregatedAgent } from "@/hooks/use-aggregated-agents";
 import type { SidebarProjectEntry } from "@/hooks/use-sidebar-workspaces-list";
 import {
@@ -243,4 +246,102 @@ it("archives workspaces left without chats but keeps worktrees and each project'
       agents,
     }),
   ).toEqual(["a"]);
+});
+
+function handoff(id: string, from: string | null, minute: number): AggregatedAgent {
+  return {
+    ...chat(id, "local", "main"),
+    lastActivityAt: new Date(`2026-09-30T09:${String(minute).padStart(2, "0")}:00Z`),
+    labels: from ? { [HANDOFF_FROM_AGENT_ID_LABEL]: from } : {},
+  };
+}
+
+it("nests a handoff chain under its newest chat, newest first", () => {
+  const first = handoff("first", null, 1);
+  const second = handoff("second", "first", 2);
+  const third = handoff("third", "second", 3);
+  const other = handoff("other", null, 4);
+  const sidebar = buildDesktopChatSidebar({
+    projects: [project("app", "local", ["main"])],
+    agents: [first, second, third, other],
+  });
+
+  expect(sidebar.recent.map((agent) => agent.id)).toEqual(["other", "third"]);
+  expect(sidebar.handoffs.get("local:third")?.map((agent) => agent.id)).toEqual([
+    "second",
+    "first",
+  ]);
+  expect(sidebar.handoffs.has("local:other")).toBe(false);
+});
+
+it("walks through archived links and promotes the newest chat left", () => {
+  const first = handoff("first", null, 1);
+  const second = { ...handoff("second", "first", 2), archivedAt: new Date() };
+  const third = handoff("third", "second", 3);
+  const projects = [project("app", "local", ["main"])];
+
+  const throughArchived = buildDesktopChatSidebar({ projects, agents: [first, second, third] });
+  expect(throughArchived.recent.map((agent) => agent.id)).toEqual(["third"]);
+  expect(throughArchived.handoffs.get("local:third")?.map((agent) => agent.id)).toEqual(["first"]);
+
+  const headArchived = buildDesktopChatSidebar({
+    projects,
+    agents: [first, handoff("second", "first", 2), { ...third, archivedAt: new Date() }],
+  });
+  expect(headArchived.recent.map((agent) => agent.id)).toEqual(["second"]);
+  expect(headArchived.handoffs.get("local:second")?.map((agent) => agent.id)).toEqual(["first"]);
+});
+
+it("keeps a chain in Pinned and in its section after a handoff", () => {
+  const first = {
+    ...handoff("first", null, 1),
+    labels: { [DESKTOP_CHAT_PINNED_AT]: "2026-09-30T08:00:00Z" },
+  };
+  const projects = [project("app", "local", ["main"])];
+  const pinned = buildDesktopChatSidebar({
+    projects,
+    agents: [first, handoff("second", "first", 2)],
+  });
+  expect(pinned.pinned.map((agent) => agent.id)).toEqual(["second"]);
+  expect(pinned.recent).toEqual([]);
+
+  const sidebar = buildDesktopChatSidebar({
+    projects,
+    agents: [handoff("first", null, 1), handoff("second", "first", 2)],
+  });
+  const partition = partitionChatSections({
+    recent: sidebar.recent,
+    projects: sidebar.projects,
+    sections: [{ id: "work", name: "Work" }],
+    chatSection: { "local:first": "work" },
+    projectSection: {},
+    pinnedProjects: [],
+    handoffs: sidebar.handoffs,
+  });
+  expect(partition.recent).toEqual([]);
+  expect(partition.custom[0]?.chats.map((agent) => agent.id)).toEqual(["second"]);
+});
+
+it("lists no placeholder workspace for a project whose chats are all archived", () => {
+  const archived = { ...chat("done", "local", "main"), archivedAt: new Date() };
+  const app = project("app", "local", ["main"]);
+  const withWorktree = {
+    ...app,
+    workspaces: [
+      ...app.workspaces,
+      {
+        ...app.workspaces[0]!,
+        workspaceId: "tree",
+        workspaceKey: "local:tree",
+        workspaceKind: "worktree" as const,
+      },
+    ],
+  };
+
+  const sidebar = buildDesktopChatSidebar({ projects: [withWorktree], agents: [archived] });
+
+  expect(sidebar.projects[0]?.chats).toEqual([]);
+  expect(sidebar.projects[0]?.emptyWorkspaces.map((workspace) => workspace.workspaceId)).toEqual([
+    "tree",
+  ]);
 });

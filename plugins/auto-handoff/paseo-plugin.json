@@ -1,0 +1,1 @@
+{ "id": "auto-handoff", "requirements": { "paseo": ">=0.11.2" } }

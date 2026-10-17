@@ -5,7 +5,7 @@ export function parseDesktopAgentDeepLink(
   input: string,
   appName = "Paseo",
 ): AgentDeepLinkTarget | null {
-  if (appName === "Paseo Custom") {
+  if (appName === "Swan") {
     let url: URL;
     try {
       url = new URL(input);

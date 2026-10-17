@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Plans Paseo Custom releases, which follow upstream Paseo stable releases only.
+// Plans Swan releases, which follow upstream Paseo stable releases only.
 //
 //   v<stable>-v<N>-beta<M>  beta M of our release N on upstream <stable>; a GitHub prerelease
 //   v<stable>-v<N>          release N promoted to stable
@@ -8,15 +8,18 @@
 // beta, nothing is released unless `--upstream-beta` asks for a one-off on it, tagged
 // v<upstream-beta>-v<N>-beta<M>, or v<upstream-beta>-v<N> once promoted.
 //
-//   node scripts/custom-release.mjs sync    merge a newer upstream stable release as -v1-beta1
+//   node scripts/custom-release.mjs sync    name a newer upstream stable release to merge
 //   node scripts/custom-release.mjs beta    release the branch as the next beta
 //   node scripts/custom-release.mjs beta --upstream-beta   the same, on an upstream beta
 //   node scripts/custom-release.mjs stable  promote the latest beta to stable
 //   node scripts/custom-release.mjs stable --upstream-beta   the same, on an upstream beta
+//   node scripts/custom-release.mjs prune <tag> <feed files...>   list the prereleases <tag>
+//                                                                 supersedes, one per line
 //
 // Prints key=value lines for $GITHUB_OUTPUT: merge, backend, tag, from, reason, prerelease,
 // version (the semver the in-app updater compares).
 import { execFileSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { isMainModule } from "./is-main-module.mjs";
 import { parseReleaseVersion } from "./release-version-utils.mjs";
 
@@ -111,8 +114,7 @@ export function planRelease({
     if (!upstreamStable || compareUpstreamTags(upstreamStable, current) <= 0) {
       return skip(`no upstream stable release is newer than ${current}`);
     }
-    const tag = nextBetaTag(upstreamStable, tags);
-    return { merge: upstreamStable, backend: upstreamStable, tag, from: "HEAD", reason: "" };
+    return { merge: upstreamStable, backend: upstreamStable, tag: "", from: "", reason: "" };
   }
   if (mode !== "beta" && mode !== "stable") {
     throw new Error(`Unknown mode "${mode}"; use sync, beta or stable`);
@@ -142,11 +144,49 @@ export function planRelease({
   };
 }
 
+/**
+ * Prereleases a published release supersedes: betas on an older upstream release. Stable releases
+ * stay, and so do betas on the current one, whose latest is what stable promotes, and every
+ * release the update feed names. The planner only reads tags on the current upstream release.
+ */
+export function obsoletePrereleases(published, releases, feedTags) {
+  const { backend } = releasePattern.exec(published).groups;
+  return releases
+    .filter(({ tagName, isPrerelease, isDraft }) => {
+      const match = releasePattern.exec(tagName);
+      return (
+        isPrerelease &&
+        !isDraft &&
+        match?.groups.beta &&
+        !feedTags.includes(tagName) &&
+        compareUpstreamTags(match.groups.backend, backend) < 0
+      );
+    })
+    .map(({ tagName }) => tagName);
+}
+
+function prune(published, feedFiles) {
+  const releases = JSON.parse(
+    execFileSync(
+      "gh",
+      ["release", "list", "--limit", "1000", "--json", "tagName,isPrerelease,isDraft"],
+      { encoding: "utf8" },
+    ),
+  );
+  const feedTags = feedFiles.flatMap((file) =>
+    [...readFileSync(file, "utf8").matchAll(/\/releases\/download\/([^/]+)\//g)].map(
+      (match) => match[1],
+    ),
+  );
+  for (const tag of obsoletePrereleases(published, releases, feedTags)) console.log(tag);
+}
+
 function git(...args) {
   return execFileSync("git", args, { encoding: "utf8" }).trim();
 }
 
-function main([mode, flag]) {
+function main([mode, flag, ...rest]) {
+  if (mode === "prune") return prune(flag, rest);
   const tags = git("tag", "--list").split("\n").filter(Boolean);
   const current = newestUpstreamTag(git("tag", "--merged", "HEAD").split("\n").filter(Boolean));
   const latest = current ? latestRelease(current, tags) : null;

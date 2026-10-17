@@ -261,16 +261,19 @@ export function HoverCardTrigger({
   children,
   focusable = false,
   accessibilityLabel,
+  style,
 }: {
   children: ReactNode;
   focusable?: boolean;
   accessibilityLabel?: string;
+  style?: StyleProp<ViewStyle>;
 }): ReactNode {
   const ctx = useContext(HoverCardContext);
   if (!ctx) return children;
   return (
     <View
       ref={ctx.setTriggerRef}
+      style={style}
       tabIndex={focusable ? 0 : undefined}
       accessibilityRole={focusable ? "button" : undefined}
       accessibilityLabel={accessibilityLabel}

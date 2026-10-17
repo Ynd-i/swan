@@ -69,6 +69,7 @@ import type {
   ValidateBranchResponse,
   BranchSuggestionsResponse,
   ForgeSearchResponse,
+  ForgeChangeRequestGetResponse,
   ForgeSearchRequest,
   GitHubSearchResponse,
   GitHubSearchRequest,
@@ -521,6 +522,7 @@ type StashListPayload = StashListResponse["payload"];
 type ValidateBranchPayload = ValidateBranchResponse["payload"];
 type BranchSuggestionsPayload = BranchSuggestionsResponse["payload"];
 type ForgeSearchPayload = ForgeSearchResponse["payload"];
+type ForgeChangeRequestGetPayload = ForgeChangeRequestGetResponse["payload"];
 type GitHubSearchPayload = GitHubSearchResponse["payload"];
 type DirectorySuggestionsPayload = DirectorySuggestionsResponse["payload"];
 type PaseoWorktreeListPayload = PaseoWorktreeListResponse["payload"];
@@ -4723,6 +4725,21 @@ export class DaemonClient {
         kinds: options.kinds,
       },
       responseType: "forge.search.response",
+      timeout: 15000,
+    });
+  }
+
+  async getForgeChangeRequest(
+    options: { cwd: string; url: string },
+    requestId?: string,
+  ): Promise<ForgeChangeRequestGetPayload> {
+    return this.sendNamespacedCorrelatedSessionRequest<"forge.change_request.get.response">({
+      requestId,
+      message: {
+        type: "forge.change_request.get.request",
+        cwd: options.cwd,
+        url: options.url,
+      },
       timeout: 15000,
     });
   }

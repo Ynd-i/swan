@@ -22,6 +22,7 @@ import { definePanel, type PanelIconProps } from "@/panels/panel-registry";
 import { ICON_SIZE, SPACING, type Theme } from "@/styles/theme";
 import {
   useWorkspaceTabLaunchCatalog,
+  type WorkspaceTabLaunchGroup,
   type WorkspaceTabLaunchItem,
 } from "@/workspace-tabs/launcher";
 
@@ -87,11 +88,16 @@ function EditProfilesButton({ label, onPress }: { label: string; onPress: () => 
   );
 }
 
-function LauncherRow({ item }: { item: WorkspaceTabLaunchItem }) {
-  const { tabId } = usePaneContext();
+function LauncherRow({
+  item,
+  onLaunch,
+}: {
+  item: WorkspaceTabLaunchItem;
+  onLaunch: (item: WorkspaceTabLaunchItem) => void;
+}) {
   const handlePress = useCallback(() => {
-    item.launch({ kind: "replace", tabId });
-  }, [item, tabId]);
+    onLaunch(item);
+  }, [item, onLaunch]);
 
   return (
     <Pressable
@@ -113,6 +119,35 @@ function LauncherRow({ item }: { item: WorkspaceTabLaunchItem }) {
       </Text>
       {item.shortcutActionId ? <LauncherShortcut actionId={item.shortcutActionId} /> : null}
     </Pressable>
+  );
+}
+
+/** The launcher rows, shared with the new chat Explorer dock, which has no pane to replace. */
+export function NewTabLauncherGroups({
+  groups,
+  onLaunch,
+}: {
+  groups: readonly WorkspaceTabLaunchGroup[];
+  onLaunch: (item: WorkspaceTabLaunchItem) => void;
+}) {
+  return (
+    <View style={styles.rail}>
+      {groups.map((group) => (
+        <View key={group.id} style={styles.group}>
+          {group.label ? (
+            <View style={styles.groupHeader}>
+              <Text style={styles.groupLabel}>{group.label}</Text>
+              {group.accessory ? (
+                <EditProfilesButton label={group.accessory.label} onPress={group.accessory.run} />
+              ) : null}
+            </View>
+          ) : null}
+          {group.items.map((item) => (
+            <LauncherRow key={item.id} item={item} onLaunch={onLaunch} />
+          ))}
+        </View>
+      ))}
+    </View>
   );
 }
 
@@ -144,6 +179,10 @@ const NewTabPanel = memo(function NewTabPanel(): ReactElement {
     [groups],
   );
   const handlesWorkspaceShortcuts = isInteractive && host === "main";
+  const launchInPlace = useCallback(
+    (item: WorkspaceTabLaunchItem) => item.launch({ kind: "replace", tabId }),
+    [tabId],
+  );
 
   useEffect(() => {
     if (!isWeb || !isInteractive) return;
@@ -245,26 +284,7 @@ const NewTabPanel = memo(function NewTabPanel(): ReactElement {
   return (
     <View ref={containerRef} style={styles.container} testID="workspace-new-tab-panel">
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.rail}>
-          {groups.map((group) => (
-            <View key={group.id} style={styles.group}>
-              {group.label ? (
-                <View style={styles.groupHeader}>
-                  <Text style={styles.groupLabel}>{group.label}</Text>
-                  {group.accessory ? (
-                    <EditProfilesButton
-                      label={group.accessory.label}
-                      onPress={group.accessory.run}
-                    />
-                  ) : null}
-                </View>
-              ) : null}
-              {group.items.map((item) => (
-                <LauncherRow key={item.id} item={item} />
-              ))}
-            </View>
-          ))}
-        </View>
+        <NewTabLauncherGroups groups={groups} onLaunch={launchInPlace} />
       </ScrollView>
     </View>
   );

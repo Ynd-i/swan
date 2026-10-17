@@ -161,13 +161,13 @@ It checks address submission, Back/Forward, guest identity, closing through the
 right titlebar, registry cleanup, retained draft and absence of main tabs. The
 target is a local HTTP fixture; no external website or real-provider turn is used.
 
-The same runner has a macOS-only agent-link mode for an already-built **Paseo Custom**
+The same runner has a macOS-only agent-link mode for an already-built **Swan**
 bundle. It starts a private Mock host and its own Electron instances, without rebuilding
 the bundle or running the browser suite:
 
 ```bash
 PASEO_DESKTOP_AGENT_LINKS_ONLY=1 \
-PASEO_DESKTOP_AGENT_LINKS_EXECUTABLE="$PWD/packages/desktop/release-custom/mac-arm64/Paseo Custom.app/Contents/MacOS/Paseo Custom" \
+PASEO_DESKTOP_AGENT_LINKS_EXECUTABLE="$PWD/packages/desktop/release-custom/mac-arm64/Swan.app/Contents/MacOS/Swan" \
 PASEO_DESKTOP_BROWSER_E2E_ARTIFACT_DIR=/tmp/paseo-custom-agent-links \
 node packages/desktop/e2e/browser-tabs.e2e.mjs
 ```

@@ -137,7 +137,7 @@ describe("desktop packaging", () => {
     );
     await validateConfiguration(config, new DebugLogger(false));
     expect(config.protocols).toEqual({
-      name: "Paseo Custom agent link",
+      name: "Swan agent link",
       schemes: ["paseo-custom"],
     });
     expect(config.mac?.protocols).toBeUndefined();
@@ -163,7 +163,7 @@ describe("desktop packaging", () => {
     }
   });
 
-  it.each(["Paseo", "Paseo Custom"])("launches the packaged %s CLI through Helper", (name) => {
+  it.each(["Paseo", "Swan"])("launches the packaged %s CLI through Helper", (name) => {
     if (process.platform === "win32") return;
 
     const bundle = createFakeMacBundle({ includeHelper: true, name });

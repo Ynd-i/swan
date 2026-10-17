@@ -9,7 +9,6 @@ import { formatAgentModeLabel, formatThinkingOptionLabel } from "@/agent-control
 import {
   FAST_MODE_FEATURE_ID,
   getDisplayedModeId,
-  getSelectableAgentModes,
   isPlanningAgentMode,
   resolvePlanToggle,
   selectPermissionMode,
@@ -202,19 +201,18 @@ function buildModeGroup(source: AgentControlContributionSource): CommandCenterCh
     ? getDisplayedModeId(source.ownerKey, modes.options, modes.selectedId)
     : null;
   const choices = modes
-    ? getSelectableAgentModes(
-        modes.options.filter((mode) => !isPlanningAgentMode(mode)),
-        source.provider,
-      ).map(
-        (mode): CommandCenterChoice => ({
-          id: mode.id,
-          path: [formatAgentModeLabel(mode, source.provider)],
-          icon: source.icons.mode(mode.id),
-          selected: mode.id === selectedId,
-          testId: `command-center-mode-${source.serverId}:${source.ownerKey}:${mode.id}`,
-          select: () => selectPermissionMode(source.ownerKey, modes, mode.id),
-        }),
-      )
+    ? modes.options
+        .filter((mode) => !isPlanningAgentMode(mode))
+        .map(
+          (mode): CommandCenterChoice => ({
+            id: mode.id,
+            path: [formatAgentModeLabel(mode, source.provider)],
+            icon: source.icons.mode(mode.id),
+            selected: mode.id === selectedId,
+            testId: `command-center-mode-${source.serverId}:${source.ownerKey}:${mode.id}`,
+            select: () => selectPermissionMode(source.ownerKey, modes, mode.id),
+          }),
+        )
     : [];
   return {
     id: "modes",

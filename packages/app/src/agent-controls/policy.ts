@@ -20,22 +20,10 @@ export function resolveNonPlanningModeId(
   return modes.find((mode) => !isPlanningAgentMode(mode))?.id ?? null;
 }
 
-// The Mac desktop offers three permission tiers (ask, auto-review, full access); plan is a
-// separate toggle and Claude's accept-edits tier is not offered.
-export function filterDesktopAgentModes(
-  modes: readonly AgentMode[],
-  provider: string | null | undefined,
-): AgentMode[] {
-  return modes.filter(
-    (mode) => !isPlanningAgentMode(mode) && !(provider === "claude" && mode.id === "acceptEdits"),
-  );
-}
-
-export function getSelectableAgentModes(
-  modes: AgentMode[],
-  provider: string | null | undefined,
-): AgentMode[] {
-  return getIsElectronMac() ? filterDesktopAgentModes(modes, provider) : modes;
+// The Mac desktop lists every provider permission mode except planning ones; plan is a
+// separate toggle there.
+export function getSelectableAgentModes(modes: AgentMode[]): AgentMode[] {
+  return getIsElectronMac() ? modes.filter((mode) => !isPlanningAgentMode(mode)) : modes;
 }
 
 // Client-side memory of the permission mode an agent had before entering a planning mode.

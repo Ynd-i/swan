@@ -71,8 +71,8 @@ test("macOS Settings keeps navigation searchable and Appearance preferences edit
     "Clicking a script's service URL: External browser",
   );
   await serviceUrl.click();
-  await page.getByRole("menuitem", { name: "In Paseo", exact: true }).click();
-  await expect(serviceUrl).toHaveAccessibleName("Clicking a script's service URL: In Paseo");
+  await page.getByRole("menuitem", { name: "In Swan", exact: true }).click();
+  await expect(serviceUrl).toHaveAccessibleName("Clicking a script's service URL: In Swan");
   await expectFrameFits();
   await expect(sidebar).toBeInViewport({ ratio: 1 });
   await expect(search).toBeInViewport({ ratio: 1 });

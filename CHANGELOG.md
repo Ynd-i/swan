@@ -2,11 +2,13 @@
 
 ## Unreleased — custom desktop
 
-These changes are available on `codex-app` in local development. Packaged
+These changes are available on `main` of `Ynd-i/swan` in local development. Packaged
 distribution and full migration acceptance remain pending; see the
 [migration plan](docs/refactors/codex-desktop-ui-plan.md).
 
 ### Added
+
+- Added auto handoff: when a chat's context passes 350k tokens or 75% of the model's window, whichever is smaller, the agent writes a handoff briefing and a new chat with the same provider and model continues the work. The new chat replaces the old one in the macOS sidebar, and earlier chats of the chain nest greyed under its chevron, keeping its pin and section. See [auto handoff](docs/auto-handoff.md).
 
 - Added agent types shared by Claude, Codex and OpenCode: each `~/.agents/agents/<name>.md`, in the Claude Code subagent format, reaches the sessions Paseo launches for all three, with Codex settings in an optional `codex:` block. See [workspace-contract.md](docs/workspace-contract.md#agents).
 
@@ -52,6 +54,8 @@ distribution and full migration acceptance remain pending; see the
 
 ### Changed
 
+- Renamed the custom desktop to Swan and the repository to `Ynd-i/swan`. Installed Paseo Custom builds keep updating in-app and keep their chats, projects and settings.
+- Each custom release deletes the prereleases and tags of older upstream releases; stable releases and the current upstream release's betas stay.
 - Measured the context window meter of Claude chats against the window Claude compacts at, such as its `autoCompactWindow` setting, as Claude Desktop does, instead of the model's full window. The daemon asks Claude once per model, after the first completed turn.
 - The macOS project picker shows a project's favicon or a folder with only its name.
 - The macOS composer offers three permission modes, Ask for approval, Auto-review and Full access, and plan mode is a toggle beside them, as in Codex. Claude's Accept edits is no longer offered. Plan keeps the chosen permission mode: turning it off, or Claude's switch after Implement, returns to that mode. Other providers keep their own non-plan modes.
@@ -142,6 +146,7 @@ distribution and full migration acceptance remain pending; see the
 
 ### Fixed
 
+- Stopped the macOS chat sidebar from leaving an empty workspace row under a project after its last chat is archived. Worktrees without chats are still listed.
 - Drew the context window meter's unused track on the macOS composer, where it matched the composer surface and only the used arc showed.
 - Fixed in-app updates on macOS needing a second Update click: the first click now installs and relaunches. The fix applies to updates from this release onward.
 - Kept a macOS project row's actions visible while the pointer stays on it after New chat, and stopped menus opened with the pointer from highlighting their first item; keyboard navigation still highlights the focused item.
@@ -164,6 +169,29 @@ distribution and full migration acceptance remain pending; see the
 - Fixed chat metadata changes remaining paused indefinitely while offline; connection errors and timeouts now return control to the user without discarding a rename draft.
 - Fixed the model popover intercepting the reasoning slider's native arrow keys.
 - Fixed new-chat history dropping its target host query parameter, and removed the redundant macOS model tooltip that could cover the reasoning slider.
+
+## 0.11.4 - 2026-10-15
+
+[Hoplite](https://hoplite.sh) joins Paseo as our first sponsor through the company sponsorship program. Hoplite builds cloud coding agents that turn tasks from GitHub, Linear, Slack and more into pull requests. Thank you to the Hoplite team for supporting Paseo.
+
+### Fixed
+
+- Fixed Hoplite showing an error in Settings → Providers instead of discovering models in workspaces linked to a Hoplite project
+
+## 0.11.3 - 2026-10-15
+
+### Added
+
+- Added Hoplite as an opt-in provider in the ACP provider catalog ([#6953](https://github.com/getpaseo/paseo/pull/6953) by [@odinglyn0](https://github.com/odinglyn0))
+- Added search to the Add provider catalog ([#6953](https://github.com/getpaseo/paseo/pull/6953), [#7030](https://github.com/getpaseo/paseo/pull/7030))
+
+### Changed
+
+- Changed Add provider failures to show as a toast ([#7030](https://github.com/getpaseo/paseo/pull/7030))
+
+### Fixed
+
+- Fixed Remove being offered for plugin providers such as Antigravity and Muse Code ([#6568](https://github.com/getpaseo/paseo/pull/6568) by [@Ctrl-Creeper](https://github.com/Ctrl-Creeper))
 
 ## 0.11.2 - 2026-10-09
 

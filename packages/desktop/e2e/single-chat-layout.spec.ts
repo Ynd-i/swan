@@ -54,10 +54,16 @@ test("macOS keeps one main conversation while tools open in the right sidebar", 
     const toolbar = page.getByTestId("desktop-explorer-toolbar");
     const plus = toolbar.getByTestId("explorer-sidebar-new-tab-button");
     await expect(plus).toBeVisible();
+    // Explorer slides open over 220ms; measure once the dock and its toolbar have settled.
+    await expect
+      .poll(async () => {
+        const [bar, dock] = await Promise.all([toolbar.boundingBox(), right.boundingBox()]);
+        return bar && dock ? Math.abs(bar.x - dock.x) : Number.POSITIVE_INFINITY;
+      })
+      .toBeLessThanOrEqual(1);
     const barBox = await toolbar.boundingBox();
     const dockBox = await right.boundingBox();
     if (!barBox || !dockBox) throw new Error("Missing right panel geometry");
-    expect(Math.abs(barBox.x - dockBox.x)).toBeLessThanOrEqual(1);
     expect(Math.abs(barBox.width - dockBox.width)).toBeLessThanOrEqual(1);
     expect(barBox.y).toBeLessThanOrEqual(1);
     expect(Math.abs(barBox.y + barBox.height - dockBox.y)).toBeLessThanOrEqual(1);
@@ -86,7 +92,8 @@ test("macOS keeps one main conversation while tools open in the right sidebar", 
     await expect(right.getByRole("textbox", { name: "Browser URL", exact: true })).toBeVisible();
     await expect(composerLocator(page)).toHaveValue(draft);
 
-    await toolbar.getByRole("button", { name: "Browse workspace files", exact: true }).click();
+    await plus.click();
+    await menu.getByTestId("workspace-new-tab-menu-files").click();
     await right
       .getByTestId("file-explorer-tree-scroll")
       .getByText("example.ts", { exact: true })
@@ -94,6 +101,9 @@ test("macOS keeps one main conversation while tools open in the right sidebar", 
     await expect(right.getByTestId("workspace-file-pane").filter({ visible: true })).toHaveCount(1);
     const tree = right.getByTestId("file-tree-rail-tree").filter({ visible: true });
     const treeToggle = right.getByTestId("file-toggle-tree").filter({ visible: true });
+    // An opened file starts without the folder tree.
+    await expect(tree).toHaveCount(0);
+    await treeToggle.click();
     await expect(tree).toBeVisible();
     const editor = right.locator('.cm-content[contenteditable="true"]').filter({ visible: true });
     await expect(editor).toBeVisible();

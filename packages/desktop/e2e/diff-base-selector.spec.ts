@@ -102,6 +102,16 @@ test("macOS comparison selects exact local and remote refs without changing the 
     const composer = composerLocator(page);
     await composer.fill("Keep this comparison draft.");
     await page.getByTestId("workspace-explorer-toggle").click();
+    // Explorer starts on the launcher; open Changes first, as the old default Explorer had it.
+    await page
+      .getByTestId("workspace-explorer-sidebar")
+      .getByTestId("workspace-new-tab-changes")
+      .click();
+    await expect(page.getByTestId("changes-tree-panel").filter({ visible: true })).toBeVisible();
+    const changesTabId = await page
+      .locator('[data-testid^="explorer-sidebar-tab-"][aria-selected="true"]')
+      .getAttribute("data-testid");
+    if (!changesTabId) throw new Error("Missing Changes tab identity");
     await page.getByTestId("explorer-sidebar-new-tab-button").click();
     await page.getByTestId("workspace-new-tab-menu-diff").click();
     const diff = page.getByTestId("working-diff-panel").filter({ visible: true });
@@ -145,7 +155,7 @@ test("macOS comparison selects exact local and remote refs without changing the 
     await expect(selector).toContainText("comparison-base");
     await expect(tree.getByText("committed.ts", { exact: true })).toBeVisible();
     await page.screenshot({ path: testInfo.outputPath("diff-local-base.png") });
-    await page.getByTestId("explorer-sidebar-tab-changes_tree").click();
+    await page.getByTestId(changesTabId).click();
     const changes = page.getByTestId("changes-tree-panel").filter({ visible: true });
     await expect(changes.getByTestId("changes-base-selector")).toHaveCount(0);
     await expect(changes.getByText("committed.ts", { exact: true })).toBeVisible();

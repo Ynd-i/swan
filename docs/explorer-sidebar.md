@@ -13,12 +13,17 @@ contracts.
 The custom macOS desktop keeps one current chat in the main area without a tab
 strip. Supporting tools use Explorer on the right, including ordinary terminals,
 browser, files, diffs and workspace plugin panels. New chat owns provider
-selection; tool launchers omit Terminal profiles and Edit profiles.
+selection; tool launchers omit Terminal profiles and Edit profiles. Agent in the Explorer
+launcher opens a chat draft in the main area and leaves the launcher in place, because a chat
+never stays in Explorer.
 Cmd+W closes the selected Explorer tool tab and does nothing while Explorer is hidden.
 It never closes the chat, because closing a chat tab archives the agent.
-The new chat screen keeps the titlebar toggle and Cmd+E. It has no workspace yet, so it shows a
-placeholder dock; while that toggle is on, the workspace the chat creates opens with Explorer
-visible. Explorer and the new chat dock slide open and closed over 220ms, the left sidebar's
+The new chat screen keeps the titlebar toggle and Cmd+E. It has no workspace yet, so its dock
+shows the Explorer launcher without Agent. A tool creates the workspace the first message would
+have created, without an agent, opens the workspace with the unsent draft and its provider setup
+in the chat draft, and selects that tool in Explorer. The first message then starts the chat in that
+workspace instead of creating a second one. While the toggle is on, a workspace created by sending
+opens with Explorer visible. Explorer and the new chat dock slide open and closed over 220ms, the left sidebar's
 timing (`packages/app/src/components/use-animated-dock.ts`), and skip it under reduced motion.
 
 Saved layouts are adapted without closing sessions or replacing tab instances.
@@ -30,7 +35,8 @@ On wide macOS windows, tool tabs and their plus menu share the window titlebar.
 The dock keeps its tabs inline in compact windows, while the main area remains a
 chat. Hiding the dock or leaving the workspace also removes its titlebar controls.
 File tools contain their own tree on the right; toggling it preserves the editor
-instance and unsaved text. One path/action row spans both columns. Its path menu
+instance and unsaved text. The Files view opens with the tree and an opened file without it.
+Opening another file from a file's tree reuses that tab, so the tree stays as the user left it. One path/action row spans both columns. Its path menu
 copies absolute or workspace-relative paths, and its editor action targets the
 current file using the existing local/remote open-target rules.
 
@@ -53,9 +59,11 @@ fixed-target labels and icons from that registration, filter by host, and never 
 panel type for another. Tab moves reject unsupported destinations, and placement resolves only to
 a compatible pane.
 
-Files and Changes are the Explorer defaults. Their panel manifests mark them as singletons,
+Files and Changes are the Explorer defaults outside macOS; the macOS Explorer starts on the New
+Tab launcher instead. Their panel manifests mark them as singletons,
 so a pane’s + menu omits each while that pane already contains it. Closing one makes its menu
-item available again. Other compatible tabs, including agents, terminals, files, and diffs,
+item available again. Closing Explorer's last tab leaves Explorer open on the New Tab launcher;
+closing that launcher hides Explorer. Other compatible tabs, including agents, terminals, files, and diffs,
 can move between Explorer and main panes.
 Keep panel implementations independent of either shell. `WorkspacePanelHost` owns mounting and
 retention, while each shell owns its tabs, focus, dragging, resizing, and shortcuts.

@@ -833,6 +833,76 @@ describe("ForgeService", () => {
     });
   });
 
+  it("previews a pull request in another repository by its URL", async () => {
+    const runner = createRunner([
+      JSON.stringify({
+        number: 183,
+        title: "build(assets): pin static assets",
+        url: "https://github.com/acme/other/pull/183",
+        state: "MERGED",
+        isDraft: false,
+        author: { login: "octocat", is_bot: false },
+        additions: 758,
+        deletions: 4088,
+        changedFiles: 21,
+        createdAt: "2026-10-15T10:00:00Z",
+        updatedAt: "2026-10-16T09:00:00Z",
+        mergedAt: "2026-10-16T09:00:00Z",
+        closedAt: "2026-10-16T09:00:00Z",
+      }),
+    ]);
+    const service = createGitHubService({
+      runner: runner.runner,
+      resolveGhPath: async () => "/usr/bin/gh",
+      now: () => 0,
+    });
+
+    const preview = await service.getChangeRequestPreview?.({
+      cwd: "/repo",
+      url: "https://github.com/acme/other/pull/183?w=1",
+    });
+
+    expect(runner.calls.map((call) => call.args)).toEqual([
+      [
+        "pr",
+        "view",
+        "https://github.com/acme/other/pull/183",
+        "--json",
+        "number,title,url,state,isDraft,author,additions,deletions,changedFiles,createdAt,updatedAt,mergedAt,closedAt",
+      ],
+    ]);
+    expect(preview).toEqual({
+      forge: "github",
+      number: 183,
+      title: "build(assets): pin static assets",
+      url: "https://github.com/acme/other/pull/183",
+      state: "merged",
+      isDraft: false,
+      authorLogin: "octocat",
+      additions: 758,
+      deletions: 4088,
+      changedFiles: 21,
+      createdAt: "2026-10-15T10:00:00Z",
+      updatedAt: "2026-10-16T09:00:00Z",
+      mergedAt: "2026-10-16T09:00:00Z",
+      closedAt: "2026-10-16T09:00:00Z",
+    });
+  });
+
+  it("refuses to pass a non pull request URL to gh", async () => {
+    const runner = createRunner([]);
+    const service = createGitHubService({
+      runner: runner.runner,
+      resolveGhPath: async () => "/usr/bin/gh",
+      now: () => 0,
+    });
+
+    await expect(
+      service.getChangeRequestPreview?.({ cwd: "/repo", url: "--repo=acme/other" }),
+    ).rejects.toThrow("Not a GitHub pull request URL");
+    expect(runner.calls).toEqual([]);
+  });
+
   it("polls PR status at fast cadence while checks are pending", async () => {
     let now = 0;
     const runner = createRunner([

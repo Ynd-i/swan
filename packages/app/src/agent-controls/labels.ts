@@ -29,15 +29,9 @@ function formatControlLabel(option: ControlLabelInput, splitHyphen: boolean): st
   return sentenceCase(splitCompactLabel(rawLabel, splitHyphen));
 }
 
-// The Mac desktop names permission modes the way the Codex and Claude apps do.
+// The Mac desktop names Codex permission modes the way the Codex app does; other providers
+// keep their own labels.
 const DESKTOP_MODE_LABEL_KEYS: Record<string, Record<string, string>> = {
-  claude: {
-    plan: "agentControls.mode.desktop.plan",
-    default: "agentControls.mode.desktop.askForReview",
-    acceptEdits: "agentControls.mode.desktop.acceptEdits",
-    auto: "agentControls.mode.desktop.autoReview",
-    bypassPermissions: "agentControls.mode.desktop.fullAccess",
-  },
   codex: {
     auto: "agentControls.mode.desktop.askForReview",
     "auto-review": "agentControls.mode.desktop.autoReview",

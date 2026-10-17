@@ -874,7 +874,7 @@ function assertCustomMacIdentity(appPath) {
   const metadata = JSON.parse(
     extractFile(path.join(resourcesPath, "app.asar"), "package.json").toString(),
   );
-  if (metadata.productName !== "Paseo Custom") {
+  if (metadata.productName !== "Swan") {
     if (process.env.PASEO_DESKTOP_EXPECT_CUSTOM === "1") {
       throw new Error("Expected the custom macOS bundle");
     }

@@ -12,6 +12,8 @@ import { useAssistantFileLinkResolverContext } from "./provider";
 import type { AssistantFileLinkSource } from "./resolver";
 import { formatFileLinkTooltipPath } from "./tooltip-path";
 import { useFileLink } from "./use-file-link";
+import { parsePullRequestLink } from "@/pull-request-links/parse";
+import { PullRequestChip, PullRequestHoverCard } from "@/pull-request-links/link";
 
 interface AssistantMarkdownLinkProps {
   source: AssistantFileLinkSource;
@@ -34,6 +36,7 @@ export function AssistantMarkdownLink({
   const { target, onHoverIn, onPress } = useFileLink(source);
   const { configRef } = useAssistantFileLinkResolverContext();
   const workspaceRoot = configRef.current.workspaceRoot;
+  const serverId = configRef.current.serverId;
   const tooltipPath = useMemo(
     () => (target ? formatFileLinkTooltipPath({ target, workspaceRoot }) : null),
     [target, workspaceRoot],
@@ -42,7 +45,15 @@ export function AssistantMarkdownLink({
     () => ({ onPress, accessibilityRole: "link" }),
     [onPress],
   );
-  const unwrapForMarkdownCopy = source.sourceType === "inline-code" || source.markup === "linkify";
+  const pullRequest = useMemo(() => parsePullRequestLink(source.href), [source.href]);
+  const pullRequestHost = useMemo(
+    () => ({ serverId: serverId ?? "", cwd: workspaceRoot ?? "" }),
+    [serverId, workspaceRoot],
+  );
+  const showPullRequestChip = pullRequest !== null && source.text?.trim() === source.href;
+  // A chip keeps its anchor on copy so the pasted markdown still carries the URL.
+  const unwrapForMarkdownCopy =
+    !showPullRequestChip && (source.sourceType === "inline-code" || source.markup === "linkify");
 
   if (isNative) {
     // Must be a MarkdownTextSpan, not a plain <Text>: on iOS the link renders
@@ -88,17 +99,33 @@ export function AssistantMarkdownLink({
       onAuxClickCapture={preventAnchorNavigation}
       style={LINK_ANCHOR_STYLE}
     >
-      <MarkdownLinkText
-        dataSet={monoSurface ? MARKDOWN_CODE_LINK_DATASET : undefined}
-        style={style}
-        onPress={onPress}
-        onHoverIn={onHoverIn}
-      >
-        {children}
-      </MarkdownLinkText>
+      {showPullRequestChip ? (
+        <PullRequestChip
+          host={pullRequestHost}
+          target={pullRequest}
+          linkStyle={style}
+          onPress={onPress}
+        />
+      ) : (
+        <MarkdownLinkText
+          dataSet={monoSurface ? MARKDOWN_CODE_LINK_DATASET : undefined}
+          style={style}
+          onPress={onPress}
+          onHoverIn={onHoverIn}
+        >
+          {children}
+        </MarkdownLinkText>
+      )}
     </a>
   );
 
+  if (pullRequest) {
+    return (
+      <PullRequestHoverCard host={pullRequestHost} target={pullRequest}>
+        {anchor}
+      </PullRequestHoverCard>
+    );
+  }
   return <FileLinkHoverTooltip filePath={tooltipPath}>{anchor}</FileLinkHoverTooltip>;
 }
 

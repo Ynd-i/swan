@@ -18,12 +18,12 @@ describe("formatAgentModeLabel", () => {
   describe("on the Mac desktop", () => {
     afterEach(() => vi.restoreAllMocks());
 
-    it("names Claude and Codex modes the way their own apps do", () => {
+    it("names Codex modes the way the Codex app does and keeps other provider labels", () => {
       vi.spyOn(platform, "getIsElectronMac").mockReturnValue(true);
-      const claude = (id: string) => formatAgentModeLabel({ id, label: id }, "claude");
       const codex = (id: string) => formatAgentModeLabel({ id, label: id }, "codex");
-      expect(claude("auto")).toBe("Auto-review");
-      expect(claude("bypassPermissions")).toBe("Full access");
+      expect(
+        formatAgentModeLabel({ id: "acceptEdits", label: "Accept File Edits" }, "claude"),
+      ).toBe("Accept file edits");
       expect(codex("auto")).toBe("Ask for review");
       expect(codex("auto-review")).toBe("Auto-review");
       expect(formatAgentModeLabel({ id: "build", label: "Build" }, "opencode")).toBe("Build");

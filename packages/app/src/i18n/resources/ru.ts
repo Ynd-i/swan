@@ -48,10 +48,10 @@ export const ru: TranslationResources = {
     problemSignInAgain: "Войдите снова.",
   },
   desktopChat: {
+    handoffs: { toggle: "Предыдущие передачи ({{count}})" },
     activity: "Действия",
     workedFor: "Время: {{duration}}",
     startWork: "Над чем поработаем?",
-    explorerAfterStart: "Файлы и изменения появятся после начала чата.",
     startInProject: "Над чем поработаем в {{project}}?",
     resetReasoning: "Сбросить интенсивность рассуждений",
     newChat: "Новый чат",
@@ -328,9 +328,7 @@ export const ru: TranslationResources = {
       searchPlaceholder: "Поиск режимов...",
       selectWithValue: "Выбрать режим агента ({{value}})",
       desktop: {
-        plan: "Режим плана",
         askForReview: "Запрашивать проверку",
-        acceptEdits: "Принимать правки",
         autoReview: "Автопроверка",
         fullAccess: "Полный доступ",
       },
@@ -1013,7 +1011,7 @@ export const ru: TranslationResources = {
           updateCurrent: "Обновление недоступно: эта ветка уже синхронизирована с {{baseRef}}.",
           mergePrNoGithub: "Слияние PR сейчас недоступно: GitHub не подключён.",
           archiveNotWorktree:
-            "Архивирование недоступно: это рабочее пространство не было создано как worktree Paseo.",
+            "Архивирование недоступно: это рабочее пространство не было создано как worktree Swan.",
           mergePrNoForge: "Слияние {{noun}} сейчас недоступно: {{brand}} не подключён.",
           mergePrMissing: "Слияние PR недоступно: PR ещё не создан.",
           mergePrDraft: "Слияние PR недоступно: PR всё ещё является черновиком.",
@@ -1197,6 +1195,8 @@ export const ru: TranslationResources = {
             cancelled: "Отменено",
           },
         },
+        previewFiles_one: "{{count}} файл",
+        previewFiles_other: "{{count}} файлов",
         states: {
           draft: "Черновик",
           merged: "Объединён",
@@ -1363,7 +1363,7 @@ export const ru: TranslationResources = {
       discord: "Discord",
       github: "Создать issue на GitHub",
       whatsNew: "Что нового",
-      appName: "Paseo",
+      appName: "Swan",
     },
     sections: {
       sessions: "История",
@@ -1513,7 +1513,7 @@ export const ru: TranslationResources = {
       close: "Закрыть окно",
     },
     quitting: {
-      title: "Завершение работы Paseo...",
+      title: "Завершение работы Swan...",
       detail: "Остановка локального демона.",
     },
     daemon: {
@@ -1528,20 +1528,20 @@ export const ru: TranslationResources = {
       },
       management: {
         title: "Управление встроенным демоном",
-        hint: "Разрешить Paseo запускать и останавливать встроенный демон",
+        hint: "Разрешить Swan запускать и останавливать встроенный демон",
         pauseTitle: "Приостановить встроенный демон",
         pauseMessage:
           "Это немедленно остановит встроенный демон. Запущенные агенты и терминалы, подключенные к встроенному демону, будут остановлены.",
         pauseAndStop: "Приостановить управление и остановить демон",
         registrationFailed:
-          "Встроенный демон запущен, но Paseo не удалось сохранить подключение к localhost. Выключите и снова включите управление демоном или добавьте localhost вручную.",
+          "Встроенный демон запущен, но Swan не удалось сохранить подключение к localhost. Выключите и снова включите управление демоном или добавьте localhost вручную.",
         pausedStopFailed:
-          "Встроенное управление демоном было приостановлено, но Paseo не смог остановить демон.",
+          "Встроенное управление демоном было приостановлено, но Swan не смог остановить демон.",
         updateFailed: "Не удалось изменить настройки управления встроенным демоном.",
       },
       keepRunning: {
         title: "Продолжать работу демона после выхода",
-        hint: "Демон продолжит работать после выхода из Paseo",
+        hint: "Демон продолжит работать после выхода из Swan",
       },
       logs: {
         title: "Файл журнала",
@@ -1612,7 +1612,7 @@ export const ru: TranslationResources = {
     },
     rosetta: {
       title: "Загрузите сборку Apple Silicon",
-      runningIntel: "Вы используете сборку Paseo для Intel через Rosetta на Apple Silicon.",
+      runningIntel: "Вы используете сборку Swan для Intel через Rosetta на Apple Silicon.",
       highCpu:
         "Из-за этого процессор сильно загружен. Чтобы устранить проблему, скачайте сборку для Apple Silicon.",
       download: "Скачать",
@@ -1657,7 +1657,7 @@ export const ru: TranslationResources = {
         microphone: "Состояние микрофона ещё не проверялось.",
       },
       testNotification: {
-        title: "Тест уведомлений Paseo",
+        title: "Тест уведомлений Swan",
         body: "Если вы это видите, уведомления на рабочем столе работают.",
         notDelivered:
           "Уведомление не доставлено. Проверьте раздел «Уведомления» в системных настройках.",
@@ -1667,12 +1667,12 @@ export const ru: TranslationResources = {
     integrations: {
       cli: {
         statusFailed: "Не удалось проверить состояние установки CLI.",
-        installFailed: "Не удалось установить Paseo CLI.",
+        installFailed: "Не удалось установить Swan CLI.",
       },
     },
   },
   rootError: {
-    title: "В Paseo возникла проблема.",
+    title: "В Swan возникла проблема.",
     body: "Попробуйте перезагрузить приложение. Если ошибка повторится, приложите приведённые ниже сведения к отчёту.",
     details: "Подробности",
   },
@@ -1767,7 +1767,7 @@ export const ru: TranslationResources = {
   workspaceContract: {
     trustNotice: {
       title: "В этом проекте есть конфигурация .agents",
-      body: "Paseo не применяет его MCP-серверы, навыки и хуки, потому что проект не отмечен как доверенный.",
+      body: "Swan не применяет его MCP-серверы, навыки и хуки, потому что проект не отмечен как доверенный.",
       trust: "Доверять проекту",
       notNow: "Не сейчас",
     },
@@ -1784,7 +1784,7 @@ export const ru: TranslationResources = {
     },
   },
   onboarding: {
-    title: "Добро пожаловать в Paseo",
+    title: "Добро пожаловать в Swan",
     subtitle: "Подключите компьютер, чтобы начать",
     actions: {
       settings: "Настройки",
@@ -1822,13 +1822,18 @@ export const ru: TranslationResources = {
     title: "Добавить провайдера",
     search: "Поиск провайдеров",
     noProviders: "Провайдеры не найдены",
+    clearSearch: "Очистить поиск",
     actions: {
       add: "Добавить",
+      addProvider: "Добавить {{provider}}",
       adding: "Добавление",
       installed: "Установлено",
       cancel: "Отмена",
       installInstructions: "Инструкции по установке",
       installInstructionsFor: "Инструкции по установке {{provider}}",
+    },
+    types: {
+      acp: "ACP",
     },
     errors: {
       unableToInstall: "Не удалось установить провайдера",
@@ -1887,7 +1892,7 @@ export const ru: TranslationResources = {
     },
     direct: {
       title: "Прямое подключение",
-      helper: "Введите адрес сервера Paseo.",
+      helper: "Введите адрес сервера Swan.",
       fields: {
         host: "Хост",
         port: "Порт",
@@ -1930,7 +1935,7 @@ export const ru: TranslationResources = {
     },
     remoteSsh: {
       title: "Удалённый SSH",
-      helper: "Подключитесь к демону Paseo на удалённом хосте.",
+      helper: "Подключитесь к демону Swan на удалённом хосте.",
       fields: {
         target: "Хост SSH",
         password: "Пароль демона",
@@ -1994,15 +1999,15 @@ export const ru: TranslationResources = {
       enableDescription:
         "Ретранслятор позволяет этому устройству подключаться откуда угодно. Трафик сопряжения защищён сквозным шифрованием.",
       relayDocs: "Как работает ретранслятор",
-      relayDocsAccessibility: "Узнать, как работает ретранслятор Paseo",
+      relayDocsAccessibility: "Узнать, как работает ретранслятор Swan",
       enableRelay: "Включить ретранслятор",
       enablingRelay: "Включение ретранслятора...",
       notNow: "Не сейчас",
       directConnectionHint:
         "Без ретранслятора подключайтесь напрямую через TCP, Tailscale или другую VPN. QR-код создаваться не будет.",
-      updateRequired: "Обновите хост, чтобы включить ретранслятор из Paseo Desktop.",
+      updateRequired: "Обновите хост, чтобы включить ретранслятор из Swan Desktop.",
       unavailable: "Данные для сопряжения недоступны.",
-      hint: "Отсканируйте этот QR-код с помощью Paseo на телефоне или скопируйте ссылку ниже.",
+      hint: "Отсканируйте этот QR-код с помощью Swan на телефоне или скопируйте ссылку ниже.",
       securityWarning:
         "Обращайтесь с этой ссылкой для сопряжения как с паролем. Любой, у кого она есть, может получить доступ к этому демону.",
       qrUnavailable: "QR-код недоступен.",
@@ -2037,7 +2042,7 @@ export const ru: TranslationResources = {
   serviceUrl: {
     title: "Открыть URL сервиса",
     message: "Открыть {{url}}?",
-    inPaseo: "В Paseo",
+    inPaseo: "В Swan",
     externalBrowser: "Внешний браузер",
     dontAskAgain: "Больше не спрашивать",
   },
@@ -2159,8 +2164,8 @@ export const ru: TranslationResources = {
       other: "использованы другие инструменты ({{count}})",
     },
     paseoCalls: {
-      one: "выполнен {{count}} вызов Paseo",
-      other: "выполнены вызовы Paseo ({{count}})",
+      one: "выполнен {{count}} вызов Swan",
+      other: "выполнены вызовы Swan ({{count}})",
     },
     and: "и",
     verbSeparator: ", ",
@@ -2171,7 +2176,7 @@ export const ru: TranslationResources = {
       search: "выполнен поиск",
       edit: "изменены файлы",
       command: "выполнены команды",
-      paseo: "вызван Paseo",
+      paseo: "вызван Swan",
       other: "использованы инструменты",
     },
     done: {
@@ -2266,7 +2271,7 @@ export const ru: TranslationResources = {
       send: "Отправить",
       sending: "Отправка...",
       sentTitle: "Тестовое уведомление отправлено",
-      sentDescription: "Paseo передал уведомление операционной системе.",
+      sentDescription: "Swan передал уведомление операционной системе.",
       sendFailedTitle: "Не удалось отправить тестовое уведомление",
     },
     hostSections: {
@@ -2285,14 +2290,14 @@ export const ru: TranslationResources = {
     metadataGeneration: {
       title: "Генерация метаданных",
       description:
-        "Выберите модель, которую Paseo будет использовать для названий рабочих пространств и веток, сообщений коммитов и черновиков PR",
+        "Выберите модель, которую Swan будет использовать для названий рабочих пространств и веток, сообщений коммитов и черновиков PR",
       selection: "Выбор модели",
       automatic: "Автоматически",
       preferred: "Вручную",
-      automaticHint: "Paseo выбирает быструю доступную модель",
-      preferredHint: "Выберите модель, которую использует Paseo",
+      automaticHint: "Swan выбирает быструю доступную модель",
+      preferredHint: "Выберите модель, которую использует Swan",
       model: "Модель",
-      fallbackHint: "Если она недоступна, Paseo использует другую доступную модель",
+      fallbackHint: "Если она недоступна, Swan использует другую доступную модель",
       docs: "Документация",
       saveError: "Не удалось обновить настройки генерации метаданных",
     },
@@ -2302,7 +2307,7 @@ export const ru: TranslationResources = {
       browserData: {
         title: "Данные браузера",
         siteData: "Файлы cookie и данные сайтов",
-        description: "Вкладки браузера в Paseo используют общие данные входа и данные сайтов.",
+        description: "Вкладки браузера в Swan используют общие данные входа и данные сайтов.",
         clear: "Очистить данные браузера",
         clearing: "Очистка...",
         confirmTitle: "Очистить данные браузера?",
@@ -2330,7 +2335,7 @@ export const ru: TranslationResources = {
       serviceUrls: {
         options: {
           ask: "Спрашивать",
-          inApp: "В Paseo",
+          inApp: "В Swan",
           external: "Внешний браузер",
         },
       },
@@ -2409,7 +2414,7 @@ export const ru: TranslationResources = {
       releaseChannel: {
         label: "Канал выпуска",
         description:
-          "Переключитесь на бета-канал, чтобы раньше получать обновления и помогать развивать Paseo.",
+          "Переключитесь на бета-канал, чтобы раньше получать обновления и помогать развивать Swan.",
         stable: "Стабильный",
         beta: "Бета",
       },
@@ -2417,7 +2422,7 @@ export const ru: TranslationResources = {
         label: "Обновления приложения",
         readyToInstall: "Версия {{version}} готова к установке",
         installTitle: "Установить обновление настольного приложения",
-        installMessage: "Это обновит Paseo на этом компьютере.",
+        installMessage: "Это обновит Swan на этом компьютере.",
         installConfirm: "Установить обновление",
         update: "Обновить",
         updateTo: "Обновить до {{version}}",
@@ -2700,11 +2705,11 @@ export const ru: TranslationResources = {
         unavailable: "Подключитесь к этому хосту, чтобы управлять навыками оркестрации",
         unsupported: "Обновите этот хост, чтобы управлять навыками оркестрации",
         updateAvailable: "Доступно обновление",
-        updateTitle: "Обновить навыки Paseo?",
+        updateTitle: "Обновить навыки Swan?",
         updateFallback: "Встроенные навыки будут синхронизированы с этим хостом.",
-        uninstallTitle: "Удалить навыки Paseo?",
+        uninstallTitle: "Удалить навыки Swan?",
         uninstallMessage:
-          "Удаляет все навыки оркестрации Paseo из ~/.agents, ~/.claude и ~/.codex на этом хосте.",
+          "Удаляет все навыки оркестрации Swan из ~/.agents, ~/.claude и ~/.codex на этом хосте.",
         choose: "Выбрать навыки",
         chooseAll: "Все навыки",
         chooseAllHint: "Устанавливать все встроенные навыки, включая добавленные позже.",
@@ -2740,9 +2745,9 @@ export const ru: TranslationResources = {
         title: "Оркестрация",
         unavailable: "Подключитесь к этому хосту, чтобы управлять оркестрацией.",
         enableTools: {
-          title: "Включить инструменты Paseo",
+          title: "Включить инструменты Swan",
           hint: "Агенты смогут управлять worktree, агентами и расписаниями.",
-          accessibilityLabel: "Добавить инструменты Paseo",
+          accessibilityLabel: "Добавить инструменты Swan",
         },
         systemPrompt: {
           title: "Системный промпт",
@@ -2847,15 +2852,15 @@ export const ru: TranslationResources = {
             "Этот хост не подключён. Дождитесь его появления в сети перед перезапуском.",
           offlineTitle: "Хост не в сети",
           offlineMessage:
-            "Этот хост не в сети. Paseo переподключится автоматически. Дождитесь подключения перед перезапуском.",
+            "Этот хост не в сети. Swan переподключится автоматически. Дождитесь подключения перед перезапуском.",
           requestFailedTitle: "Ошибка",
           requestFailedMessage:
-            "Не удалось отправить запрос на перезапуск. Paseo переподключается автоматически. Повторите попытку, когда хост появится в сети.",
+            "Не удалось отправить запрос на перезапуск. Swan переподключается автоматически. Повторите попытку, когда хост появится в сети.",
           dialogFailedMessage: "Не удалось открыть диалог подтверждения перезапуска.",
         },
         update: {
           desktopManagedHint:
-            "Этот демон управляется Paseo Desktop. Обновите Paseo Desktop на хосте.",
+            "Этот демон управляется Swan Desktop. Обновите Swan Desktop на хосте.",
           title: "Обновить демон",
           hint: "Обновить демон до последней версии и перезапустить его",
           confirm: "Обновить",
@@ -3019,7 +3024,7 @@ export const ru: TranslationResources = {
         newScript: "Новый скрипт",
         editScript: "Изменить {{name}}",
         runAsService: "Запускать как сервис",
-        serviceHint: "Paseo управляет процессом и назначает порт через переменную $PASEO_PORT.",
+        serviceHint: "Swan управляет процессом и назначает порт через переменную $PASEO_PORT.",
         actions: {
           add: "Добавить скрипт",
           edit: "Редактировать",
@@ -3028,7 +3033,7 @@ export const ru: TranslationResources = {
       },
       metadata: {
         title: "Генерация метаданных",
-        info: "Инструкции для этого проекта, добавляемые в промпты ИИ, с помощью которых Paseo генерирует метаданные. Используйте их, чтобы соблюдать принятые в команде правила именования веток, оформления коммитов и формата PR.",
+        info: "Инструкции для этого проекта, добавляемые в промпты ИИ, с помощью которых Swan генерирует метаданные. Используйте их, чтобы соблюдать принятые в команде правила именования веток, оформления коммитов и формата PR.",
         branchName: "Названия веток",
         branchNamePlaceholder:
           "Добавляйте к веткам префиксы feat/ или fix/, а к личным веткам — mb/",

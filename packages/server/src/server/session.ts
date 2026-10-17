@@ -2880,6 +2880,8 @@ export class Session {
       case "forge.search.request":
       case "github_search_request":
         return this.checkoutSession.handleForgeSearchRequest(msg);
+      case "forge.change_request.get.request":
+        return this.checkoutSession.handleForgeChangeRequestGetRequest(msg);
       case "stash_save_request":
         return this.checkoutSession.handleStashSaveRequest(msg);
       case "stash_pop_request":

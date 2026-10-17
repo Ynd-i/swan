@@ -33,7 +33,12 @@ import { useSessionStore } from "@/stores/session-store";
 import type { Theme } from "@/styles/theme";
 import { confirmDialog } from "@/utils/confirm-dialog";
 import type { DesktopChatTarget } from "./desktop-chat-actions";
-import { desktopChatKey, desktopChatPinnedAt, isDesktopChatUnread } from "./desktop-chat-model";
+import {
+  chainPinnedAt,
+  desktopChatKey,
+  desktopChatPinnedAt,
+  isDesktopChatUnread,
+} from "./desktop-chat-model";
 import { archiveEmptiedWorkspaces, useDesktopChatMutation } from "./use-desktop-chat";
 
 const ArchiveIcon = withUnistyles(Archive);
@@ -65,6 +70,7 @@ const windowLeading = <WindowIcon size={16} uniProps={mutedIcon} />;
 export function DesktopChatMenuItems({
   context,
   toolbar,
+  nested,
   pinned,
   unread,
   disabled,
@@ -79,6 +85,8 @@ export function DesktopChatMenuItems({
 }: {
   context?: boolean;
   toolbar?: boolean;
+  /** An earlier chat of a handoff chain: pin and archive belong to the chat that continues it. */
+  nested?: boolean;
   pinned: boolean;
   unread: boolean;
   disabled: boolean;
@@ -115,9 +123,11 @@ export function DesktopChatMenuItems({
       <Item onSelect={onRename} disabled={disabled} leading={renameLeading}>
         {t("renameModal.rename")}
       </Item>
-      <Item onSelect={onPin} disabled={disabled} leading={pinned ? unpinLeading : pinLeading}>
-        {t(pinned ? "sidebar.workspace.actions.unpin" : "sidebar.workspace.actions.pin")}
-      </Item>
+      {nested ? null : (
+        <Item onSelect={onPin} disabled={disabled} leading={pinned ? unpinLeading : pinLeading}>
+          {t(pinned ? "sidebar.workspace.actions.unpin" : "sidebar.workspace.actions.pin")}
+        </Item>
+      )}
       {toolbar ? archiveItem : readItem}
       {sectionPage ? (
         <DropdownMenuSubTrigger id={sectionPage} leading={sectionLeading} disabled={disabled}>
@@ -148,8 +158,12 @@ export function DesktopChatMenuItems({
           </Item>
         </>
       ) : null}
-      <DropdownMenuSeparator />
-      {toolbar ? readItem : archiveItem}
+      {nested ? null : (
+        <>
+          <DropdownMenuSeparator />
+          {toolbar ? readItem : archiveItem}
+        </>
+      )}
     </>
   );
 }
@@ -212,13 +226,22 @@ export function useChatForkPage(agent: DesktopChatTarget): MenuPageDefinition | 
   );
 }
 
-export function useDesktopChatMenu(agent: DesktopChatTarget) {
+const NO_HANDOFFS: readonly DesktopChatTarget[] = [];
+
+/**
+ * `handoffs` are the earlier chats nested under `agent`; pinning and archiving apply to the whole
+ * chain.
+ */
+export function useDesktopChatMenu(
+  agent: DesktopChatTarget,
+  handoffs: readonly DesktopChatTarget[] = NO_HANDOFFS,
+) {
   const { t } = useTranslation();
   const toast = useToast();
   const { update, pendingAgent } = useDesktopChatMutation();
   const { archiveAgent, isArchivingAgent } = useArchiveAgent();
   const [renaming, setRenaming] = useState(false);
-  const pinned = desktopChatPinnedAt(agent) !== null;
+  const pinned = chainPinnedAt(agent, handoffs) !== null;
   const unread = isDesktopChatUnread(agent);
   const busy =
     pendingAgent !== null || isArchivingAgent({ serverId: agent.serverId, agentId: agent.id });
@@ -226,11 +249,15 @@ export function useDesktopChatMenu(agent: DesktopChatTarget) {
     void update(agent, { kind: "read" }).catch(() => {});
   }, [agent, update]);
   const togglePin = useCallback(() => {
-    void update(
-      agent,
-      pinned ? { kind: "unpin" } : { kind: "pin", pinnedAt: new Date().toISOString() },
-    ).catch(() => {});
-  }, [agent, pinned, update]);
+    if (!pinned) {
+      void update(agent, { kind: "pin", pinnedAt: new Date().toISOString() }).catch(() => {});
+      return;
+    }
+    const members = [agent, ...handoffs].filter((member) => desktopChatPinnedAt(member) !== null);
+    void (async () => {
+      for (const member of members) await update(member, { kind: "unpin" });
+    })().catch(() => {});
+  }, [agent, handoffs, pinned, update]);
   const toggleRead = useCallback(() => {
     void update(agent, { kind: unread ? "read" : "unread" }).catch(() => {});
   }, [agent, unread, update]);
@@ -248,9 +275,11 @@ export function useDesktopChatMenu(agent: DesktopChatTarget) {
       ?.catch(() => toast.error(t("sidebar.project.actions.openNewWindowFailed")));
   }, [agent.id, agent.serverId, t, toast]);
   const archive = useCallback(() => {
+    // The earlier chats go first, so the sidebar never promotes one while the chain is archived.
+    const members = [...handoffs, agent];
     void (async () => {
       if (
-        agent.turn.phase === "open" &&
+        members.some((member) => member.turn.phase === "open") &&
         !(await confirmDialog({
           title: t("workspace.tabs.confirmations.archiveRunningAgentTitle"),
           message: t("workspace.tabs.confirmations.archiveRunningAgentMessage"),
@@ -260,10 +289,12 @@ export function useDesktopChatMenu(agent: DesktopChatTarget) {
         }))
       )
         return;
-      await archiveAgent({ serverId: agent.serverId, agentId: agent.id });
-      await archiveEmptiedWorkspaces([agent]);
+      for (const member of members) {
+        await archiveAgent({ serverId: member.serverId, agentId: member.id });
+      }
+      await archiveEmptiedWorkspaces(members);
     })().catch((error) => toast.error(error instanceof Error ? error.message : String(error)));
-  }, [agent, archiveAgent, t, toast]);
+  }, [agent, archiveAgent, handoffs, t, toast]);
   return {
     busy,
     unread,

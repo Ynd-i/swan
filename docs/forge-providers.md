@@ -111,6 +111,14 @@ Thread the checkout head SHA through adapter cache and poll identities as well
 as the lookup itself. Otherwise a commit made on the same branch can inherit the
 previous commit's cached terminal status until the cache expires.
 
+Pull request links in agent messages render as a chip with a hover card
+(`packages/app/src/pull-request-links/`). The card's data comes from the optional
+`getChangeRequestPreview` method over `forge.change_request.get.request`. Only
+GitHub implements it, and the daemon calls the GitHub service whatever the cwd's
+forge is, because `gh pr view <url>` resolves the repository from the URL. To
+preview another forge's links, teach the app parser its URL shape and route the
+request by URL host instead.
+
 Cloud hosts in the manifest are a bounded public-host list, not a self-host
 allowlist. Self-hosted detection is a trust gate: Paseo only talks to a forge
 host that is either a known cloud host or one the CLI is already authenticated

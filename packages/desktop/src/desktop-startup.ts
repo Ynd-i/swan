@@ -15,6 +15,21 @@ export async function runDesktopStartup(deps: DesktopStartupDependencies): Promi
   deps.inheritLoginShellEnv();
   await deps.bootstrapGui();
 }
+
+/** Swan was published as Paseo Custom, whose data folder holds its daemon home and settings. */
+export function resolveCustomUserDataPath({
+  isPackaged,
+  appName,
+  appDataPath,
+}: {
+  isPackaged: boolean;
+  appName: string;
+  appDataPath: string;
+}): string | null {
+  if (!isPackaged || appName !== "Swan") return null;
+  return path.join(appDataPath, "Paseo Custom");
+}
+
 export function configureDesktopDaemonEnvironment({
   isPackaged,
   appName,

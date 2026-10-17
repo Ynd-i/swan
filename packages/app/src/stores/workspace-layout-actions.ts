@@ -1253,6 +1253,8 @@ export function createDefaultLayout(): WorkspaceLayout {
 }
 
 function createDefaultExplorerSidebarTabs(): WorkspaceTab[] {
+  // The macOS Explorer opens on the launcher; Files and Changes are a click away there.
+  if (getIsElectronMac()) return [createNewWorkspaceTab()];
   const createdAt = Date.now();
   const targets = [{ kind: "files" }, { kind: "changes_tree" }] as const;
   return targets.map((target) => ({

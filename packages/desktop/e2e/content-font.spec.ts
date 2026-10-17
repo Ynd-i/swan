@@ -96,10 +96,19 @@ test("macOS code weight reaches files, Markdown, tool output and canvas without 
     ).toHaveCSS("font-weight", "500");
 
     await page.getByTestId("workspace-explorer-toggle").click();
-    await page.getByTestId("explorer-sidebar-tab-files").click();
+    await page
+      .getByTestId("workspace-explorer-sidebar")
+      .getByTestId("workspace-new-tab-files")
+      .click();
     const dock = page.getByTestId("workspace-explorer-sidebar");
     const tree = dock.getByTestId("file-tree-rail-tree").filter({ visible: true });
     await tree.getByText("sample.ts", { exact: true }).click();
+    // An opened file starts without the folder tree.
+    await dock
+      .getByTestId("file-tool-toolbar")
+      .filter({ visible: true })
+      .getByTestId("file-toggle-tree")
+      .click();
     const editor = dock.locator('.cm-content[contenteditable="true"]').filter({ visible: true });
     await expect(editor).toHaveCSS("font-weight", "500");
     await expect(editor).toContainText("answer = 43");
@@ -136,7 +145,7 @@ test("macOS code weight reaches files, Markdown, tool output and canvas without 
     await expect(canvas).toHaveCSS("font-weight", "400");
     // Canvas serializes normal 400 without the weight token.
     await expect.poll(paintedFont).toMatch(/^(?:400 )?12px /);
-    await page.getByTestId("explorer-sidebar-tab-files").click();
+    await page.getByRole("button", { name: "Browse workspace files", exact: true }).click();
     await tree.getByText("weights.md", { exact: true }).click();
     await expect(fence).toHaveCSS("font-weight", "400");
     await expect(preview.getByText("strong words", { exact: true })).toHaveCSS(
@@ -241,7 +250,10 @@ test("macOS composer hides its focus hint while retaining shortcut and narrow dr
 
     await page.getByTestId("workspace-explorer-toggle").click();
     await expect(page.getByTestId("workspace-explorer-sidebar")).toBeVisible();
-    await page.getByTestId("explorer-sidebar-tab-files").click();
+    await page
+      .getByTestId("workspace-explorer-sidebar")
+      .getByTestId("workspace-new-tab-files")
+      .click();
     await expect(
       page.getByTestId("file-explorer-tree-scroll").filter({ visible: true }),
     ).toBeVisible();
@@ -304,7 +316,10 @@ test("macOS composer placeholder follows the default dark override through theme
     await expect(input).toHaveAttribute("placeholder", "Ask anything");
     await expect.poll(placeholderColor).toBe("rgb(132, 132, 129)");
     await page.getByTestId("workspace-explorer-toggle").click();
-    await page.getByTestId("explorer-sidebar-tab-files").click();
+    await page
+      .getByTestId("workspace-explorer-sidebar")
+      .getByTestId("workspace-new-tab-files")
+      .click();
     await expect(
       page.getByTestId("file-explorer-tree-scroll").filter({ visible: true }),
     ).toBeVisible();

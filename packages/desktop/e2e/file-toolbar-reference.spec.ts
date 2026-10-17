@@ -63,8 +63,8 @@ test("macOS file toolbar keeps the path and editor actions above both file colum
     await openAgentRoute(page, fixture);
     await page.getByTestId("workspace-explorer-toggle").click();
     await page
-      .getByTestId("desktop-explorer-toolbar")
-      .getByRole("button", { name: "Browse workspace files", exact: true })
+      .getByTestId("workspace-explorer-sidebar")
+      .getByTestId("workspace-new-tab-files")
       .click();
     const dock = page.getByTestId("workspace-explorer-sidebar");
     for (const directory of ["packages", "desktop", "e2e"]) {
@@ -73,6 +73,8 @@ test("macOS file toolbar keeps the path and editor actions above both file colum
     await dock.getByText(filename, { exact: true }).click();
     const toolbar = dock.getByTestId("file-tool-toolbar").filter({ visible: true });
     await expect(toolbar).toBeVisible({ timeout: 2_000 });
+    // An opened file starts without the folder tree; this reference covers the file beside it.
+    await toolbar.getByTestId("file-toggle-tree").click();
     const path = toolbar.getByTestId("file-path-menu-trigger");
     await expect(path).toContainText("e2e");
     await expect(path).toContainText(filename);

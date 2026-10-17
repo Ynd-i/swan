@@ -1006,19 +1006,11 @@ export function createWorkspaceLayoutStore(
               tabId: normalizedTabId,
               explorerSidebarPaneId,
             });
-            const nextLayoutBeforeFocusNormalization =
-              closedLayout &&
-              closingPane?.id === explorerSidebarPaneId &&
-              closingPane.tabIds.length === 1
-                ? (setPaneHiddenInLayout({
-                    layout: closedLayout,
-                    paneId: explorerSidebarPaneId,
-                    hidden: true,
-                  }) ?? closedLayout)
-                : closedLayout;
-            const nextLayout = nextLayoutBeforeFocusNormalization
+            // An emptied Explorer keeps the launcher closeTabInLayout leaves in it and stays open;
+            // closing that launcher (above) hides Explorer.
+            const nextLayout = closedLayout
               ? keepWorkspaceFocusOutOfExplorerSidebar(
-                  nextLayoutBeforeFocusNormalization,
+                  closedLayout,
                   explorerSidebarPaneId,
                   layout.focusedPaneId,
                 )
@@ -1123,17 +1115,18 @@ export function createWorkspaceLayoutStore(
           const currentTab = collectAllTabs(
             getWorkspaceLayout(get().layoutByWorkspace, normalizedWorkspaceKey).root,
           ).find((tab) => tab.tabId === normalizedTabId);
+          // Chats and tools live in different panes here, so a replacement that crosses them opens
+          // the target where it belongs and keeps the current tab.
           if (
             getIsElectronMac() &&
             currentTab &&
-            isMainChatTarget(currentTab.target) &&
-            !isMainChatTarget(normalizedTarget)
+            isMainChatTarget(currentTab.target) !== isMainChatTarget(normalizedTarget)
           ) {
             const openedTabId = get().openTab({
               workspaceKey: normalizedWorkspaceKey,
               target: normalizedTarget,
               intent: "reveal",
-              parentTabId: normalizedTabId,
+              ...(isMainChatTarget(normalizedTarget) ? {} : { parentTabId: normalizedTabId }),
             });
             if (openedTabId && tabState !== undefined)
               get().setTabState(normalizedWorkspaceKey, openedTabId, tabState);

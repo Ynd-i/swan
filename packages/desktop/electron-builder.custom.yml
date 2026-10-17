@@ -1,22 +1,23 @@
 # Keep upstream packaging inputs inherited.
 extends: ./electron-builder.yml
+# Published as Paseo Custom; Squirrel.Mac only installs updates with the same identifier.
 appId: local.paseo.custom.desktop
-productName: Paseo Custom
-executableName: Paseo Custom
+productName: Swan
+executableName: Swan
 # Only the custom-release workflow adds an update feed, to the builds it publishes; see
 # docs/release.md#custom-releases.
 publish: null
 # Object form replaces the parent protocol array; another array would concatenate it.
 protocols:
-  name: Paseo Custom agent link
+  name: Swan agent link
   schemes:
     - paseo-custom
 extraMetadata:
-  productName: Paseo Custom
+  productName: Swan
 directories:
   output: release-custom
 mac:
-  artifactName: "Paseo-Custom-${version}-${arch}.${ext}"
+  artifactName: "Swan-${version}-${arch}.${ext}"
   identity: "-"
   entitlements: assets/entitlements.custom.mac.plist
   entitlementsInherit: assets/entitlements.custom.mac.plist

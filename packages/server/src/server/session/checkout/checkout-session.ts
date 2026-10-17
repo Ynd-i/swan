@@ -1452,6 +1452,36 @@ export class CheckoutSession {
     }
   }
 
+  async handleForgeChangeRequestGetRequest(
+    msg: Extract<SessionInboundMessage, { type: "forge.change_request.get.request" }>,
+  ): Promise<void> {
+    const { cwd, url, requestId } = msg;
+    try {
+      // gh resolves the repository from the URL, so links outside the cwd's repo work too.
+      if (!this.github.getChangeRequestPreview) {
+        throw new Error("Change request previews are not supported");
+      }
+      const changeRequest = await this.github.getChangeRequestPreview({
+        cwd: expandTilde(cwd),
+        url,
+      });
+      this.host.emit({
+        type: "forge.change_request.get.response",
+        payload: { url, changeRequest, error: null, requestId },
+      });
+    } catch (error) {
+      this.host.emit({
+        type: "forge.change_request.get.response",
+        payload: {
+          url,
+          changeRequest: null,
+          error: error instanceof Error ? error.message : String(error),
+          requestId,
+        },
+      });
+    }
+  }
+
   cleanup(): void {
     this.statusUpdateFingerprints.clear();
   }

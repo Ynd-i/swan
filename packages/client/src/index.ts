@@ -20,6 +20,7 @@ import type {
   MutableDaemonConfig,
   MutableDaemonConfigPatch,
   ProviderDiagnosticResponseMessage,
+  ProviderSubagentDescriptorPayload,
   ProviderUsageListResponseMessage,
   ProjectPlacementPayload,
   WorkspaceProjectDescriptorPayload,
@@ -295,6 +296,7 @@ export interface PaseoAgentCommandsOptions {
 }
 
 export type PaseoAgentCommandsResult = ListCommandsResponse["payload"];
+export type PaseoProviderSubagent = ProviderSubagentDescriptorPayload;
 
 export type PaseoAgentUpdate = Extract<SessionOutboundMessage, { type: "agent_update" }>["payload"];
 
@@ -374,6 +376,8 @@ export interface PaseoAgentHandle {
    * rejecting.
    */
   commands(options?: PaseoAgentCommandsOptions): Promise<PaseoAgentCommandsResult>;
+  /** The provider's own subagents under this agent, such as Claude's background agents. */
+  subagents(): Promise<PaseoProviderSubagent[]>;
   archive(): Promise<{ archivedAt: string }>;
   detach(): Promise<void>;
   subscribe(handler: (update: PaseoAgentUpdate) => void): () => void;
@@ -966,6 +970,7 @@ function createAgentHandleFactory(
         return result;
       },
       commands: (options) => daemonClient.listCommands({ agentId: id, ...options }),
+      subagents: async () => (await daemonClient.listProviderSubagents(id)).subagents,
       archive: async () => {
         const result = await daemonClient.archiveAgent(id);
         if (current) {

@@ -22,6 +22,7 @@ import type {
   FetchCatalogOptions,
 } from "../agent/agent-sdk-types.js";
 import type { AgentPermissionRequest, AgentPermissionResponse } from "../agent/agent-sdk-types.js";
+import type { ProviderSubagentInputEvent } from "../agent/provider-subagents/store.js";
 import { isLikelyExternalToolName } from "@getpaseo/protocol/tool-name-normalization";
 
 const TEST_CAPABILITIES: AgentCapabilityFlags = {
@@ -59,12 +60,19 @@ interface FakeAgentSessionOptions {
   memoryMarker?: string | null;
   closeSession?: () => Promise<void>;
   onStartTurn?: (prompt: AgentPromptInput) => void;
+  respond?: FakeTurnScript;
 }
+
+/** Overrides the reply text and completion usage of a plain prompt turn, and can report a subagent. */
+export type FakeTurnScript = (
+  prompt: string,
+) => { text?: string; usage?: AgentUsage; subagent?: ProviderSubagentInputEvent } | undefined;
 
 export interface TestAgentClientOptions {
   beforeCreateSession?: () => Promise<void>;
   closeSession?: () => Promise<void>;
   onStartTurn?: (prompt: AgentPromptInput) => void;
+  respond?: FakeTurnScript;
   supportsMcpServers?: boolean;
 }
 
@@ -338,6 +346,7 @@ class FakeAgentSession implements AgentSession {
 
   private readonly closeSession: (() => Promise<void>) | undefined;
   private readonly onStartTurn: ((prompt: AgentPromptInput) => void) | undefined;
+  private readonly respond: FakeTurnScript | undefined;
 
   constructor(options: FakeAgentSessionOptions) {
     this.capabilities = {
@@ -350,6 +359,7 @@ class FakeAgentSession implements AgentSession {
     this.memoryMarker = options.memoryMarker ?? null;
     this.closeSession = options.closeSession;
     this.onStartTurn = options.onStartTurn;
+    this.respond = options.respond;
     this.historyPath = path.join(
       tmpdir(),
       "paseo-fake-provider-history",
@@ -779,7 +789,17 @@ class FakeAgentSession implements AgentSession {
         }
       }
 
-      const assistantText = this.buildAssistantText(textPrompt);
+      const scripted = this.respond?.(textPrompt);
+      if (scripted?.subagent) {
+        const subagent: AgentStreamEvent = {
+          type: "provider_subagent",
+          provider: this.providerName,
+          event: scripted.subagent,
+        };
+        await this.appendHistoryEvent(subagent);
+        this.notifySubscribers(subagent);
+      }
+      const assistantText = scripted?.text ?? this.buildAssistantText(textPrompt);
       const assistantChunkA: AgentStreamEvent = {
         type: "timeline",
         provider: this.providerName,
@@ -802,7 +822,7 @@ class FakeAgentSession implements AgentSession {
       const completed: AgentStreamEvent = {
         type: "turn_completed",
         provider: this.providerName,
-        usage: { inputTokens: 1, outputTokens: 1 },
+        usage: scripted?.usage ?? { inputTokens: 1, outputTokens: 1 },
       };
       await this.appendHistoryEvent(completed);
       this.notifySubscribers(completed);
@@ -1220,6 +1240,7 @@ class FakeAgentClient implements AgentClient {
       supportsMcpServers: this.options.supportsMcpServers,
       closeSession: this.options.closeSession,
       onStartTurn: this.options.onStartTurn,
+      respond: this.options.respond,
     });
   }
 
@@ -1245,6 +1266,7 @@ class FakeAgentClient implements AgentClient {
       memoryMarker: typeof marker === "string" ? marker : null,
       closeSession: this.options.closeSession,
       onStartTurn: this.options.onStartTurn,
+      respond: this.options.respond,
     });
   }
 

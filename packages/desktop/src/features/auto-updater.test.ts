@@ -64,7 +64,7 @@ describe("checkForAppUpdate", () => {
       intent: "manual",
     });
     autoUpdaterMock.handlers.get("update-downloaded")?.({ version: "1.2.4" });
-    vi.mocked(app.getName).mockReturnValue("Paseo Custom");
+    vi.mocked(app.getName).mockReturnValue("Swan");
     autoUpdaterMock.checkForUpdates.mockClear();
     autoUpdaterMock.downloadUpdate.mockClear();
     autoUpdaterMock.quitAndInstall.mockClear();

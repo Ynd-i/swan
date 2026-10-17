@@ -107,10 +107,10 @@ export function AgentModeControl({
   const iconColor = theme.colors.foregroundMuted;
   const selectedModeLabel = selectedMode ? formatAgentModeLabel(selectedMode, provider) : "";
 
-  // The trigger keeps showing a hidden mode's own label; only the list and cycling are filtered.
+  // The trigger keeps showing a planning mode's own label; only the list and cycling are filtered.
   const selectableModes = useMemo(
-    () => (surface === "toolbar" ? getSelectableAgentModes(modeOptions, provider) : modeOptions),
-    [modeOptions, provider, surface],
+    () => (surface === "toolbar" ? getSelectableAgentModes(modeOptions) : modeOptions),
+    [modeOptions, surface],
   );
   const allOptions = useMemo<ComboboxOption[]>(
     () => selectableModes.map((m) => ({ id: m.id, label: formatAgentModeLabel(m, provider) })),

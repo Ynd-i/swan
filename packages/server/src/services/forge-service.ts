@@ -1,4 +1,4 @@
-import type { ForgeSearchKind } from "@getpaseo/protocol/messages";
+import type { ForgeChangeRequestPreview, ForgeSearchKind } from "@getpaseo/protocol/messages";
 
 export type ForgeSearchRequestKind = ForgeSearchKind | "github-issue" | "github-pr" | "pr";
 
@@ -475,6 +475,10 @@ export interface ForgeService {
   getPullRequestTimeline(options: GetPullRequestTimelineOptions): Promise<PullRequestTimeline>;
   getCheckDetails(options: GetCheckDetailsOptions): Promise<CheckDetails>;
   searchIssuesAndPrs(options: SearchIssuesAndPrsOptions): Promise<SearchResult>;
+  /** Preview card data for a change request addressed by its web URL, in any repository. */
+  getChangeRequestPreview?(
+    options: { cwd: string; url: string } & ForgeReadOptions,
+  ): Promise<ForgeChangeRequestPreview>;
   createPullRequest(options: CreatePullRequestOptions): Promise<PullRequestCreateResult>;
   mergePullRequest(options: MergePullRequestOptions): Promise<PullRequestMergeResult>;
   enablePullRequestAutoMerge(

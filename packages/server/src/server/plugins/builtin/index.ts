@@ -4,11 +4,13 @@ import { fileURLToPath } from "node:url";
 
 export const builtinPlugins = [
   "antigravity-provider",
+  "auto-handoff",
   "claude-usage-source",
   "codex-usage-source",
   "copilot-usage-source",
   "cursor-usage-source",
   "grok-usage-source",
+  "hoplite-provider",
   "kimi-usage-source",
   "minimax-usage-source",
   "muse-provider",

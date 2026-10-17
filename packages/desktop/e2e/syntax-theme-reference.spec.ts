@@ -28,8 +28,8 @@ test("Codex syntax is the new Mac default while explicit presets and custom font
     await openAgentRoute(page, fixture);
     await page.getByTestId("workspace-explorer-toggle").click();
     await page
-      .getByTestId("desktop-explorer-toolbar")
-      .getByRole("button", { name: "Browse workspace files", exact: true })
+      .getByTestId("workspace-explorer-sidebar")
+      .getByTestId("workspace-new-tab-files")
       .click();
     const dock = page.getByTestId("workspace-explorer-sidebar");
     await dock.getByText("sample.ts", { exact: true }).click();

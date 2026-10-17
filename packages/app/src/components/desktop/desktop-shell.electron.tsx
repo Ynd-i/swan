@@ -226,7 +226,7 @@ function DesktopNavigationRail({ pathname }: { pathname: string }) {
   const settingsActive = pathname.includes("/settings");
   return (
     <View style={styles.rail} testID="desktop-shell-rail">
-      <RailButton onPress={openHome} label="Paseox" active={homeActive} testID="desktop-shell-home">
+      <RailButton onPress={openHome} label="Swan" active={homeActive} testID="desktop-shell-home">
         <HomeIcon size={20} uniProps={railIconProps(homeActive)} />
       </RailButton>
       <RailButton

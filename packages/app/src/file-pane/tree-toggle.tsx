@@ -7,6 +7,7 @@ import { useCallback } from "react";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { getIsElectronMac } from "@/constants/platform";
 import { defaultFileState, fileStateForFilesView, fileStateSchema } from "@/panels/file/state";
+import { usePaneContext } from "@/panels/pane-context";
 import { usePanelState } from "@/panels/use-panel-state";
 
 const ThemedFolders = withUnistyles(Folders);
@@ -15,9 +16,11 @@ export function FileTreeToggle() {
   const { t } = useTranslation();
   const isCompact = useIsCompactFormFactor();
   const isMac = getIsElectronMac();
+  // Matches the hosting panel's default: the Files view starts with its tree, a file without it.
+  const { target } = usePaneContext();
   const [fileState, setFileState] = usePanelState(
     fileStateSchema,
-    isMac ? fileStateForFilesView : defaultFileState,
+    target.kind === "files" ? fileStateForFilesView : defaultFileState,
   );
   const visible = fileState.treeVisible;
   const toggle = useCallback(

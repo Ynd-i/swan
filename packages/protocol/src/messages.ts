@@ -2488,6 +2488,13 @@ export const ForgeSearchRequestSchema = z.object({
   requestId: z.string(),
 });
 
+export const ForgeChangeRequestGetRequestSchema = z.object({
+  type: z.literal("forge.change_request.get.request"),
+  cwd: z.string(),
+  url: z.string(),
+  requestId: z.string(),
+});
+
 // COMPAT(githubSearchRpc): legacy RPC retained when forge.search.* shipped in
 // v0.2.0-beta.1. Stop serving and consuming it after 2027-01-17 once client
 // and daemon floors are >= v0.2.0.
@@ -3357,6 +3364,7 @@ export const SessionInboundMessageSchema = z.discriminatedUnion("type", [
   ValidateBranchRequestSchema,
   BranchSuggestionsRequestSchema,
   ForgeSearchRequestSchema,
+  ForgeChangeRequestGetRequestSchema,
   GitHubSearchRequestSchema,
   DirectorySuggestionsRequestSchema,
   PaseoWorktreeListRequestSchema,
@@ -3641,6 +3649,8 @@ export const ServerInfoStatusPayloadSchema = z
         // and github_search fallback after 2027-01-17 once the supported daemon
         // floor is >= v0.2.0.
         forgeSearch: z.boolean().optional(),
+        // COMPAT(forgeChangeRequestGet): added in v0.11.4 (fork), remove gate after 2027-04-16.
+        forgeChangeRequestGet: z.boolean().optional(),
         // COMPAT(daemonStatusRpc): added in v0.1.76, remove gate after 2026-11-18.
         daemonStatusRpc: z.boolean().optional(),
         // COMPAT(daemonConfigReload): added in v0.4.0, remove gate after 2027-02-14.
@@ -3743,6 +3753,8 @@ export const ServerInfoStatusPayloadSchema = z
         commitBaseClassification: z.boolean().optional(),
         // COMPAT(providerRemoval): added in v0.1.105, drop the gate when floor >= v0.1.105.
         providerRemoval: z.boolean().optional(),
+        // COMPAT(hopliteProvider): added after v0.11.2, remove after 2027-04-15 once host floor includes the bundled adapter.
+        hopliteProvider: z.boolean().optional(),
         // COMPAT(importSessionWorkspaceTarget): added in v0.1.110, remove gate after 2027-01-16.
         importSessionWorkspaceTarget: z.boolean().optional(),
         // COMPAT(importSessionSearch): added in v0.8.0, remove gate after 2027-03-02.
@@ -5978,6 +5990,33 @@ export const ForgeSearchResponseSchema = z.object({
   payload: ForgeSearchResponsePayloadSchema,
 });
 
+export const ForgeChangeRequestPreviewSchema = z.object({
+  forge: z.string(),
+  number: z.number(),
+  title: z.string(),
+  url: z.string(),
+  state: z.string(),
+  isDraft: z.boolean(),
+  authorLogin: z.string().nullable(),
+  additions: z.number(),
+  deletions: z.number(),
+  changedFiles: z.number(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  mergedAt: z.string().nullable(),
+  closedAt: z.string().nullable(),
+});
+
+export const ForgeChangeRequestGetResponseSchema = z.object({
+  type: z.literal("forge.change_request.get.response"),
+  payload: z.object({
+    url: z.string(),
+    changeRequest: ForgeChangeRequestPreviewSchema.nullable(),
+    error: z.string().nullable(),
+    requestId: z.string(),
+  }),
+});
+
 // COMPAT(githubSearchRpc): legacy RPC retained when forge.search.* shipped in
 // v0.2.0-beta.1. Stop serving and consuming it after 2027-01-17 once client
 // and daemon floors are >= v0.2.0.
@@ -7071,6 +7110,7 @@ export const SessionOutboundMessageSchema = z.discriminatedUnion("type", [
   ValidateBranchResponseSchema,
   BranchSuggestionsResponseSchema,
   ForgeSearchResponseSchema,
+  ForgeChangeRequestGetResponseSchema,
   GitHubSearchResponseSchema,
   DirectorySuggestionsResponseSchema,
   PaseoWorktreeListResponseSchema,
@@ -7485,6 +7525,9 @@ export type ForgeSearchItem = z.infer<typeof ForgeSearchItemSchema>;
 export type ForgeSearchKind = "issue" | "change_request";
 export type ForgeSearchRequest = z.infer<typeof ForgeSearchRequestSchema>;
 export type ForgeSearchResponse = z.infer<typeof ForgeSearchResponseSchema>;
+export type ForgeChangeRequestPreview = z.infer<typeof ForgeChangeRequestPreviewSchema>;
+export type ForgeChangeRequestGetRequest = z.infer<typeof ForgeChangeRequestGetRequestSchema>;
+export type ForgeChangeRequestGetResponse = z.infer<typeof ForgeChangeRequestGetResponseSchema>;
 export type GitHubSearchItem = z.infer<typeof GitHubSearchItemSchema>;
 export type GitHubSearchKind = z.infer<typeof GitHubSearchKindSchema>;
 export type GitHubSearchRequest = z.infer<typeof GitHubSearchRequestSchema>;

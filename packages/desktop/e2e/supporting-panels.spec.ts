@@ -38,14 +38,28 @@ test("desktop panel tabs keep active controls visible and retain terminals acros
     await firstTab.click();
     await expect(harness.terminalSurface(page).filter({ visible: true })).toHaveCount(1);
     await expect(page.getByTestId("terminal-attach-loading")).toBeHidden();
-    await page.getByTestId("explorer-sidebar-tab-files").click();
-    await expect(page.getByTestId("files-pane-header")).toBeVisible();
+    // Explorer starts on the launcher, and launched tabs get instance ids, so read each id back.
+    const selectedTab = page.locator(
+      '[data-testid^="explorer-sidebar-tab-"][aria-selected="true"]',
+    );
+    const launchTool = async (tool: "changes" | "files", readyTestId: string) => {
+      await page.getByTestId("explorer-sidebar-new-tab-button").click();
+      await page.getByTestId(`workspace-new-tab-menu-${tool}`).click();
+      await expect(page.getByTestId(readyTestId).filter({ visible: true })).toBeVisible();
+      const testId = await selectedTab.getAttribute("data-testid");
+      if (!testId) throw new Error(`Missing ${tool} tab identity`);
+      return testId;
+    };
+    const closeTestId = (testId: string) =>
+      testId.replace("explorer-sidebar-tab-", "explorer-sidebar-tab-close-");
+    const changesTabId = await launchTool("changes", "changes-tree-panel");
+    const filesTabId = await launchTool("files", "files-pane-header");
     const explorerRail = page.getByTestId("explorer-sidebar-tab-rail");
     const filesTab = explorerRail.getByRole("button", {
       name: "Browse workspace files",
       exact: true,
     });
-    const closeFiles = page.getByTestId("explorer-sidebar-tab-close-files");
+    const closeFiles = page.getByTestId(closeTestId(filesTabId));
     await expect(page.getByTestId("file-explorer-tree-scroll")).toBeVisible();
     await page.screenshot({ path: testInfo.outputPath("supporting-tabs-baseline.png") });
     await expect(filesTab).toHaveCSS("height", "32px");
@@ -75,8 +89,8 @@ test("desktop panel tabs keep active controls visible and retain terminals acros
     await expect(page.getByTestId("files-pane-header")).toBeVisible();
     await expect(page.getByTestId("file-explorer-tree-scroll")).toBeVisible();
     await expect(filesTab).toHaveAttribute("aria-selected", "true");
-    const changesTab = page.getByTestId("explorer-sidebar-tab-changes_tree");
-    const closeChanges = page.getByTestId("explorer-sidebar-tab-close-changes_tree");
+    const changesTab = page.getByTestId(changesTabId);
+    const closeChanges = page.getByTestId(closeTestId(changesTabId));
     await page.mouse.move(600, 600);
     await expect(closeChanges.locator("..")).toHaveCSS("opacity", "0");
     await changesTab.focus();

@@ -1,21 +1,19 @@
-# Paseo Custom releases for the Ynd-i/codex-app fork. See docs/release.md#custom-releases.
+# Swan releases for the Ynd-i/swan fork. See docs/release.md#custom-releases.
 # Follows upstream Paseo stable releases only; nothing publishes while the branch is on an
 # upstream beta, except a one-off run with upstream_beta.
-# sync (scheduled): merge a newer upstream stable release, test, publish v<stable>-v1-beta1.
 # beta (manual): test and publish the branch as the next v<stable>-v<N>-beta<M>.
 # stable (manual): rebuild the latest beta's commit and publish it as v<stable>-v<N>.
+# upstream-pr.yml opens a pull request for each new upstream stable release.
 name: Custom release
 
 on:
-  schedule:
-    - cron: "17 */6 * * *"
   workflow_dispatch:
     inputs:
       mode:
-        description: "sync: merge a newer upstream stable release; beta: release the branch; stable: promote the latest beta"
+        description: "beta: release the branch; stable: promote the latest beta"
         type: choice
-        options: [sync, beta, stable]
-        default: sync
+        options: [beta, stable]
+        default: beta
       upstream_beta:
         description: "beta or stable: release although the branch is on an upstream beta"
         type: boolean
@@ -39,12 +37,11 @@ env:
 
 jobs:
   plan:
-    if: github.repository == 'Ynd-i/codex-app'
+    if: github.repository == 'Ynd-i/swan'
     runs-on: ubuntu-latest
     outputs:
       tag: ${{ steps.plan.outputs.tag }}
       backend: ${{ steps.plan.outputs.backend }}
-      merge: ${{ steps.plan.outputs.merge }}
       prerelease: ${{ steps.plan.outputs.prerelease }}
       version: ${{ steps.plan.outputs.version }}
       sha: ${{ steps.commit.outputs.sha }}
@@ -61,24 +58,8 @@ jobs:
       - name: Plan
         id: plan
         run: >-
-          node scripts/custom-release.mjs "${{ inputs.mode || 'sync' }}"
+          node scripts/custom-release.mjs "${{ inputs.mode }}"
           ${{ inputs.upstream_beta && '--upstream-beta' || '' }} | tee -a "$GITHUB_OUTPUT"
-
-      - name: Merge upstream release
-        if: steps.plan.outputs.merge != ''
-        env:
-          MERGE: ${{ steps.plan.outputs.merge }}
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          if ! git merge --no-edit -m "chore: merge upstream Paseo $MERGE" "refs/tags/$MERGE"; then
-            git diff --name-only --diff-filter=U | sed 's/^/- /' > conflicts.md
-            { echo "Upstream $MERGE conflicts with $BRANCH; merge it by hand:"; cat conflicts.md; } >> "$GITHUB_STEP_SUMMARY"
-            git merge --abort
-            exit 1
-          fi
-          # Tests and the build run on this commit; the branch moves only after they pass.
-          git push --force origin "HEAD:refs/heads/custom-release/$MERGE"
 
       - name: Commit to release
         id: commit
@@ -128,7 +109,7 @@ jobs:
       - run: node scripts/npm-retry.mjs ci
       # The app version stays upstream's to match the bundled daemon; the in-app updater
       # compares this stamp instead.
-      - name: Build Paseo Custom
+      - name: Build Swan
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
           # Metro's web bundle ran out of heap on the runner (run 37387649334).
@@ -147,7 +128,7 @@ jobs:
             echo "::error::Set CUSTOM_SIGNING_P12 and CUSTOM_SIGNING_P12_PASSWORD; see docs/release.md#custom-releases"
             exit 1
           fi
-          app="packages/desktop/release-custom/mac-arm64/Paseo Custom.app"
+          app="packages/desktop/release-custom/mac-arm64/Swan.app"
           printf 'provider: generic\nurl: https://raw.githubusercontent.com/%s/%s\nupdaterCacheDirName: paseo-custom-updater\n' \
             "$GITHUB_REPOSITORY" "$FEED_BRANCH" > "$app/Contents/Resources/app-update.yml"
           curl -fsSL -o rcodesign.tar.gz "$APPLE_CODESIGN_URL"
@@ -162,18 +143,18 @@ jobs:
       - name: Smoke-test the signed app
         env:
           PASEO_DESKTOP_EXPECT_CUSTOM: "1"
-        run: node packages/desktop/e2e/packaged-app-smoke.js --app "packages/desktop/release-custom/mac-arm64/Paseo Custom.app"
+        run: node packages/desktop/e2e/packaged-app-smoke.js --app "packages/desktop/release-custom/mac-arm64/Swan.app"
       # Both downloads carry the smoke-tested app as signed, without packaging or signing it again.
       - name: Package the smoke-tested app as a dmg and a zip
         env:
           TAG: ${{ needs.plan.outputs.tag }}
           VERSION: ${{ needs.plan.outputs.version }}
         run: |
-          app="packages/desktop/release-custom/mac-arm64/Paseo Custom.app"
-          base="Paseo-Custom-$TAG-arm64"
+          app="packages/desktop/release-custom/mac-arm64/Swan.app"
+          base="Swan-$TAG-arm64"
           (cd packages/desktop && npx electron-builder --config electron-builder.custom.yml -c.mac.identity=null \
-            --prepackaged "release-custom/mac-arm64/Paseo Custom.app" --mac dmg --arm64 --publish never)
-          mv packages/desktop/release-custom/Paseo-Custom-*-arm64.dmg "$base.dmg"
+            --prepackaged "release-custom/mac-arm64/Swan.app" --mac dmg --arm64 --publish never)
+          mv packages/desktop/release-custom/Swan-*-arm64.dmg "$base.dmg"
           ditto -c -k --sequesterRsrc --keepParent "$app" "$base.zip"
           for file in "$base.dmg" "$base.zip"; do
             shasum -a 256 "$file" > "$file.sha256"
@@ -188,9 +169,9 @@ jobs:
           EOF
       - uses: actions/upload-artifact@v4
         with:
-          name: paseo-custom
+          name: swan
           path: |
-            Paseo-Custom-*-arm64.*
+            Swan-*-arm64.*
             update-feed.yml
 
   publish:
@@ -198,31 +179,26 @@ jobs:
     runs-on: ubuntu-latest
     env:
       GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
       TAG: ${{ needs.plan.outputs.tag }}
       SHA: ${{ needs.plan.outputs.sha }}
       BACKEND: ${{ needs.plan.outputs.backend }}
-      MERGE: ${{ needs.plan.outputs.merge }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Advance the branch to the merged upstream release
-        if: env.MERGE != ''
-        run: |
-          git push origin "$SHA:refs/heads/$BRANCH"
-          git push origin --delete "custom-release/$MERGE"
       - uses: actions/download-artifact@v4
         with:
-          name: paseo-custom
+          name: swan
       - name: Publish the GitHub release
         run: |
-          base="Paseo-Custom-$TAG-arm64"
+          base="Swan-$TAG-arm64"
           cat > notes.md <<EOF
-          Paseo Custom $TAG: the Codex-style macOS desktop on upstream Paseo [$BACKEND](https://github.com/getpaseo/paseo/releases/tag/$BACKEND).
+          Swan $TAG: the Codex-style macOS desktop on upstream Paseo [$BACKEND](https://github.com/getpaseo/paseo/releases/tag/$BACKEND).
 
-          - Open the \`.dmg\` and drag Paseo Custom to Applications; the \`.zip\` holds the same app.
-          - Apple Silicon only. Self-signed and not notarized: on first launch, right-click the app and choose Open, or run \`xattr -dr com.apple.quarantine "/Applications/Paseo Custom.app"\`.
-          - Later releases install from inside the app. Betas reach only the beta release channel.
+          - Open the \`.dmg\` and drag Swan to Applications; the \`.zip\` holds the same app.
+          - Apple Silicon only. Self-signed and not notarized: on first launch, right-click the app and choose Open, or run \`xattr -dr com.apple.quarantine "/Applications/Swan.app"\`.
+          - Later releases install from inside the app. Betas reach only the beta release channel. An app updated from Paseo Custom keeps its \`Paseo Custom.app\` name and data.
           - Runs its own daemon and home; it does not replace or update the official Paseo app.
           - Source: $SHA.
           - SHA-256: dmg \`$(cut -d' ' -f1 "$base.dmg.sha256")\`, zip \`$(cut -d' ' -f1 "$base.zip.sha256")\`
@@ -230,7 +206,7 @@ jobs:
           flags=()
           if [ "${{ needs.plan.outputs.prerelease }}" = "true" ]; then flags+=(--prerelease); fi
           gh release create "$TAG" "$base.dmg" "$base.dmg.sha256" "$base.zip" "$base.zip.sha256" \
-            --target "$SHA" --title "Paseo Custom $TAG" --notes-file notes.md "${flags[@]}"
+            --target "$SHA" --title "Swan $TAG" --notes-file notes.md "${flags[@]}"
       # The in-app updater reads beta-mac.yml on the beta channel and latest-mac.yml on stable.
       - name: Point the update feed at the release
         run: |
@@ -244,10 +220,16 @@ jobs:
           cp update-feed.yml feed/beta-mac.yml
           if [ "${{ needs.plan.outputs.prerelease }}" != "true" ]; then cp update-feed.yml feed/latest-mac.yml; fi
           git -C feed add -A
-          git -C feed commit -m "Paseo Custom $TAG"
+          git -C feed commit -m "Swan $TAG"
           git -C feed push origin "HEAD:refs/heads/$FEED_BRANCH"
+      # Runs once the feed names the new release, so no installed app is left pointing at a
+      # deleted download. Their tags go too; see obsoletePrereleases in scripts/custom-release.mjs.
+      - name: Delete prereleases on older upstream releases
+        run: |
+          node scripts/custom-release.mjs prune "$TAG" feed/*.yml |
+            while read -r tag; do gh release delete "$tag" --yes --cleanup-tag; done
       - name: Keep inherited upstream workflows disabled
         run: |
           gh workflow list --all --json path,state \
-            --jq '.[] | select(.state == "active" and .path != ".github/workflows/custom-release.yml") | .path' |
+            --jq '.[] | select(.state == "active" and .path != ".github/workflows/custom-release.yml" and .path != ".github/workflows/upstream-pr.yml") | .path' |
             while read -r path; do gh workflow disable "$(basename "$path")"; done

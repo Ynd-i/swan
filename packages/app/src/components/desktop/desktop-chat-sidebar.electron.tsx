@@ -12,6 +12,7 @@ import { useAggregatedAgents } from "@/hooks/use-aggregated-agents";
 import { useKeyboardShortcutsStore } from "@/stores/keyboard-shortcuts-store";
 import type { Theme } from "@/styles/theme";
 import { buildDesktopChatSidebar, partitionChatSections } from "./desktop-chat-model";
+import { HandoffChainsContext } from "./desktop-chat-row";
 import { ChatInbox } from "./desktop-chat-inbox";
 import { SectionDialogsProvider } from "./desktop-chat-section-menus";
 import {
@@ -57,7 +58,7 @@ function ChatSidebarHeader() {
   const inboxState = useMemo(() => ({ selected: inboxOpen }), [inboxOpen]);
   return (
     <View style={styles.header}>
-      <Text style={styles.brand}>Paseox</Text>
+      <Text style={styles.brand}>Swan</Text>
       <View style={styles.spacer} />
       <SidebarDisplayPreferencesMenu chatMode />
       <HeaderToggleButton
@@ -115,8 +116,17 @@ function ChatSidebarList({ onAddProject }: { onAddProject: () => void }) {
         chatSection,
         projectSection,
         pinnedProjects,
+        handoffs: model.handoffs,
       }),
-    [chatSection, model.projects, model.recent, pinnedProjects, projectSection, sections],
+    [
+      chatSection,
+      model.handoffs,
+      model.projects,
+      model.recent,
+      pinnedProjects,
+      projectSection,
+      sections,
+    ],
   );
   const inboxChats = useMemo(() => [...model.pinned, ...model.recent], [model]);
   const sectionOrder = useMemo(
@@ -172,41 +182,43 @@ function ChatSidebarList({ onAddProject }: { onAddProject: () => void }) {
       contentContainerStyle={styles.listContent}
       testID="sidebar-project-list"
     >
-      {inboxOpen ? (
-        <ChatInbox chats={inboxChats} selectedKey={selectedKey} />
-      ) : (
-        <SidebarDndContext sectionOrder={sectionOrder}>
-          <PinnedSection
-            chats={model.pinned}
-            projects={partition.pinnedProjects}
-            selectedKey={selectedKey}
-          />
-          <SortableSections sectionIds={shownSections}>
-            {shownSections.map((sectionId) => (
-              <SortableSection
-                key={sectionId}
-                sectionId={sectionId}
-                label={sectionLabel(sectionId)}
-                acceptsProjects={sectionId !== CHAT_SECTION.recent}
-              >
-                {(dragHandleProps) => renderSection(sectionId, dragHandleProps)}
-              </SortableSection>
-            ))}
-          </SortableSections>
-        </SidebarDndContext>
-      )}
-      {model.projects.length === 0 && model.recent.length === 0 && model.pinned.length === 0 ? (
-        <View style={styles.empty}>
-          <Text style={styles.secondaryText}>
-            {t(allProjects.length > 0 ? "sidebar.filterEmpty.description" : "sessions.empty")}
-          </Text>
-          {allProjects.length === 0 ? (
-            <Button variant="ghost" onPress={onAddProject}>
-              {t("sidebar.actions.addProject")}
-            </Button>
-          ) : null}
-        </View>
-      ) : null}
+      <HandoffChainsContext.Provider value={model.handoffs}>
+        {inboxOpen ? (
+          <ChatInbox chats={inboxChats} selectedKey={selectedKey} />
+        ) : (
+          <SidebarDndContext sectionOrder={sectionOrder}>
+            <PinnedSection
+              chats={model.pinned}
+              projects={partition.pinnedProjects}
+              selectedKey={selectedKey}
+            />
+            <SortableSections sectionIds={shownSections}>
+              {shownSections.map((sectionId) => (
+                <SortableSection
+                  key={sectionId}
+                  sectionId={sectionId}
+                  label={sectionLabel(sectionId)}
+                  acceptsProjects={sectionId !== CHAT_SECTION.recent}
+                >
+                  {(dragHandleProps) => renderSection(sectionId, dragHandleProps)}
+                </SortableSection>
+              ))}
+            </SortableSections>
+          </SidebarDndContext>
+        )}
+        {model.projects.length === 0 && model.recent.length === 0 && model.pinned.length === 0 ? (
+          <View style={styles.empty}>
+            <Text style={styles.secondaryText}>
+              {t(allProjects.length > 0 ? "sidebar.filterEmpty.description" : "sessions.empty")}
+            </Text>
+            {allProjects.length === 0 ? (
+              <Button variant="ghost" onPress={onAddProject}>
+                {t("sidebar.actions.addProject")}
+              </Button>
+            ) : null}
+          </View>
+        ) : null}
+      </HandoffChainsContext.Provider>
     </ScrollView>
   );
 }

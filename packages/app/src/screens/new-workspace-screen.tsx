@@ -25,7 +25,11 @@ import {
 import { Composer } from "@/composer";
 import { ComposerDock } from "@/composer/dock";
 import { PaseoLogo } from "@/components/icons/paseo-logo";
-import { getIsElectronMac } from "@/constants/platform";
+import { getIsElectron, getIsElectronMac } from "@/constants/platform";
+import { BROWSER_NEW_TAB_URL } from "@/desktop/browser/new-tab-url";
+import { createWorkspaceBrowser } from "@/desktop/browser/store";
+import type { NewTabLauncher } from "@/workspace-tabs/launcher";
+import type { NewTabSelection } from "@/workspace-tabs/new-tab";
 import { FileDropZone } from "@/components/file-drop/file-drop-zone";
 import {
   resolveComposerAttachmentSubmitFormat,
@@ -59,7 +63,10 @@ import {
   type LaunchTarget,
 } from "@/new-workspace-launch/target";
 import { useTerminalComposerState } from "@/new-workspace-launch/composer-state";
-import { runCreateTerminalWorkspace } from "./new-workspace-terminal";
+import {
+  runCreateTerminalWorkspace,
+  type CreateTerminalWorkspaceInput,
+} from "./new-workspace-terminal";
 import {
   useHostRuntimeClient,
   useHostRuntimeConnectionStatuses,
@@ -79,7 +86,12 @@ import {
   type WorkspaceDescriptor,
 } from "@/stores/session-store";
 import { useWorkspace } from "@/stores/session-store-hooks";
-import { buildNewWorkspaceDraftKey, generateDraftId } from "@/stores/draft-keys";
+import {
+  buildDraftStoreKey,
+  buildNewWorkspaceDraftKey,
+  generateDraftId,
+} from "@/stores/draft-keys";
+import { useDraftStore } from "@/stores/draft-store";
 import { useOpenAddProject } from "@/hooks/use-open-add-project";
 import { isActiveCreateFlowForDraft, useCreateFlowStore } from "@/stores/create-flow-store";
 import {
@@ -898,6 +910,27 @@ interface WorkspaceDraftSubmissionConfig {
 interface WorkspaceCreationResult {
   workspace: ReturnType<typeof normalizeWorkspaceDescriptor>;
   agent?: AgentSnapshotPayload;
+}
+
+/** Opens a new chat dock tool in the workspace the dock just created. */
+async function createDockToolTarget(input: {
+  selection: Exclude<NewTabSelection, { kind: "agent" }>;
+  workspace: { id: string; workspaceDirectory: string };
+  createTerminal: CreateTerminalWorkspaceInput["createTerminal"];
+}): Promise<WorkspaceTabTarget> {
+  const { selection, workspace } = input;
+  if (selection.kind === "target") return selection.target;
+  if (selection.kind === "browser") {
+    const { browserId } = createWorkspaceBrowser(
+      getIsElectronMac() ? { initialUrl: BROWSER_NEW_TAB_URL } : undefined,
+    );
+    return { kind: "browser", browserId };
+  }
+  const { terminalId } = await input.createTerminal({
+    workspaceDirectory: workspace.workspaceDirectory,
+    workspaceId: workspace.id,
+  });
+  return { kind: "terminal", terminalId };
 }
 
 async function createMultiplicityWorkspace(input: {
@@ -2477,6 +2510,33 @@ export function NewWorkspaceScreen({
     ],
   );
 
+  const createWorkspaceTerminal = useCallback(
+    async (input: Parameters<CreateTerminalWorkspaceInput["createTerminal"]>[0]) => {
+      const connectedClient = withConnectedClient();
+      const createdTerminal = await connectedClient.createTerminal(
+        input.workspaceDirectory,
+        input.name,
+        undefined,
+        { command: input.command, args: input.args, workspaceId: input.workspaceId },
+      );
+      const terminal = createdTerminal.terminal;
+      if (!terminal) {
+        throw new Error(createdTerminal.error ?? t("newWorkspace.errors.createWorktreeFailed"));
+      }
+      queryClient.setQueryData<ListTerminalsPayload>(
+        buildTerminalsQueryKey(selectedServerId, input.workspaceDirectory, input.workspaceId),
+        (current) =>
+          upsertCreatedTerminalPayload({
+            current,
+            terminal,
+            workspaceDirectory: input.workspaceDirectory,
+          }),
+      );
+      return { terminalId: terminal.id };
+    },
+    [queryClient, selectedServerId, t, withConnectedClient],
+  );
+
   const handleSubmitTerminalLaunch = useCallback(async () => {
     try {
       setErrorMessage(null);
@@ -2489,29 +2549,7 @@ export function NewWorkspaceScreen({
         profile: selectedTerminalProfile,
         profileName: selectedTerminalProfile?.name,
         ensureWorkspace: async (request) => (await ensureWorkspace(request)).workspace,
-        createTerminal: async (input) => {
-          const connectedClient = withConnectedClient();
-          const createdTerminal = await connectedClient.createTerminal(
-            input.workspaceDirectory,
-            input.name,
-            undefined,
-            { command: input.command, args: input.args, workspaceId: input.workspaceId },
-          );
-          const terminal = createdTerminal.terminal;
-          if (!terminal) {
-            throw new Error(createdTerminal.error ?? t("newWorkspace.errors.createWorktreeFailed"));
-          }
-          queryClient.setQueryData<ListTerminalsPayload>(
-            buildTerminalsQueryKey(selectedServerId, input.workspaceDirectory, input.workspaceId),
-            (current) =>
-              upsertCreatedTerminalPayload({
-                current,
-                terminal,
-                workspaceDirectory: input.workspaceDirectory,
-              }),
-          );
-          return { terminalId: terminal.id };
-        },
+        createTerminal: createWorkspaceTerminal,
         sendTerminalInput: (terminalId, data) => {
           withConnectedClient().sendTerminalInput(terminalId, { type: "input", data });
         },
@@ -2538,19 +2576,109 @@ export function NewWorkspaceScreen({
       toast.error(message);
     }
   }, [
+    createWorkspaceTerminal,
     ensureWorkspace,
     isStillOnCreateScreen,
     launchTarget,
-    queryClient,
     selectedServerId,
     selectedSourceDirectory,
     selectedTerminalProfile,
-    t,
     terminalPromptText,
     toast,
     updateFormPreferences,
     withConnectedClient,
   ]);
+
+  // The tool needs the workspace the first message would create, so create it now and move the
+  // unsent draft, with its provider setup, into the workspace's chat draft.
+  const clearChatDraft = chatDraft.clear;
+  const handleOpenExplorerTool = useCallback(
+    async (selection: NewTabSelection) => {
+      if (selection.kind === "agent" || isPending) return;
+      try {
+        setErrorMessage(null);
+        setPendingAction(selection.kind === "terminal" ? "terminal" : "empty");
+        const draft = useDraftStore.getState().getDraftInput(draftKey);
+        const { workspace: createdWorkspace } = await ensureWorkspace({
+          cwd: selectedSourceDirectory ?? "",
+          // Names the workspace and branch after the unsent draft, as the terminal launcher does.
+          prompt: draft?.text ?? "",
+          attachments: [],
+          withInitialAgent: false,
+        });
+        const toolTarget = await createDockToolTarget({
+          selection,
+          workspace: createdWorkspace,
+          createTerminal: createWorkspaceTerminal,
+        });
+        if (!isStillOnCreateScreen()) {
+          setPendingAction(null);
+          return;
+        }
+        const workspaceDraftId = creationIdentity.draftId;
+        if (draft) {
+          useDraftStore.getState().saveDraftInput({
+            draftKey: buildDraftStoreKey({
+              serverId: selectedServerId,
+              agentId: workspaceDraftId,
+              draftId: workspaceDraftId,
+            }),
+            draft,
+          });
+        }
+        clearChatDraft("sent");
+        const provider = composerState?.selectedProvider;
+        navigateToWorkspace({
+          serverId: selectedServerId,
+          workspaceId: createdWorkspace.id,
+          target: {
+            kind: "draft",
+            draftId: workspaceDraftId,
+            ...(composerState && provider
+              ? {
+                  setup: buildWorkspaceDraftSetupFromComposer({
+                    cwd: createdWorkspace.workspaceDirectory,
+                    provider,
+                    composerState,
+                  }),
+                }
+              : {}),
+          },
+        });
+        revealNewChatExplorer(selectedServerId, createdWorkspace.id, toolTarget);
+      } catch (error) {
+        const message = toErrorMessage(error);
+        setPendingAction(null);
+        setErrorMessage(message);
+        toast.error(message);
+      }
+    },
+    [
+      clearChatDraft,
+      composerState,
+      createWorkspaceTerminal,
+      creationIdentity,
+      draftKey,
+      ensureWorkspace,
+      isPending,
+      isStillOnCreateScreen,
+      selectedServerId,
+      selectedSourceDirectory,
+      toast,
+    ],
+  );
+  const explorerLauncher = useMemo<NewTabLauncher>(
+    () => ({
+      showChanges: !projectCleared && worktreeSupport !== "unsupported",
+      showPullRequest: false,
+      showBrowser: getIsElectron(),
+      terminalDisabled: isPending,
+      launch: (selection) => {
+        void handleOpenExplorerTool(selection);
+      },
+    }),
+    [handleOpenExplorerTool, isPending, projectCleared, worktreeSupport],
+  );
 
   const renderPickerOption = useCallback(
     (props: {
@@ -2739,6 +2867,7 @@ export function NewWorkspaceScreen({
         formStack={formStack}
         errorMessage={errorMessage}
         onImportSession={importSession.open}
+        explorerLauncher={explorerLauncher}
       >
         {composer}
       </NewWorkspaceLayout>
@@ -2756,6 +2885,7 @@ function NewWorkspaceLayout({
   formStack,
   errorMessage,
   onImportSession,
+  explorerLauncher,
   children,
 }: {
   isCompact: boolean;
@@ -2766,6 +2896,7 @@ function NewWorkspaceLayout({
   formStack: ReactNode;
   errorMessage: string | null;
   onImportSession: () => void;
+  explorerLauncher: NewTabLauncher;
   children: ReactNode;
 }) {
   const { t } = useTranslation();
@@ -2806,7 +2937,7 @@ function NewWorkspaceLayout({
           {/* Mac imports through History and Cmd+K, like Codex keeping this area clear. */}
           {composer}
         </View>
-        <NewChatExplorerDock />
+        <NewChatExplorerDock serverId={serverId ?? ""} launcher={explorerLauncher} />
       </View>
     );
   } else {

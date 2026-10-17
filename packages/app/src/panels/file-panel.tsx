@@ -12,7 +12,7 @@ import { FileExplorerPane } from "@/components/file-explorer-pane";
 import { TreeRail } from "@/components/tree-rail";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { getIsElectronMac } from "@/constants/platform";
-import { defaultFileState, fileStateForFilesView, fileStateSchema } from "@/panels/file/state";
+import { defaultFileState, fileStateSchema } from "@/panels/file/state";
 import { useAddFileToChat } from "@/panels/use-add-file-to-chat";
 import { usePanelState } from "@/panels/use-panel-state";
 
@@ -50,10 +50,8 @@ function FilePanel() {
   const workspaceDirectory = useWorkspaceDirectory(serverId, workspaceId);
   const isMac = getIsElectronMac();
   const isCompact = useIsCompactFormFactor();
-  const [fileState, setFileState] = usePanelState(
-    fileStateSchema,
-    isMac ? fileStateForFilesView : defaultFileState,
-  );
+  // An opened file shows only itself; the folder tree is one toggle away.
+  const [fileState, setFileState] = usePanelState(fileStateSchema, defaultFileState);
   const { addFile, canAddToChat } = useAddFileToChat({ serverId, workspaceId });
   const onOpenFile = useCallback(
     (path: string) => openPreferredTarget({ kind: "file", path }, "explorerFiles"),

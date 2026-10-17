@@ -20,16 +20,16 @@ complete; this section replaces that handoff.
   its delivery and an app typecheck fix; see [delivery](#delivery--2026-10-03). It is
   fast-forwarded into `codex-app`.
 - Release state (2026-10-03 12:50 UTC): the product branch `codex/desktop-ui` was
-  renamed `codex-app`, and on 2026-10-04 `main`; it is the default branch of `Ynd-i/codex-app`, where only
-  `custom-release.yml` is enabled. User decision: releases follow upstream stable
+  renamed `codex-app`, and on 2026-10-04 `main`; it is the default branch of `Ynd-i/swan` (`Ynd-i/codex-app` until 2026-10-16), where only
+  `custom-release.yml` and `upstream-pr.yml` are enabled. User decision: releases follow upstream stable
   releases only, tagged `v<stable>-v<N>-beta<M>` and promoted to `v<stable>-v<N>`, each
   with a `.dmg` and a `.zip`. Porting to stable `v0.10.3` was rejected: 50 files conflict
   and 26 belong to 0.11-only systems. The branch merges upstream `v0.11.0-beta.3`
   (`43b259f`); eight files conflicted under `packages/app/src/usage`, the changelog and
   one e2e spec, resolved by keeping the Mac overview, adding upstream's hover pin glyph
-  and `unavailable` login problems, and localizing that copy in all nine languages. The
-  pipeline releases nothing until upstream ships `0.11.0`; the scheduled sync then
-  merges it and publishes `v0.11.0-v1-beta1`. As user-requested one-off exceptions,
+  and `unavailable` login problems, and localizing that copy in all nine languages. Since
+  2026-10-15, `upstream-pr.yml` opens a pull request for each new upstream stable
+  release instead of merging and publishing it. As user-requested one-off exceptions,
   built and smoke-tested locally and ad-hoc signed, the prereleases
   `v0.11.0-beta.1-v1-beta1` and `v0.11.0-beta.3-v1-beta1` are published by the user.
   Later one-offs run in CI with `upstream_beta`; see
@@ -133,7 +133,7 @@ compact layouts and constrained settings windows. Keep the 320px default width
 for new preferences and retain saved widths.
 
 The upstream baseline is `getpaseo/paseo` commit `53ee9cd` on `main`. Work lives on
-`main` of `Ynd-i/codex-app`. This document owns the steps, decisions, progress, and evidence.
+`main` of `Ynd-i/swan`, published as Swan (Paseo Custom until 2026-10-16). This document owns the steps, decisions, progress, and evidence.
 The root [changelog](../../CHANGELOG.md) records custom work under Unreleased;
 the existing versioned entries describe upstream releases.
 
@@ -1422,13 +1422,14 @@ The user asked for fewer permission modes, Codex's plan workflow without backend
 changes, and a list of sidebar, composer and transcript fixes. All of it is in
 `packages/app`; the daemon, protocol and provider plugins are unchanged.
 
-- Permission modes: Mac lists Ask for approval, Auto-review and Full access (Claude
-  `default`/`auto`/`bypassPermissions`, Codex `auto`/`auto-review`/`full-access`).
-  Planning modes and Claude `acceptEdits` are hidden by one filter in
-  `agent-controls/policy.ts`, shared by the menu, Shift+Tab cycling and the command
-  center. Other providers keep their non-planning modes. An agent left in a hidden mode
+- Permission modes: Mac lists every non-planning mode the provider reports, with the
+  provider's own labels (Claude shows Always Ask, Accept File Edits, Auto mode and
+  Bypass). Codex modes are renamed to the Codex app's Ask for review, Auto-review and
+  Full access. Planning modes are hidden from the menu, Shift+Tab cycling and the
+  command center because plan is a toggle (below). An agent left in a planning mode
   still shows that mode's label. The Mac mode trigger has no caret and its tooltip shows
-  no shortcut.
+  no shortcut. (2026-10-16: the earlier three-tier list that hid Claude `acceptEdits`
+  and relabeled Claude modes was dropped.)
 - Plan toggle: Codex exposes plan as the `plan_mode` feature, so it combines with any
   permission mode. Claude, OpenCode and Copilot expose plan as a mode, which replaces
   the permission mode. `resolvePlanToggle` drives either. For mode-based plan the app

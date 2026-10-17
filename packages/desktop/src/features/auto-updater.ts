@@ -41,7 +41,7 @@ const UPDATE_CHANNEL_NOT_PUBLISHED_CODE = "ERR_UPDATER_CHANNEL_FILE_NOT_FOUND";
 let cachedCustomUpdateVersion: string | null | undefined;
 
 /**
- * The update version CI stamps into a published Paseo Custom build as `paseoCustomUpdateVersion`
+ * The update version CI stamps into a published Swan build as `paseoCustomUpdateVersion`
  * in the app's package.json. The app version stays upstream's so it keeps matching the bundled
  * daemon; the updater compares this one instead. Builds without it cannot update in place.
  */
@@ -72,7 +72,7 @@ export function releaseTagOfUpdateVersion(updateVersion: string): string | null 
   return `v${groups.base}-v${groups.release}${groups.beta ? `-beta${groups.beta}` : ""}`;
 }
 
-/** The release tag of a published Paseo Custom build, shown as its version in Settings. */
+/** The release tag of a published Swan build, shown as its version in Settings. */
 export function getCustomReleaseTag(): string | null {
   const updateVersion = getCustomUpdateVersion();
   return updateVersion ? releaseTagOfUpdateVersion(updateVersion) : null;
@@ -299,7 +299,7 @@ class ElectronAppUpdateRuntime implements AppUpdateRuntime {
 const appUpdateService = createAppUpdateService({
   runtime: new ElectronAppUpdateRuntime(),
   isPackaged: () => app.isPackaged,
-  // Only the upstream application may consume its release feed. A published Paseo Custom
+  // Only the upstream application may consume its release feed. A published Swan
   // build carries its own feed and update version; other renamed builds stay manual.
   unavailableReason: () =>
     app.getName() === "Paseo" || getCustomUpdateVersion()

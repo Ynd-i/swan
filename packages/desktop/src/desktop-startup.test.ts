@@ -1,13 +1,17 @@
 import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
-import { configureDesktopDaemonEnvironment, runDesktopStartup } from "./desktop-startup";
+import {
+  configureDesktopDaemonEnvironment,
+  resolveCustomUserDataPath,
+  runDesktopStartup,
+} from "./desktop-startup";
 
 describe("desktop startup", () => {
   it("isolates a custom package's daemon while preserving explicit launch settings", () => {
     const env: NodeJS.ProcessEnv = {};
     const input = {
       isPackaged: true,
-      appName: "Paseo Custom",
+      appName: "Swan",
       userDataPath: "/tmp/Paseo Custom",
       env,
     };
@@ -26,12 +30,25 @@ describe("desktop startup", () => {
   });
 
   it.each([
-    { isPackaged: false, appName: "Paseo Custom" },
+    { isPackaged: false, appName: "Swan" },
     { isPackaged: true, appName: "Paseo" },
   ])("preserves existing daemon defaults for $appName packaged=$isPackaged", (identity) => {
     const env: NodeJS.ProcessEnv = {};
     configureDesktopDaemonEnvironment({ ...identity, userDataPath: "/tmp/paseo", env });
     expect(env).toEqual({});
+  });
+
+  it("keeps the packaged Swan data folder it was published with as Paseo Custom", () => {
+    const appDataPath = "/Users/me/Library/Application Support";
+    expect(resolveCustomUserDataPath({ isPackaged: true, appName: "Swan", appDataPath })).toBe(
+      path.join(appDataPath, "Paseo Custom"),
+    );
+    for (const identity of [
+      { isPackaged: false, appName: "Swan" },
+      { isPackaged: true, appName: "Paseo" },
+    ]) {
+      expect(resolveCustomUserDataPath({ ...identity, appDataPath })).toBeNull();
+    }
   });
 
   it("runs CLI passthrough before GUI login-shell env inheritance", async () => {

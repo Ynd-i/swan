@@ -80,7 +80,10 @@ test("macOS file tree filters unopened nested files and preserves file actions",
     });
     await openAgentRoute(page, fixture);
     await page.getByTestId("workspace-explorer-toggle").click();
-    await page.getByRole("button", { name: "Browse workspace files", exact: true }).click();
+    await page
+      .getByTestId("workspace-explorer-sidebar")
+      .getByTestId("workspace-new-tab-files")
+      .click();
     const right = page.getByTestId("workspace-explorer-sidebar");
     const filter = right.getByTestId("files-filter").filter({ visible: true });
     await expect(filter).toBeVisible();
@@ -96,6 +99,12 @@ test("macOS file tree filters unopened nested files and preserves file actions",
     await expect(right.locator(".cm-content").filter({ visible: true })).toContainText(
       "export const needle = true;",
     );
+    // An opened file starts without the folder tree.
+    await right
+      .getByTestId("file-tool-toolbar")
+      .filter({ visible: true })
+      .getByTestId("file-toggle-tree")
+      .click();
     const fileTree = right.getByTestId("file-tree-rail-tree").filter({ visible: true });
     await fileTree.getByTestId("files-filter").fill("zzzz-no-match");
     await expect(fileTree.getByTestId("files-filter-empty")).toBeVisible();
@@ -176,8 +185,12 @@ test("macOS Files starts with an empty editor beside its searchable tree", async
     const draft = "Keep the conversation draft while browsing files.";
     await composerLocator(page).fill(draft);
     await page.getByTestId("workspace-explorer-toggle").click();
-    const filesTab = page.getByTestId("explorer-sidebar-tab-files");
-    await filesTab.click();
+    // A tab launched from the launcher keeps the launcher's id, so find Files by its label.
+    const filesTab = page.getByRole("button", { name: "Browse workspace files", exact: true });
+    await page
+      .getByTestId("workspace-explorer-sidebar")
+      .getByTestId("workspace-new-tab-files")
+      .click();
     const right = page.getByTestId("workspace-explorer-sidebar");
     const empty = right.getByTestId("files-empty-editor").filter({ visible: true });
     await expect(empty).toBeVisible();
@@ -231,6 +244,8 @@ test("macOS Files starts with an empty editor beside its searchable tree", async
     await expect(right.locator(".cm-content").filter({ visible: true })).toContainText(
       "export const needle = true;",
     );
+    await expect(right.getByTestId("file-tree-rail-tree").filter({ visible: true })).toHaveCount(0);
+    await toolbar.getByTestId("file-toggle-tree").click();
     await expect(right.getByTestId("file-tree-rail-tree").filter({ visible: true })).toBeVisible();
     await expect(composerLocator(page)).toHaveValue(draft);
     const fileTab = page.getByRole("button", { name: "src/needle.ts", exact: true });
