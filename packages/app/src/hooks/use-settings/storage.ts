@@ -26,8 +26,13 @@ import { getIsElectronMac, isNative } from "@/constants/platform";
 import {
   DEFAULT_CONTENT_MAX_WIDTH,
   FONT_SIZE,
+  HEX_COLOR_PATTERN,
   PLUGIN_THEME_PREFERENCE,
   THEME_OPTIONS,
+  THEME_TINTS,
+  type ThemeColorRole,
+  type ThemeColorSettings,
+  type ThemeName,
   type ThemePreference,
   type FontWeightSetting,
 } from "@/styles/theme";
@@ -51,6 +56,20 @@ const ThemePreferenceSchema = z.enum([
   ...THEME_OPTIONS.map((option) => option.name),
   PLUGIN_THEME_PREFERENCE,
 ]);
+const ThemeNameSchema = z.enum(Object.keys(THEME_TINTS) as [ThemeName, ...ThemeName[]]);
+const ThemeColorSchema = z.string().regex(HEX_COLOR_PATTERN).optional().catch(undefined);
+const ThemeColorOverridesSchema = z
+  .object({
+    main: ThemeColorSchema,
+    sidebar: ThemeColorSchema,
+    selection: ThemeColorSchema,
+    accent: ThemeColorSchema,
+    text: ThemeColorSchema,
+    mutedText: ThemeColorSchema,
+    border: ThemeColorSchema,
+  } satisfies Record<ThemeColorRole, typeof ThemeColorSchema>)
+  .catch({});
+
 /** Where the theme picker lands when the persisted preference cannot be honoured. */
 export const DEFAULT_THEME_PREFERENCE = "auto" satisfies ThemePreference;
 export const DEFAULT_TERMINAL_SCROLLBACK_LINES = 10_000;
@@ -87,6 +106,7 @@ export interface AppSettings {
   theme: ThemePreference;
   /** Which contributed theme `theme: "plugin"` selects. */
   pluginThemeId: string | null;
+  themeColors: ThemeColorSettings;
   language: AppLanguage;
   sendBehavior: SendBehavior;
   serviceUrlBehavior: ServiceUrlBehavior;
@@ -152,6 +172,7 @@ export interface Settings extends AppSettings {
 export const DEFAULT_CLIENT_SETTINGS: AppSettings = {
   theme: DEFAULT_THEME_PREFERENCE,
   pluginThemeId: null,
+  themeColors: {},
   language: "system",
   sendBehavior: "steer",
   serviceUrlBehavior: "ask",
@@ -233,6 +254,7 @@ const StoredAppSettingsSchema = z
   .looseObject({
     theme: ThemePreferenceSchema.catch(DEFAULT_THEME_PREFERENCE),
     pluginThemeId: z.string().nullable().catch(null),
+    themeColors: z.partialRecord(ThemeNameSchema, ThemeColorOverridesSchema).catch({}),
     language: z
       .enum(["system", "ar", "en", "es", "fr", "ja", "ko", "pt-BR", "ru", "zh-CN"])
       .catch("system"),

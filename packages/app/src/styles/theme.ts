@@ -942,6 +942,8 @@ export const THEME_COLOR_ROLES = [
 ] as const;
 export type ThemeColorRole = (typeof THEME_COLOR_ROLES)[number];
 export type ThemeColorOverrides = Partial<Record<ThemeColorRole, string>>;
+/** User colors per built-in theme; a theme without an entry keeps its own palette. */
+export type ThemeColorSettings = Partial<Record<ThemeName, ThemeColorOverrides>>;
 
 export const HEX_COLOR_PATTERN = /^#[0-9a-f]{6}$/i;
 
@@ -955,7 +957,7 @@ const THEME_COLOR_ROLE_TOKENS = {
   border: "border",
 } as const satisfies Record<ThemeColorRole, keyof Theme["colors"]>;
 
-function withColorOverrides<Config extends LightThemeConfig | DarkThemeConfig>(
+export function withColorOverrides<Config extends LightThemeConfig | DarkThemeConfig>(
   config: Config,
   overrides: ThemeColorOverrides,
 ): Config {
@@ -978,7 +980,7 @@ function withColorOverrides<Config extends LightThemeConfig | DarkThemeConfig>(
   };
 }
 
-export function buildThemeColors(tint: ThemeTint, overrides: ThemeColorOverrides) {
+function buildThemeColors(tint: ThemeTint, overrides: ThemeColorOverrides) {
   return tint.colorScheme === "light"
     ? buildLightSemanticColors(withColorOverrides(tint.config, overrides))
     : buildDarkSemanticColors(withColorOverrides(tint.config, overrides));
