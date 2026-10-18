@@ -41,17 +41,19 @@ export function BranchSwitcher({
   const toast = useToast();
   const queryClient = useQueryClient();
 
-  const { branchOptions, isOpen, setIsOpen, handleBranchSelect } = useBranchSwitcher({
-    client,
-    normalizedServerId: serverId,
-    normalizedWorkspaceId: workspaceId,
-    workspaceDirectory,
-    currentBranchName,
-    isGitCheckout,
-    isConnected,
-    toast,
-    queryClient,
-  });
+  const { branchOptions, pendingBranch, isOpen, setIsOpen, handleBranchSelect } = useBranchSwitcher(
+    {
+      client,
+      normalizedServerId: serverId,
+      normalizedWorkspaceId: workspaceId,
+      workspaceDirectory,
+      currentBranchName,
+      isGitCheckout,
+      isConnected,
+      toast,
+      queryClient,
+    },
+  );
 
   const handleOpen = useCallback(() => setIsOpen(true), [setIsOpen]);
 
@@ -76,6 +78,7 @@ export function BranchSwitcher({
   if (!currentBranchName) {
     return null;
   }
+  const branchLabel = pendingBranch ?? currentBranchName;
 
   return (
     <View ref={anchorRef} collapsable={false} style={styles.anchor}>
@@ -83,12 +86,13 @@ export function BranchSwitcher({
         <TooltipTrigger asChild>
           <ToolbarLabelSelectTrigger
             testID={testID}
-            label={currentBranchName}
+            label={branchLabel}
             open={isOpen}
             onPress={handleOpen}
+            disabled={pendingBranch !== null}
             accessibilityRole="button"
             accessibilityLabel={t("branchSwitcher.currentBranch", {
-              branchName: currentBranchName,
+              branchName: branchLabel,
             })}
           />
         </TooltipTrigger>
