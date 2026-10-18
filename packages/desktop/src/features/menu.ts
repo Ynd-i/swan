@@ -70,6 +70,9 @@ function buildApplicationMenuTemplate(
 ): Electron.MenuItemConstructorOptions[] {
   const isMac = process.platform === "darwin";
   const zoomEnabled = !capturing;
+  const zoomIn = withBrowserWindow((win) => {
+    win.webContents.setZoomLevel(win.webContents.getZoomLevel() + 0.5);
+  });
 
   return [
     ...(isMac
@@ -119,11 +122,18 @@ function buildApplicationMenuTemplate(
       submenu: [
         {
           label: "Zoom In",
+          accelerator: "CmdOrCtrl+Plus",
+          enabled: zoomEnabled,
+          click: zoomIn,
+        },
+        // Layouts with a dedicated "+" key (e.g. German) only produce "+"; US layouts expect Cmd+=.
+        {
+          label: "Zoom In",
           accelerator: "CmdOrCtrl+=",
           enabled: zoomEnabled,
-          click: withBrowserWindow((win) => {
-            win.webContents.setZoomLevel(win.webContents.getZoomLevel() + 0.5);
-          }),
+          visible: false,
+          acceleratorWorksWhenHidden: true,
+          click: zoomIn,
         },
         {
           label: "Zoom Out",
