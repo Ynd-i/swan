@@ -154,6 +154,16 @@ describe("applyAppearance", () => {
     });
   });
 
+  it.each([
+    ["#d97757", "#ffffff"],
+    ["#3b82f6", "#ffffff"],
+    ["#ffcc00", "#151515"],
+  ])("gives accent %s readable %s text", (accent, accentForeground) => {
+    applyAppearance(makeInput({ themeColors: { dark: { accent } } }));
+
+    expect(runUpdaterFor("dark").colors.accentForeground).toBe(accentForeground);
+  });
+
   it("restores the authored color once the user's color is cleared", () => {
     applyAppearance(makeInput({ themeColors: {} }));
 

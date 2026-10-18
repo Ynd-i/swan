@@ -67,12 +67,12 @@ export function parseHexColor(hex: string): [number, number, number] | null {
   ];
 }
 
-/** Whether dark text reads better than white text on this color. */
+/** Whether a fill needs dark text. Saturated mid-tones such as Claude coral keep white text. */
 export function isLightHexColor(hex: string): boolean {
   const rgb = parseHexColor(hex);
   if (!rgb) return false;
   const [r, g, b] = rgb.map(srgbToLinear);
-  return linearRgbToOklab(r, g, b).L > 0.65;
+  return linearRgbToOklab(r, g, b).L > 0.7;
 }
 
 /** Adds alpha to a theme-owned hex color in a format accepted by Canvas and Skia. */

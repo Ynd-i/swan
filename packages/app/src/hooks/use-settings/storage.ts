@@ -32,7 +32,6 @@ import {
   THEME_TINTS,
   type ThemeColorRole,
   type ThemeColorSettings,
-  type ThemeName,
   type ThemePreference,
   type FontWeightSetting,
 } from "@/styles/theme";
@@ -56,7 +55,7 @@ const ThemePreferenceSchema = z.enum([
   ...THEME_OPTIONS.map((option) => option.name),
   PLUGIN_THEME_PREFERENCE,
 ]);
-const ThemeNameSchema = z.enum(Object.keys(THEME_TINTS) as [ThemeName, ...ThemeName[]]);
+const THEME_NAMES = new Set<string>(Object.keys(THEME_TINTS));
 const ThemeColorSchema = z.string().regex(HEX_COLOR_PATTERN).optional().catch(undefined);
 const ThemeColorOverridesSchema = z
   .object({
@@ -254,7 +253,14 @@ const StoredAppSettingsSchema = z
   .looseObject({
     theme: ThemePreferenceSchema.catch(DEFAULT_THEME_PREFERENCE),
     pluginThemeId: z.string().nullable().catch(null),
-    themeColors: z.partialRecord(ThemeNameSchema, ThemeColorOverridesSchema).catch({}),
+    // Per entry, so a retired theme name does not discard the other themes' colors.
+    themeColors: z
+      .record(z.string(), ThemeColorOverridesSchema)
+      .transform(
+        (stored): ThemeColorSettings =>
+          Object.fromEntries(Object.entries(stored).filter(([name]) => THEME_NAMES.has(name))),
+      )
+      .catch({}),
     language: z
       .enum(["system", "ar", "en", "es", "fr", "ja", "ko", "pt-BR", "ru", "zh-CN"])
       .catch("system"),
