@@ -1480,7 +1480,14 @@ changes, and a list of sidebar, composer and transcript fixes. All of it is in
   overflow or meet the status or actions, and scroll to their end at 2em/s while hovered
   (`desktop-sidebar-title.tsx`). The running and busy indicator is a 12pt quarter arc
   spinning over a faint track (`desktop-progress-ring.web.tsx`); Codex's running sidebar
-  row was never captured, so this follows the user's description. Empty workspace rows archive from a
+  row was never captured, so this follows the user's description. A chat also spins while
+  any subagent below it runs, managed or provider-owned, because Claude's background
+  subagents outlive the parent's turn and the chat otherwise reads as done
+  (`desktopChatStatus`, 2026-10-19). A collapsed handoff chain spins for its earlier chats
+  too. Provider subagents are known only for parents this
+  app session listed or received updates for, so after an app restart a chat whose
+  subagents were already running spins only after it is opened or a subagent reports an
+  update. Empty workspace rows archive from a
   hover button or right-click through `useWorkspaceArchive`, so worktrees still confirm
   risky archives. Archiving a project's only workspace archives the project.
 - Usage: the sidebar entry shows the most used window across pinned sources plus

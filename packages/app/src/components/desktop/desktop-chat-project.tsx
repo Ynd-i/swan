@@ -1,4 +1,4 @@
-import { memo, useCallback, useMemo, useState, type ReactNode, type Ref } from "react";
+import { memo, useCallback, useContext, useMemo, useState, type ReactNode, type Ref } from "react";
 import { router } from "expo-router";
 import {
   Archive,
@@ -61,7 +61,12 @@ import { resolveSidebarProjectLocalPath } from "@/utils/sidebar-project-row-mode
 import { redirectIfArchivingActiveWorkspace } from "@/utils/sidebar-workspace-archive-redirect";
 import { OpenInFileManagerMenuItem } from "@/workspace/open-in-file-manager/menu-item";
 import { useWorkspaceArchive } from "@/workspace/use-workspace-archive";
-import { isDesktopChatUnread, type DesktopChatProject } from "./desktop-chat-model";
+import {
+  desktopChatStatus,
+  isDesktopChatUnread,
+  type DesktopChatProject,
+} from "./desktop-chat-model";
+import { SubagentsRunningContext } from "./desktop-chat-row";
 import { SectionChatList } from "./desktop-chat-section-list";
 import { useArchiveChats, useSectionMovePage } from "./desktop-chat-section-menus";
 import { useChatSectionsStore } from "./desktop-chat-sections-store";
@@ -88,11 +93,6 @@ const removeLeading = <RemoveIcon size={16} uniProps={mutedIcon} />;
 // The archive button covers this much of the title's right edge (the md+ button width, as in
 // the chat row).
 const EMPTY_WORKSPACE_ACTION_WIDTH = 26;
-
-/** The chat row's status: an open turn counts as running. */
-function chatStatus(agent: DesktopChatProject["chats"][number]) {
-  return agent.turn.phase === "open" ? "running" : agent.status;
-}
 
 function EmptyWorkspaceRow({ workspace }: { workspace: SidebarWorkspacePlacement }) {
   const { t } = useTranslation();
@@ -437,11 +437,12 @@ export const ChatProject = memo(function ChatProject({
     ...dragAttributes
   } = dragHandleProps?.attributes ?? {};
   const revealed = hovered || focused || menuOpen || contextOpen;
+  const subagentsRunning = useContext(SubagentsRunningContext);
   // A collapsed project stands in for its hidden chats: their spinner, else their most urgent dot.
   const hiddenStatus = useMemo(() => {
     const buckets = chats.map((agent) =>
       deriveSidebarStateBucket({
-        status: chatStatus(agent),
+        status: desktopChatStatus(agent, subagentsRunning),
         requiresAttention: isDesktopChatUnread(agent),
         attentionReason: agent.attentionReason,
         pendingPermissionCount: agent.pendingPermissionCount,
@@ -449,7 +450,7 @@ export const ChatProject = memo(function ChatProject({
     );
     const bucket = aggregateSidebarStateBuckets(buckets);
     return bucket === "done" ? null : { bucket, agent: chats[buckets.indexOf(bucket)] };
-  }, [chats]);
+  }, [chats, subagentsRunning]);
   return (
     <View style={styles.project}>
       <ContextMenu open={contextOpen} onOpenChange={setContextOpen}>
@@ -493,7 +494,7 @@ export const ChatProject = memo(function ChatProject({
                   <Progress uniProps={mutedIcon} />
                 ) : (
                   <AgentStatusDot
-                    status={chatStatus(hiddenStatus.agent)}
+                    status={desktopChatStatus(hiddenStatus.agent, subagentsRunning)}
                     requiresAttention={isDesktopChatUnread(hiddenStatus.agent)}
                     attentionReason={hiddenStatus.agent.attentionReason}
                     pendingPermissionCount={hiddenStatus.agent.pendingPermissionCount}

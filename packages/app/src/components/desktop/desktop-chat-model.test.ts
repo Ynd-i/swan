@@ -11,11 +11,13 @@ import {
   buildDesktopChatSidebar,
   DESKTOP_CHAT_PINNED_AT,
   DESKTOP_CHAT_UNREAD,
+  desktopChatStatus,
   isDesktopChatUnread,
   latestReplyPreview,
   orderSectionChats,
   partitionChatSections,
   selectEmptiedWorkspaces,
+  selectRunningProviderSubagentParents,
   type DesktopChatProject,
 } from "./desktop-chat-model";
 
@@ -400,4 +402,49 @@ it("lists no placeholder workspace for a project whose chats are all archived", 
   expect(sidebar.projects[0]?.emptyWorkspaces.map((workspace) => workspace.workspaceId)).toEqual([
     "tree",
   ]);
+});
+
+it("shows a chat as running while a subagent below it runs", () => {
+  const root = chat("root", "local", "main");
+  const idleRoot = chat("idle-root", "local", "main");
+  const child = chat("child", "local", "main");
+  child.labels[PARENT_AGENT_ID_LABEL] = "root";
+  const grandchild = chat("grandchild", "local", "main");
+  grandchild.labels[PARENT_AGENT_ID_LABEL] = "child";
+  grandchild.turn = { phase: "open", turnId: null, startedAt: null, cancellationRequestId: null };
+  const finished = chat("finished", "local", "main");
+  finished.labels[PARENT_AGENT_ID_LABEL] = "idle-root";
+  const archived = chat("archived", "local", "main");
+  archived.labels[PARENT_AGENT_ID_LABEL] = "idle-root";
+  archived.status = "running";
+  archived.archivedAt = new Date("2026-09-30T10:00:00Z");
+
+  const model = buildDesktopChatSidebar({
+    projects: [project("app", "local", ["main"])],
+    agents: [root, idleRoot, child, grandchild, finished, archived],
+  });
+
+  expect([...model.subagentsRunning]).toEqual(["local:root"]);
+  expect(desktopChatStatus(root, model.subagentsRunning)).toBe("running");
+  expect(desktopChatStatus(idleRoot, model.subagentsRunning)).toBe("idle");
+});
+
+it("shows a chat as running while a provider subagent below it runs", () => {
+  const root = chat("root", "local", "main");
+  const child = chat("child", "local", "main");
+  child.labels[PARENT_AGENT_ID_LABEL] = "root";
+  const remote = chat("root", "remote", "main");
+
+  const model = buildDesktopChatSidebar({
+    projects: [project("app", "local", ["main"]), project("remote-app", "remote", ["main"])],
+    agents: [root, child, remote],
+    runningProviderSubagentParents: selectRunningProviderSubagentParents(
+      new Map([
+        ["local\0child\0task-1", { parentAgentId: "child", status: "running" as const }],
+        ["remote\0root\0task-2", { parentAgentId: "root", status: "completed" as const }],
+      ]),
+    ),
+  });
+
+  expect([...model.subagentsRunning]).toEqual(["local:root"]);
 });

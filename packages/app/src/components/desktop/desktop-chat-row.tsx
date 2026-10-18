@@ -11,7 +11,12 @@ import type { AggregatedAgent } from "@/hooks/use-aggregated-agents";
 import type { Theme } from "@/styles/theme";
 import { navigateToAgent } from "@/utils/navigate-to-agent";
 import { deriveSidebarStateBucket } from "@/utils/sidebar-agent-state";
-import { desktopChatKey, type HandoffChains, type StartedChats } from "./desktop-chat-model";
+import {
+  desktopChatKey,
+  desktopChatStatus,
+  type HandoffChains,
+  type StartedChats,
+} from "./desktop-chat-model";
 import { DesktopChatMenuItems, useChatForkPage, useDesktopChatMenu } from "./desktop-chat-menu";
 import { useSectionMovePage } from "./desktop-chat-section-menus";
 import { useChatSectionsStore } from "./desktop-chat-sections-store";
@@ -30,6 +35,8 @@ const mutedIcon = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
 export const HandoffChainsContext = createContext<HandoffChains>(new Map());
 /** Chats started from a proposal, so a chat row can list them under itself. */
 export const StartedChatsContext = createContext<StartedChats>(new Map());
+/** Chats with a running subagent below them, so a chat whose own turn ended still shows working. */
+export const SubagentsRunningContext = createContext<ReadonlySet<string>>(new Set());
 // Each nesting level sits one chevron deeper.
 const NEST_INDENT = 22;
 // The width each row action covers at the right edge of the title.
@@ -174,6 +181,20 @@ function isChainSelected(input: {
   return input.handoffs.some((handoff) => desktopChatKey(handoff) === input.selectedKey);
 }
 
+/** A collapsed chain shows its earlier chats' running state on the head row. */
+function chainStatus(input: {
+  agent: AggregatedAgent;
+  handoffs: readonly AggregatedAgent[] | undefined;
+  open: boolean;
+  subagentsRunning: ReadonlySet<string>;
+}): AggregatedAgent["status"] {
+  const hidden = input.open ? [] : (input.handoffs ?? []);
+  const running = hidden.some(
+    (handoff) => desktopChatStatus(handoff, input.subagentsRunning) === "running",
+  );
+  return running ? "running" : desktopChatStatus(input.agent, input.subagentsRunning);
+}
+
 /** A chain moves between sections as one chat. */
 function useChainSection(key: string, handoffs: readonly AggregatedAgent[] | undefined) {
   const memberKeys = useMemo(() => [key, ...(handoffs ?? []).map(desktopChatKey)], [handoffs, key]);
@@ -295,6 +316,7 @@ export const ChatRow = memo(function ChatRow({
   const key = desktopChatKey(agent);
   const handoffs = useContext(HandoffChainsContext).get(key);
   const started = useContext(StartedChatsContext).get(key);
+  const subagentsRunning = useContext(SubagentsRunningContext);
   const nestLevel = depth + (superseded ? 1 : 0);
   const nestStyle = useMemo(
     () => (nestLevel > 0 ? { marginLeft: NEST_INDENT * nestLevel } : undefined),
@@ -315,7 +337,7 @@ export const ChatRow = memo(function ChatRow({
   );
   const revealed = hovered || contextOpen;
   const title = agent.title || t("agentList.fallbackTitle");
-  const status = agent.turn.phase === "open" ? "running" : agent.status;
+  const status = chainStatus({ agent, handoffs, open: handoffsOpen, subagentsRunning });
   const bucket = deriveSidebarStateBucket({
     status,
     requiresAttention: unread,
