@@ -51,6 +51,7 @@ export const ptBR: TranslationResources = {
     handoffs: { toggle: "Transferências anteriores ({{count}})" },
     activity: "Atividade",
     workedFor: "Duração: {{duration}}",
+    thinking: "Pensando",
     startWork: "Em que vamos trabalhar?",
     startInProject: "Em que vamos trabalhar em {{project}}?",
     resetReasoning: "Redefinir intensidade do raciocínio",
@@ -2185,6 +2186,13 @@ export const ptBR: TranslationResources = {
       shell: "Executado",
       search: "Pesquisado",
       fetch: "Obtido",
+    },
+    running: {
+      read: "Lendo",
+      edit: "Editando",
+      shell: "Executando",
+      search: "Pesquisando",
+      fetch: "Buscando",
     },
   },
   renameModal: {

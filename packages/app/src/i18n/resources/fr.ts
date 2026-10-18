@@ -51,6 +51,7 @@ export const fr: TranslationResources = {
     handoffs: { toggle: "Passations précédentes ({{count}})" },
     activity: "Activité",
     workedFor: "Durée : {{duration}}",
+    thinking: "Réflexion",
     startWork: "Sur quoi allons-nous travailler ?",
     startInProject: "Sur quoi allons-nous travailler dans {{project}} ?",
     resetReasoning: "Réinitialiser l’intensité du raisonnement",
@@ -2198,6 +2199,13 @@ export const fr: TranslationResources = {
       shell: "Exécuté",
       search: "Recherché",
       fetch: "Récupéré",
+    },
+    running: {
+      read: "Lecture",
+      edit: "Modification",
+      shell: "Exécution",
+      search: "Recherche",
+      fetch: "Récupération",
     },
   },
   renameModal: {

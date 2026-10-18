@@ -3128,27 +3128,28 @@ interface ToolCallProps {
   maxDetailHeight?: number;
 }
 
-// Finished Mac tool rows read like Codex steps: "已读取 History.swift", "已运行 pwd".
-const MAC_DONE_LABEL_KEYS: Partial<Record<ToolCallDetail["type"], string>> = {
-  read: "toolCallGroup.done.read",
-  edit: "toolCallGroup.done.edit",
-  write: "toolCallGroup.done.edit",
-  shell: "toolCallGroup.done.shell",
-  search: "toolCallGroup.done.search",
-  fetch: "toolCallGroup.done.fetch",
+// Mac tool rows read like Codex steps: "正在运行 pwd", then "已运行 pwd".
+const MAC_LABEL_VERBS: Partial<Record<ToolCallDetail["type"], string>> = {
+  read: "read",
+  edit: "edit",
+  write: "edit",
+  shell: "shell",
+  search: "search",
+  fetch: "fetch",
 };
 
-function toolCallLabel(
+export function toolCallLabel(
   t: (key: string) => string,
   status: ToolCallProps["status"],
   detail: ToolCallDetail | undefined,
   displayName: string,
 ): string {
-  const key =
-    getIsElectronMac() && status === "completed" && detail
-      ? MAC_DONE_LABEL_KEYS[detail.type]
-      : undefined;
-  return key ? t(key) : displayName;
+  const verb = getIsElectronMac() && detail ? MAC_LABEL_VERBS[detail.type] : undefined;
+  if (verb && status === "completed") return t(`toolCallGroup.done.${verb}`);
+  if (verb && (status === "running" || status === "executing")) {
+    return t(`toolCallGroup.running.${verb}`);
+  }
+  return displayName;
 }
 
 export const ToolCall = memo(function ToolCall({

@@ -51,6 +51,7 @@ export const zhCN: TranslationResources = {
     handoffs: { toggle: "更早的交接（{{count}}）" },
     activity: "活动",
     workedFor: "用时 {{duration}}",
+    thinking: "思考中",
     startWork: "我们应该做些什么？",
     startInProject: "我们应该在{{project}}中做些什么？",
     resetReasoning: "重置推理强度",
@@ -2131,6 +2132,13 @@ export const zhCN: TranslationResources = {
       shell: "已运行",
       search: "已搜索",
       fetch: "已获取",
+    },
+    running: {
+      read: "正在读取",
+      edit: "正在编辑",
+      shell: "正在运行",
+      search: "正在搜索",
+      fetch: "正在获取",
     },
   },
   renameModal: {

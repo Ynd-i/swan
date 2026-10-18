@@ -51,6 +51,7 @@ export const ar: TranslationResources = {
     handoffs: { toggle: "عمليات التسليم السابقة ({{count}})" },
     activity: "النشاط",
     workedFor: "المدة: {{duration}}",
+    thinking: "يفكر",
     startWork: "على ماذا نعمل؟",
     startInProject: "على ماذا نعمل في {{project}}؟",
     resetReasoning: "إعادة ضبط مستوى الاستدلال",
@@ -2152,6 +2153,13 @@ export const ar: TranslationResources = {
       shell: "تم التشغيل",
       search: "تم البحث",
       fetch: "تم الجلب",
+    },
+    running: {
+      read: "يقرأ",
+      edit: "يحرر",
+      shell: "يشغّل",
+      search: "يبحث",
+      fetch: "يجلب",
     },
   },
   renameModal: {

@@ -48,6 +48,7 @@ export const en = {
     handoffs: { toggle: "Earlier handoffs ({{count}})" },
     activity: "Activity",
     workedFor: "Worked for {{duration}}",
+    thinking: "Thinking",
     startWork: "What should we work on?",
     startInProject: "What should we work on in {{project}}?",
     resetReasoning: "Reset reasoning intensity",
@@ -2178,6 +2179,13 @@ export const en = {
       shell: "Ran",
       search: "Searched",
       fetch: "Fetched",
+    },
+    running: {
+      read: "Reading",
+      edit: "Editing",
+      shell: "Running",
+      search: "Searching",
+      fetch: "Fetching",
     },
   },
   renameModal: {

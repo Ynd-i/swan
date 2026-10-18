@@ -51,6 +51,7 @@ export const ru: TranslationResources = {
     handoffs: { toggle: "Предыдущие передачи ({{count}})" },
     activity: "Действия",
     workedFor: "Время: {{duration}}",
+    thinking: "Размышляю",
     startWork: "Над чем поработаем?",
     startInProject: "Над чем поработаем в {{project}}?",
     resetReasoning: "Сбросить интенсивность рассуждений",
@@ -2185,6 +2186,13 @@ export const ru: TranslationResources = {
       shell: "Выполнено",
       search: "Поиск",
       fetch: "Загружено",
+    },
+    running: {
+      read: "Читаю",
+      edit: "Редактирую",
+      shell: "Выполняю",
+      search: "Ищу",
+      fetch: "Загружаю",
     },
   },
   renameModal: {

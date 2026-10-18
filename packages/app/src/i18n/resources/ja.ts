@@ -51,6 +51,7 @@ export const ja: TranslationResources = {
     handoffs: { toggle: "以前の引き継ぎ（{{count}}）" },
     activity: "アクティビティ",
     workedFor: "所要時間: {{duration}}",
+    thinking: "考え中",
     startWork: "何をしましょうか？",
     startInProject: "{{project}} で何をしましょうか？",
     resetReasoning: "推論の強度をリセット",
@@ -2173,6 +2174,13 @@ export const ja: TranslationResources = {
       shell: "実行済み",
       search: "検索済み",
       fetch: "取得済み",
+    },
+    running: {
+      read: "読み取り中",
+      edit: "編集中",
+      shell: "実行中",
+      search: "検索中",
+      fetch: "取得中",
     },
   },
   renameModal: {

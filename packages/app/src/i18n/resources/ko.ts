@@ -51,6 +51,7 @@ export const ko: TranslationResources = {
     handoffs: { toggle: "이전 인계 ({{count}})" },
     activity: "활동",
     workedFor: "소요 시간: {{duration}}",
+    thinking: "생각 중",
     startWork: "어떤 작업을 할까요?",
     startInProject: "{{project}}에서 어떤 작업을 할까요?",
     resetReasoning: "추론 강도 재설정",
@@ -2163,6 +2164,13 @@ export const ko: TranslationResources = {
       shell: "실행함",
       search: "검색함",
       fetch: "가져옴",
+    },
+    running: {
+      read: "읽는 중",
+      edit: "편집 중",
+      shell: "실행 중",
+      search: "검색 중",
+      fetch: "가져오는 중",
     },
   },
   renameModal: {

@@ -13,6 +13,7 @@ export type ToolCallDetailGroup = OverviewToolCallGroup;
 
 export interface PreparedToolCallHistory {
   mode: "overview";
+  absorbThoughts: boolean;
   grouped: GroupedHistory<ToolCallDetailGroup>;
 }
 
@@ -41,14 +42,17 @@ function visibleToolCallItems(items: StreamItem[]): StreamItem[] {
 export function prepareToolCallHistory(
   level: ToolCallDetailLevel,
   tail: StreamItem[],
+  absorbThoughts = false,
 ): PreparedToolCallHistory | null {
   if (level === "detailed") {
     return null;
   }
   return {
     mode: "overview",
+    absorbThoughts,
     grouped: prepareGroupedHistory({
       tail: visibleToolCallItems(tail),
+      absorbThoughts,
       buildGroup: buildOverviewGroup,
     }),
   };
@@ -76,6 +80,7 @@ export function projectToolCallDetailLevel(input: {
     history: input.preparedHistory.grouped,
     head: visibleToolCallItems(input.head),
     isTurnActive: input.isTurnActive,
+    absorbThoughts: input.preparedHistory.absorbThoughts,
     buildGroup: buildOverviewGroup,
   });
 }
