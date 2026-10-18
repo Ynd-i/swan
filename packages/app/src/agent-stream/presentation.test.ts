@@ -94,7 +94,11 @@ function pluginData(items: StreamItem[]): unknown[] {
   return items.flatMap((item) => (item.kind === "plugin" ? [item.data] : []));
 }
 
-const presentationOptions = { level: "overview" as const, isTurnActive: true };
+const presentationOptions = {
+  level: "overview" as const,
+  isTurnActive: true,
+  absorbThoughts: false,
+};
 
 function streamHarness(transform?: TimelineItemTransform) {
   let state: { tail: StreamItem[]; head: StreamItem[] } = { tail: [], head: [] };

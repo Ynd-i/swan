@@ -15,6 +15,8 @@ interface PresentationInput {
   transform: TimelineItemTransform | undefined;
   level: ToolCallDetailLevel;
   isTurnActive: boolean;
+  /** Codex-style desktop folds the thoughts between tool calls into their group. */
+  absorbThoughts: boolean;
 }
 
 function retainItems(previous: StreamItem[], next: StreamItem[]): StreamItem[] {
@@ -77,6 +79,7 @@ export function createStreamPresentation() {
   let promotedRows: StreamItem[] = [];
   let preparedTail: StreamItem[] | undefined;
   let preparedLevel: ToolCallDetailLevel | undefined;
+  let preparedAbsorbThoughts: boolean | undefined;
   let preparedHistory: PreparedToolCallHistory | null = null;
 
   /**
@@ -170,10 +173,15 @@ export function createStreamPresentation() {
       displayHistory = historyRows;
       promotedRows = nextPromoted;
     }
-    if (preparedTail !== displayTail || preparedLevel !== input.level) {
-      preparedHistory = prepareToolCallHistory(input.level, displayTail);
+    if (
+      preparedTail !== displayTail ||
+      preparedLevel !== input.level ||
+      preparedAbsorbThoughts !== input.absorbThoughts
+    ) {
+      preparedHistory = prepareToolCallHistory(input.level, displayTail, input.absorbThoughts);
       preparedTail = displayTail;
       preparedLevel = input.level;
+      preparedAbsorbThoughts = input.absorbThoughts;
     }
     return projectToolCallDetailLevel({
       level: input.level,

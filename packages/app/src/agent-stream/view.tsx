@@ -539,6 +539,7 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
           transform: transformTimelineItem,
           level: toolCallDetailLevel,
           isTurnActive,
+          absorbThoughts: getIsElectronMac() && !isMobile,
         }),
       [
         presentStream,
@@ -547,6 +548,7 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
         transformTimelineItem,
         toolCallDetailLevel,
         isTurnActive,
+        isMobile,
       ],
     );
     const forkDivider = useForkDividerPlacement({
@@ -619,6 +621,7 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
       model: baseRenderModel,
       scope: `${resolvedServerId}:${agentId}`,
       isMobile,
+      isTurnActive,
       toolGroups: presentation.groupsByHostId,
       revealLoadedHistory,
       viewportRef,
@@ -843,23 +846,39 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
             onExpandedChange={setToolCallGroupExpanded}
           >
             {expanded
-              ? group.run.calls.map((call, index) => (
-                  <React.Fragment key={call.id}>
-                    {renderSingleToolCallItem(
-                      call,
-                      index === group.run.calls.length - 1,
-                      GROUPED_TOOL_CALL_DETAIL_MAX_HEIGHT,
-                    )}
-                  </React.Fragment>
-                ))
+              ? group.run.items.map((runItem, index) => {
+                  const isLast = index === group.run.items.length - 1;
+                  return (
+                    <React.Fragment key={runItem.id}>
+                      {runItem.kind === "thought" ? (
+                        <ThoughtSlot
+                          itemId={runItem.id}
+                          onInlineDetailsExpandedChangeByItemId={setInlineDetailsExpanded}
+                          text={runItem.text}
+                          status={runItem.status}
+                          isLastInSequence={isLast}
+                          defaultExpanded={autoExpandReasoning}
+                        />
+                      ) : (
+                        renderSingleToolCallItem(
+                          runItem,
+                          isLast,
+                          GROUPED_TOOL_CALL_DETAIL_MAX_HEIGHT,
+                        )
+                      )}
+                    </React.Fragment>
+                  );
+                })
               : null}
           </OverviewToolCallGroupView>
         );
       },
       [
+        autoExpandReasoning,
         expandedToolCallGroupIds,
         getToolCallGroup,
         renderSingleToolCallItem,
+        setInlineDetailsExpanded,
         setToolCallGroupExpanded,
       ],
     );

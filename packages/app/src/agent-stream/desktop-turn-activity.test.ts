@@ -86,6 +86,7 @@ function inputFor(turnItems: StreamItem[], isTurnActive = false) {
       isTurnActive,
       activeTurnStartedAt: isTurnActive ? new Date(6000) : null,
     }).byAssistantId,
+    isTurnActive,
     expanded: new Set<string>(),
     toolGroups: new Map<string, ToolCallDetailGroup>(),
   };
@@ -114,6 +115,7 @@ describe("desktop turn activity", () => {
         isTurnActive: false,
         activeTurnStartedAt: null,
       }).byAssistantId,
+      isTurnActive: false,
       expanded: new Set<string>(),
       toolGroups: new Map<string, ToolCallDetailGroup>(),
     };
@@ -127,7 +129,7 @@ describe("desktop turn activity", () => {
     ]);
     expect([...collapsed.hiddenItemIds]).toEqual(["intro:0", "thought", "read"]);
     const activity = collapsed.byHostId.get("intro:0")!;
-    expect(activity.timing.durationMs).toBe(5000);
+    expect(activity.state).toMatchObject({ kind: "complete", timing: { durationMs: 5000 } });
     expect(collapsed.groupByMessageId.get("intro")).toBe(activity.id);
     const expanded = project({ ...input, expanded: new Set([activity.id]) });
     expect(projectDesktopActivityItems(items, expanded).map((item) => item.id)).toEqual(
@@ -217,7 +219,13 @@ describe("desktop turn activity", () => {
     const input = inputFor(turn);
     input.toolGroups.set(
       host.id,
-      buildOverviewGroup({ id: host.id, calls: [failed, read], latest: read, isSealed: true }),
+      buildOverviewGroup({
+        id: host.id,
+        items: [failed, read],
+        calls: [failed, read],
+        latest: read,
+        isSealed: true,
+      }),
     );
     const projection = createDesktopTurnActivityProjection()(input);
     expect(projectDesktopActivityItems(turn, projection).map((item) => item.id)).toEqual([
@@ -238,5 +246,84 @@ describe("desktop turn activity", () => {
     expect(projectDesktopActivityItems(turn, projection).map((item) => item.id)).toEqual(
       turn.map((item) => item.id),
     );
+  });
+});
+
+describe("desktop turn activity while the turn is working", () => {
+  const read = items[3] as ToolCallItem;
+  function shell(id: string, status: "running" | "completed" | "failed"): ToolCallItem {
+    return {
+      ...read,
+      id,
+      payload: {
+        source: "agent",
+        data: {
+          provider: "codex",
+          callId: id,
+          name: "shell",
+          status,
+          error: status === "failed" ? "Command failed" : null,
+          detail: { type: "shell", command: id },
+        },
+      },
+    };
+  }
+  const working = [...items.slice(0, 4), shell("fetch", "running")];
+
+  it("folds steps behind the latest one and keeps progress text visible", () => {
+    const projection = createDesktopTurnActivityProjection()(inputFor(working, true));
+    const activity = projection.byHostId.get("intro:0")!;
+    expect(activity.state).toEqual({ kind: "working", latestStep: working[4] });
+    expect([...projection.hiddenItemIds]).toEqual(["thought", "read", "fetch"]);
+    expect(projectDesktopActivityItems(working, projection).map((item) => item.id)).toEqual([
+      "user",
+      "intro:0",
+    ]);
+  });
+
+  it("keeps failed calls visible and the expand id stable as steps arrive", () => {
+    const project = createDesktopTurnActivityProjection();
+    const first = project(inputFor(working, true)).byHostId.get("intro:0")!;
+    const next = [...working, shell("broken", "failed")];
+    const projection = project(inputFor(next, true));
+    expect(projection.byHostId.get("intro:0")?.id).toBe(first.id);
+    expect(projection.hiddenItemIds.has("broken")).toBe(false);
+  });
+
+  it("does not revise the row while the latest thought streams", () => {
+    const project = createDesktopTurnActivityProjection();
+    const streaming: StreamItem = {
+      kind: "thought",
+      id: "live-thought",
+      turnId: "turn",
+      text: "Weighing",
+      status: "loading",
+      timestamp: new Date(6000),
+    };
+    const first = project(inputFor([...working, streaming], true));
+    const next = project(inputFor([...working, { ...streaming, text: "Weighing more" }], true));
+    expect(next).toBe(first);
+  });
+
+  it("names the trailing thought of an overview host as the latest step", () => {
+    const thought = items[2]!;
+    const host = { ...read, id: "overview" };
+    const turn = [items[0]!, items[1]!, host];
+    const input = inputFor(turn, true);
+    input.toolGroups.set(
+      host.id,
+      buildOverviewGroup({
+        id: host.id,
+        items: [read, thought as Extract<StreamItem, { kind: "thought" }>],
+        calls: [read],
+        latest: read,
+        isSealed: false,
+      }),
+    );
+    const projection = createDesktopTurnActivityProjection()(input);
+    expect(projection.byHostId.get("intro:0")?.state).toEqual({
+      kind: "working",
+      latestStep: thought,
+    });
   });
 });

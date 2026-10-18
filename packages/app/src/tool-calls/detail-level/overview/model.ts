@@ -93,6 +93,9 @@ export function buildOverviewGroup(run: ToolCallRun): OverviewToolCallGroup {
     }
   }
 
+  // A thought still streaming inside the run keeps the group live.
+  isLoading ||= run.items.some((item) => item.kind === "thought" && item.status === "loading");
+
   const summary = {
     editedFileCount: editedFiles.size,
     commandCount,
