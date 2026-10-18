@@ -627,7 +627,13 @@ describe("chat proposals in the stream presentation", () => {
     const harness = streamHarness();
     harness.send(assistant(proposal));
     const completed = harness.send({ type: "turn_completed", provider: "claude" });
-    const card = { title: "Fix the gate", task: "Gate tools/list.\n\nAdd a test.", context: null };
+    const card = {
+      title: "Fix the gate",
+      task: "Gate tools/list.\n\nAdd a test.",
+      context: null,
+      model: null,
+      thinking: null,
+    };
     expect(completed.tail).toMatchObject([
       { kind: "assistant_message", text: "", proposals: [card] },
     ]);
