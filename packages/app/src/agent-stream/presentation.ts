@@ -3,6 +3,12 @@ import type { TimelineItemTransform } from "@/plugins/timeline/model";
 import { projectPluginTimelineItems } from "@/plugins/timeline/projection";
 import { splitMarkdownBlocksWithKinds } from "@/utils/split-markdown-blocks";
 import {
+  parseStartedChatPrompt,
+  parseStartedChatReports,
+  splitChatProposals,
+  type ChatProposal,
+} from "@/chat-proposals/proposal";
+import {
   prepareToolCallHistory,
   projectToolCallDetailLevel,
   type PreparedToolCallHistory,
@@ -35,18 +41,50 @@ export function getStreamItemMessageId(item: StreamItem): string {
 }
 
 /**
- * A block is reusable only when it still stands for the same source state. Text and
- * turn are what the reader sees; cursor and timestamp are what the timeline reads back
+ * A block is reusable only when it still stands for the same source state. Text, proposals
+ * and turn are what the reader sees; cursor and timestamp are what the timeline reads back
  * through the row — a reused block carrying a pre-canonical cursor reports a stale
  * reading position and weakens fork-boundary resolution.
  */
-function isReusableBlock(block: AssistantMessageItem, source: AssistantMessageItem, id: string) {
+function isReusableBlock(
+  block: AssistantMessageItem | undefined,
+  source: AssistantMessageItem,
+  next: Pick<AssistantMessageItem, "id" | "text" | "proposals">,
+): block is AssistantMessageItem {
   return (
-    block.id === id &&
+    block !== undefined &&
+    block.id === next.id &&
+    block.text === next.text &&
+    sameProposals(block.proposals, next.proposals) &&
     block.turnId === source.turnId &&
     block.timestamp.getTime() === source.timestamp.getTime() &&
     block.timelineCursor?.epoch === source.timelineCursor?.epoch &&
     block.timelineCursor?.seq === source.timelineCursor?.seq
+  );
+}
+
+/** A streamed chunk that only adds text. Taking out a proposal block is not an append. */
+function isPlainAppend(text: string, sourceText: string, previousText: string): boolean {
+  return (
+    sourceText === text &&
+    text.startsWith(previousText) &&
+    splitChatProposals(previousText).text === previousText
+  );
+}
+
+function sameProposals(
+  left: readonly ChatProposal[] | undefined,
+  right: readonly ChatProposal[] | undefined,
+): boolean {
+  if (!left || !right) return left === right;
+  return (
+    left.length === right.length &&
+    left.every(
+      (proposal, index) =>
+        proposal.title === right[index]!.title &&
+        proposal.task === right[index]!.task &&
+        proposal.context === right[index]!.context,
+    )
   );
 }
 
@@ -64,7 +102,16 @@ export function createStreamPresentation() {
       /^\s*<spoken-input>([\s\S]*?)<\/spoken-input>(?:\s*<instruction>This message was spoken by the user\.[\s\S]*?<\/instruction>)?\s*$/.exec(
         item.text,
       );
-    const projected = spokenInput ? { ...item, text: spokenInput[1].trim() } : item;
+    const startedChat = spokenInput ? null : parseStartedChatPrompt(item.text);
+    const startedChatReports =
+      spokenInput || startedChat ? null : parseStartedChatReports(item.text);
+    let projected = item;
+    if (spokenInput) projected = { ...item, text: spokenInput[1].trim() };
+    else if (startedChat) projected = { ...item, text: startedChat.task, startedChat };
+    else if (startedChatReports) {
+      const text = startedChatReports.map((report) => report.reply).join("\n\n");
+      projected = { ...item, text, startedChatReports };
+    }
     userMessageCache.set(item, projected);
     return projected;
   }
@@ -96,11 +143,16 @@ export function createStreamPresentation() {
     if (cached) return cached;
     const previousSource = liveSources.get(item.id);
     const previous = previousSource && blocksBySource.get(previousSource);
+    // Proposal blocks leave the text before it is split; the message's cards follow its last block.
+    const split = splitChatProposals(item.text);
+    const sourceText = split.text;
+    const proposals = split.proposals.length > 0 ? split.proposals : undefined;
     // Parse only the growing last block on append, as the old live reducer did.
     // Canonical text replacements are parsed afresh instead of joining fragments.
-    const isAppend = previousSource && previous && item.text.startsWith(previousSource.text);
+    const isAppend =
+      previousSource && previous && isPlainAppend(item.text, sourceText, previousSource.text);
     let prefix: AssistantMessageItem[] = [];
-    let growingText = item.text;
+    let growingText = sourceText;
     if (isAppend) {
       prefix = previous.slice(0, -1);
       growingText =
@@ -114,27 +166,25 @@ export function createStreamPresentation() {
     const blocks = [...prefix];
     for (const [offset, { text, kind }] of textBlocks.entries()) {
       const index = prefix.length + offset;
+      const isLast = offset === textBlocks.length - 1;
       let blockText = text;
-      if (offset === textBlocks.length - 1) {
+      if (isLast) {
         // The split drops trailing blank lines, including a line break followed only
         // by the next line's indent. Keep them so the next append continues that line.
-        const trailingBlankLines = /\n\s*$/.exec(item.text)?.[0] ?? "";
+        const trailingBlankLines = /\n\s*$/.exec(sourceText)?.[0] ?? "";
         blockText += trailingBlankLines;
       }
-      const existing = previous?.[index];
-      const id = `${item.id}:block:${index}`;
-      if (existing?.text === blockText && isReusableBlock(existing, item, id)) {
-        blocks.push(existing);
-        continue;
-      }
-      blocks.push({
-        ...item,
-        id,
-        blockGroupId: item.id,
-        blockIndex: index,
-        blockKind: kind,
+      const next = {
+        id: `${item.id}:block:${index}`,
         text: blockText,
-      });
+        ...(isLast && proposals ? { proposals } : {}),
+      };
+      const existing = previous?.[index];
+      blocks.push(
+        isReusableBlock(existing, item, next)
+          ? existing
+          : { ...item, ...next, blockGroupId: item.id, blockIndex: index, blockKind: kind },
+      );
     }
     blocksBySource.set(item, blocks);
     return blocks;

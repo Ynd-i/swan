@@ -8,6 +8,7 @@ import { timelineItemIdentity } from "@getpaseo/protocol/timeline-identity";
 import type { AgentAttachment, AgentStreamEventPayload } from "@getpaseo/protocol/messages";
 import type { AttachmentMetadata } from "@/attachments/types";
 import type { MarkdownBlockKind } from "@/utils/split-markdown-blocks";
+import type { ChatBrief, ChatProposal, StartedChatReport } from "@/chat-proposals/proposal";
 import { extractTaskEntriesFromToolCall } from "../utils/tool-call-parsers";
 
 /**
@@ -101,6 +102,10 @@ export interface UserMessageItem {
   timestamp: Date;
   images?: UserMessageImageAttachment[];
   attachments?: AgentAttachment[];
+  /** Display-only: the first prompt of a chat started from a proposal. */
+  startedChat?: ChatBrief;
+  /** Display-only: a note from chats started from this chat's proposals. */
+  startedChatReports?: StartedChatReport[];
 }
 
 export interface UserMessageInput {
@@ -715,6 +720,8 @@ export interface AssistantMessageItem {
   blockGroupId?: string;
   blockIndex?: number;
   blockKind?: MarkdownBlockKind;
+  /** The chats the message proposes, on its last block. */
+  proposals?: ChatProposal[];
 }
 
 export interface TimelinePosition {

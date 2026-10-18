@@ -239,6 +239,28 @@ describe("desktop turn activity", () => {
     ]);
   });
 
+  it("keeps a final reply that is only a chat proposal visible after its folded activity", () => {
+    const proposal = { title: "Fix the gate", task: "Gate tools/list.", context: null };
+    const turn: StreamItem[] = [
+      ...items.slice(0, 4),
+      {
+        kind: "assistant_message",
+        id: "answer:0",
+        blockGroupId: "answer",
+        turnId: "turn",
+        text: "",
+        timestamp: new Date(5000),
+        proposals: [proposal],
+      },
+    ];
+    const projection = createDesktopTurnActivityProjection()(inputFor(turn));
+    expect([...projection.hiddenItemIds]).toEqual(["intro:0", "thought", "read"]);
+    expect(projectDesktopActivityItems(turn, projection).at(-1)).toMatchObject({
+      id: "answer:0",
+      proposals: [proposal],
+    });
+  });
+
   it("does not hide a completed response that has no text after its last activity", () => {
     const turn = items.slice(0, 4);
     const projection = createDesktopTurnActivityProjection()(inputFor(turn));

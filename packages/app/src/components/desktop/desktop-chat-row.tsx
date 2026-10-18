@@ -11,7 +11,7 @@ import type { AggregatedAgent } from "@/hooks/use-aggregated-agents";
 import type { Theme } from "@/styles/theme";
 import { navigateToAgent } from "@/utils/navigate-to-agent";
 import { deriveSidebarStateBucket } from "@/utils/sidebar-agent-state";
-import { desktopChatKey, type HandoffChains } from "./desktop-chat-model";
+import { desktopChatKey, type HandoffChains, type StartedChats } from "./desktop-chat-model";
 import { DesktopChatMenuItems, useChatForkPage, useDesktopChatMenu } from "./desktop-chat-menu";
 import { useSectionMovePage } from "./desktop-chat-section-menus";
 import { useChatSectionsStore } from "./desktop-chat-sections-store";
@@ -28,6 +28,10 @@ const mutedIcon = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
 
 /** Auto-handoff chains of the sidebar, so a chat row can nest the chats it continues. */
 export const HandoffChainsContext = createContext<HandoffChains>(new Map());
+/** Chats started from a proposal, so a chat row can list them under itself. */
+export const StartedChatsContext = createContext<StartedChats>(new Map());
+// Each nesting level sits one chevron deeper.
+const NEST_INDENT = 22;
 // The width each row action covers at the right edge of the title.
 // ponytail: the md+ button width; below 720pt buttons grow to 32 and the fade stops short. Measure
 // the actions if the compact sidebar matters.
@@ -226,11 +230,13 @@ function HandoffRows({
   open,
   selectedKey,
   indented,
+  depth,
 }: {
   handoffs?: readonly AggregatedAgent[];
   open: boolean;
   selectedKey: string | null;
   indented: boolean;
+  depth: number;
 }) {
   if (!open) return null;
   return handoffs.map((handoff) => (
@@ -239,7 +245,31 @@ function HandoffRows({
       agent={handoff}
       selectedKey={selectedKey}
       indented={indented}
+      depth={depth}
       superseded
+    />
+  ));
+}
+
+/** Chats started from this chat's proposals, always shown one level deeper, like Claude's. */
+function StartedRows({
+  started = [],
+  selectedKey,
+  indented,
+  depth,
+}: {
+  started?: readonly AggregatedAgent[];
+  selectedKey: string | null;
+  indented: boolean;
+  depth: number;
+}) {
+  return started.map((chat) => (
+    <ChatRow
+      key={desktopChatKey(chat)}
+      agent={chat}
+      selectedKey={selectedKey}
+      indented={indented}
+      depth={depth + 1}
     />
   ));
 }
@@ -248,12 +278,15 @@ export const ChatRow = memo(function ChatRow({
   agent,
   selectedKey,
   indented = false,
+  depth = 0,
   superseded,
   dragHandleProps,
 }: {
   agent: AggregatedAgent;
   selectedKey: string | null;
   indented?: boolean;
+  /** How many started-chat levels this row sits under. */
+  depth?: number;
   /** An earlier chat of a handoff chain, nested and greyed under the chat that continues it. */
   superseded?: boolean;
   dragHandleProps?: DraggableListDragHandleProps;
@@ -261,6 +294,12 @@ export const ChatRow = memo(function ChatRow({
   const { t } = useTranslation();
   const key = desktopChatKey(agent);
   const handoffs = useContext(HandoffChainsContext).get(key);
+  const started = useContext(StartedChatsContext).get(key);
+  const nestLevel = depth + (superseded ? 1 : 0);
+  const nestStyle = useMemo(
+    () => (nestLevel > 0 ? { marginLeft: NEST_INDENT * nestLevel } : undefined),
+    [nestLevel],
+  );
   const { busy, unread, markRead, menuProps, renameModal } = useDesktopChatMenu(agent, handoffs);
   const [hovered, setHovered] = useState(false);
   const [contextOpen, setContextOpen] = useState(false);
@@ -320,7 +359,7 @@ export const ChatRow = memo(function ChatRow({
             style={[
               styles.chatRow,
               indented && styles.indented,
-              superseded && styles.superseded,
+              nestStyle,
               revealed && styles.rowHovered,
               selected && styles.rowSelected,
             ]}
@@ -383,7 +422,9 @@ export const ChatRow = memo(function ChatRow({
         open={handoffsOpen}
         selectedKey={selectedKey}
         indented={indented}
+        depth={nestLevel}
       />
+      <StartedRows started={started} selectedKey={selectedKey} indented={indented} depth={depth} />
       {renameModal}
     </>
   );
@@ -399,8 +440,6 @@ const styles = StyleSheet.create((theme) => ({
     paddingRight: 4,
   },
   indented: { paddingLeft: 32 },
-  // Nested one chevron deeper than the chat that continues it.
-  superseded: { marginLeft: 22 },
   supersededTitle: { color: theme.colors.foregroundMuted },
   handoffToggle: {
     width: 16,

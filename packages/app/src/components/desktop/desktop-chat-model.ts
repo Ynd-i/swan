@@ -7,6 +7,7 @@ import type {
   SidebarProjectEntry,
   SidebarWorkspacePlacement,
 } from "@/hooks/use-sidebar-workspaces-list";
+import { STARTED_FROM_AGENT_ID_LABEL } from "@/chat-proposals/proposal";
 import { isWorkspaceRootAgent } from "@/subagents/policies";
 import { isChatFolderPath } from "@/projects/chat-folder";
 import { applyStoredOrdering } from "@/hooks/sidebar-workspaces-view-model";
@@ -80,6 +81,59 @@ function foldHandoffChains(
   return { heads: visible.filter((agent) => !claimed.has(desktopChatKey(agent))), chains };
 }
 
+/** Chats started from a proposal, keyed by the row of the chat they came from, newest first. */
+export type StartedChats = ReadonlyMap<string, AggregatedAgent[]>;
+
+/**
+ * Nests each chat started from a proposal under the row of the chat it came from, like Claude's
+ * linked sessions. Either side may be a handoff chain: the link is read from any chat of the started
+ * chain and resolves to the row that now shows its source. A pinned chat keeps its own row, and a
+ * chat whose source is not shown stays at the top level.
+ */
+function foldStartedChats(
+  heads: readonly AggregatedAgent[],
+  chains: ReadonlyMap<string, AggregatedAgent[]>,
+  pinnedAt: (agent: AggregatedAgent) => number | null,
+): { roots: AggregatedAgent[]; started: Map<string, AggregatedAgent[]> } {
+  const rowOf = new Map<string, string>();
+  for (const head of heads) {
+    const key = desktopChatKey(head);
+    rowOf.set(key, key);
+    for (const member of chains.get(key) ?? []) rowOf.set(desktopChatKey(member), key);
+  }
+  const sourceRow = new Map<string, string>();
+  for (const head of heads) {
+    const key = desktopChatKey(head);
+    if (pinnedAt(head) !== null) continue;
+    const sourceId = [head, ...(chains.get(key) ?? [])]
+      .map((member) => member.labels[STARTED_FROM_AGENT_ID_LABEL])
+      .find(Boolean);
+    const row = sourceId ? rowOf.get(`${head.serverId}:${sourceId}`) : undefined;
+    if (row && row !== key) sourceRow.set(key, row);
+  }
+  // Labels set at creation point at older chats, so only edited labels can form a cycle.
+  const inCycle = (key: string) => {
+    const seen = new Set<string>();
+    for (let row = sourceRow.get(key); row && !seen.has(row); row = sourceRow.get(row)) {
+      if (row === key) return true;
+      seen.add(row);
+    }
+    return false;
+  };
+  const roots: AggregatedAgent[] = [];
+  const started = new Map<string, AggregatedAgent[]>();
+  for (const head of heads) {
+    const key = desktopChatKey(head);
+    const row = sourceRow.get(key);
+    if (!row || inCycle(key)) {
+      roots.push(head);
+      continue;
+    }
+    started.set(row, [...(started.get(row) ?? []), head]);
+  }
+  return { roots, started };
+}
+
 /** A chain is pinned while any of its chats is, so a handoff keeps the chat in Pinned. */
 export function chainPinnedAt(
   agent: Pick<AggregatedAgent, "labels">,
@@ -100,6 +154,7 @@ export function buildDesktopChatSidebar({
   pinned: AggregatedAgent[];
   recent: AggregatedAgent[];
   handoffs: HandoffChains;
+  started: StartedChats;
 } {
   const projectByWorkspace = new Map<string, string>();
   for (const project of projects) {
@@ -127,15 +182,17 @@ export function buildDesktopChatSidebar({
   const { heads, chains } = foldHandoffChains(visible, agentByKey);
   const pinnedAt = (agent: AggregatedAgent) =>
     chainPinnedAt(agent, chains.get(desktopChatKey(agent)));
+  const { roots, started } = foldStartedChats(heads, chains, pinnedAt);
+  // A started chat lists under its source, yet its own workspace still holds a chat.
+  const workspacesWithChats = new Set(
+    heads.map((agent) => `${agent.serverId}:${agent.workspaceId}`),
+  );
   const chatsByProject = new Map<string, AggregatedAgent[]>();
-  const workspacesWithChats = new Set<string>();
-  for (const agent of heads) {
-    const workspaceKey = `${agent.serverId}:${agent.workspaceId}`;
-    const projectKey = projectByWorkspace.get(workspaceKey)!;
+  for (const agent of roots) {
+    const projectKey = projectByWorkspace.get(`${agent.serverId}:${agent.workspaceId}`)!;
     const chats = chatsByProject.get(projectKey) ?? [];
     chats.push(agent);
     chatsByProject.set(projectKey, chats);
-    workspacesWithChats.add(workspaceKey);
   }
   return {
     // A chat without a project lives in a chat folder project; it shows in Recent only.
@@ -156,11 +213,12 @@ export function buildDesktopChatSidebar({
           ),
         };
       }),
-    pinned: heads
+    pinned: roots
       .filter((agent) => pinnedAt(agent) !== null)
       .sort((left, right) => pinnedAt(right)! - pinnedAt(left)!),
-    recent: heads.filter((agent) => pinnedAt(agent) === null),
+    recent: roots.filter((agent) => pinnedAt(agent) === null),
     handoffs: chains,
+    started,
   };
 }
 

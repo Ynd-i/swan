@@ -92,6 +92,10 @@ import { useRetainedPanelActive } from "@/components/retained-panel";
 import { useStreamHistoryWindow } from "./use-stream-history-window";
 import { PluginTimelineItemView, useInstalledTimelineTransform } from "@/plugins/timeline";
 import { ForkOriginDivider, useForkDividerPlacement } from "./fork-origin-divider";
+import { ChatProposalCard } from "@/chat-proposals/proposal-card";
+import { proposalKey } from "@/chat-proposals/proposal";
+import { StartedChatBrief } from "@/chat-proposals/started-chat-brief";
+import { StartedChatReports } from "@/chat-proposals/started-chat-report";
 
 function renderLiveAuxiliaryNode(input: {
   pendingPermissions: ReactNode;
@@ -699,6 +703,39 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
 
     const renderUserMessageItem = useCallback(
       (layoutItem: StreamLayoutItem, item: Extract<StreamItem, { kind: "user_message" }>) => {
+        let chatNote: ReactNode = null;
+        if (item.startedChat) {
+          chatNote = (
+            <StartedChatBrief
+              serverId={resolvedServerId}
+              agentId={agentId}
+              messageId={item.id}
+              brief={item.startedChat}
+            />
+          );
+        } else if (item.startedChatReports) {
+          chatNote = (
+            <StartedChatReports
+              serverId={resolvedServerId}
+              messageId={item.id}
+              reports={item.startedChatReports}
+            />
+          );
+        }
+        if (chatNote) {
+          // Briefs and reports render agent-written Markdown, whose paths and links need the resolver.
+          return (
+            <AssistantFileLinkResolverProvider
+              client={client}
+              serverId={resolvedServerId}
+              workspaceRoot={workspaceRoot}
+              onOpenWorkspaceFile={handleInlinePathPress}
+              toast={toast}
+            >
+              {chatNote}
+            </AssistantFileLinkResolverProvider>
+          );
+        }
         return (
           <UserMessage
             serverId={resolvedServerId}
@@ -719,7 +756,16 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
           />
         );
       },
-      [context.capabilities, agentId, client, pendingClientMessageIds, resolvedServerId],
+      [
+        context.capabilities,
+        agentId,
+        client,
+        handleInlinePathPress,
+        pendingClientMessageIds,
+        resolvedServerId,
+        toast,
+        workspaceRoot,
+      ],
     );
 
     const renderAssistantMessageItem = useCallback(
@@ -747,6 +793,15 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
                 />
               )}
             </ChatFindExpansion>
+            {item.proposals?.map((proposal) => (
+              <ChatProposalCard
+                key={proposalKey(agentId, proposal)}
+                serverId={resolvedServerId}
+                sourceAgentId={agentId}
+                proposal={proposal}
+                client={client}
+              />
+            ))}
           </AssistantFileLinkResolverProvider>
         );
       },

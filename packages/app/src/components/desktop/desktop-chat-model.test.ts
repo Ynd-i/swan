@@ -3,6 +3,7 @@ import {
   HANDOFF_FROM_AGENT_ID_LABEL,
   PARENT_AGENT_ID_LABEL,
 } from "@getpaseo/protocol/agent-labels";
+import { STARTED_FROM_AGENT_ID_LABEL } from "@/chat-proposals/proposal";
 import type { AggregatedAgent } from "@/hooks/use-aggregated-agents";
 import type { SidebarProjectEntry } from "@/hooks/use-sidebar-workspaces-list";
 import {
@@ -320,6 +321,61 @@ it("keeps a chain in Pinned and in its section after a handoff", () => {
   });
   expect(partition.recent).toEqual([]);
   expect(partition.custom[0]?.chats.map((agent) => agent.id)).toEqual(["second"]);
+});
+
+function startedFrom(agent: AggregatedAgent, source: string): AggregatedAgent {
+  return { ...agent, labels: { ...agent.labels, [STARTED_FROM_AGENT_ID_LABEL]: source } };
+}
+
+it("nests started chats under the row of the chat they came from, through handoffs", () => {
+  const source = handoff("source", null, 1);
+  const sourceNext = handoff("source-next", "source", 5);
+  const started = startedFrom(handoff("started", null, 3), "source");
+  const startedNext = handoff("started-next", "started", 4);
+  const worktreeChat = {
+    ...startedFrom(handoff("in-worktree", null, 2), "source"),
+    workspaceId: "wt",
+  };
+  const app = project("app", "local", ["main", "wt"]);
+  app.workspaces[1]!.workspaceKind = "worktree";
+  const sidebar = buildDesktopChatSidebar({
+    projects: [app],
+    agents: [source, sourceNext, started, startedNext, worktreeChat],
+  });
+
+  expect(sidebar.recent.map((agent) => agent.id)).toEqual(["source-next"]);
+  expect(sidebar.started.get("local:source-next")?.map((agent) => agent.id)).toEqual([
+    "started-next",
+    "in-worktree",
+  ]);
+  expect(sidebar.handoffs.get("local:started-next")?.map((agent) => agent.id)).toEqual(["started"]);
+  expect(sidebar.projects[0]?.chats.map((agent) => agent.id)).toEqual(["source-next"]);
+  expect(sidebar.projects[0]?.emptyWorkspaces).toEqual([]);
+});
+
+it("keeps a pinned started chat, or one whose source is gone, on its own row", () => {
+  const projects = [project("app", "local", ["main"])];
+  const pinned = {
+    ...startedFrom(handoff("pinned", null, 2), "source"),
+    labels: {
+      [STARTED_FROM_AGENT_ID_LABEL]: "source",
+      [DESKTOP_CHAT_PINNED_AT]: "2026-09-30T08:00:00Z",
+    },
+  };
+  const orphan = startedFrom(handoff("orphan", null, 3), "archived-source");
+  const sidebar = buildDesktopChatSidebar({
+    projects,
+    agents: [
+      handoff("source", null, 1),
+      pinned,
+      orphan,
+      { ...handoff("archived-source", null, 0), archivedAt: new Date() },
+    ],
+  });
+
+  expect(sidebar.pinned.map((agent) => agent.id)).toEqual(["pinned"]);
+  expect(sidebar.recent.map((agent) => agent.id)).toEqual(["orphan", "source"]);
+  expect(sidebar.started.size).toBe(0);
 });
 
 it("lists no placeholder workspace for a project whose chats are all archived", () => {
