@@ -149,7 +149,6 @@ import { withTimeout } from "../../../../utils/promise-timeout.js";
 import { terminateWithTreeKill } from "../../../../utils/tree-kill.js";
 import { execCommand } from "../../../../utils/spawn.js";
 import { composeSystemPromptParts } from "../../system-prompt.js";
-import { concatHooksByEvent, type HooksByEvent } from "../../workspace-contract/hooks-json.js";
 
 const fsPromises = promises;
 const CLAUDE_SETTING_SOURCES: NonNullable<ClaudeOptions["settingSources"]> = [
@@ -2784,12 +2783,7 @@ class ClaudeAgentSession implements AgentSession {
     if (!this.claudeSessionId) {
       return null;
     }
-    // The daemon recomputes the workspace contract at every launch, so the record must not keep it.
-    const {
-      providerOptions: _providerOptions,
-      workspaceContract: _workspaceContract,
-      ...persistedConfig
-    } = this.config;
+    const { providerOptions: _providerOptions, ...persistedConfig } = this.config;
     this.persistence = {
       provider: "claude",
       sessionId: this.claudeSessionId,
@@ -3530,7 +3524,6 @@ class ClaudeAgentSession implements AgentSession {
       ...(effort ? { effort } : {}),
       ...providerOptions,
       ...settingsOptions,
-      ...this.buildPluginOptions(),
       // Provider subagent panes render the child's nested transcript.
       forwardSubagentText: true,
       // Stop and replace abort only the main turn, like Esc in Claude Code, and background
@@ -3562,18 +3555,6 @@ class ClaudeAgentSession implements AgentSession {
     return base;
   }
 
-  private buildPluginOptions(): Pick<ClaudeOptions, "plugins"> | Record<string, never> {
-    const projectLayers = this.config.workspaceContract?.projectLayers ?? [];
-    if (projectLayers.length === 0) {
-      return {};
-    }
-    // Claude loads each layer's skills, hooks, agents and commands as a plugin. The daemon
-    // already injects the layer's .mcp.json servers, so the plugin must not start them again.
-    return {
-      plugins: projectLayers.map((dir) => ({ type: "local", path: dir, skipMcpDiscovery: true })),
-    };
-  }
-
   private buildSettingsOptions(
     providerOptions: ClaudeProviderOptions,
     input: { ultracode: boolean },
@@ -3582,8 +3563,7 @@ class ClaudeAgentSession implements AgentSession {
     // Internal agents do daemon work such as naming a branch, so the user's and
     // project's hooks must not run for them.
     const disableAllHooks = this.config.internal === true;
-    const hooks = this.resolveUserLayerHooks();
-    if (fastMode === null && !input.ultracode && !disableAllHooks && !hooks) {
+    if (fastMode === null && !input.ultracode && !disableAllHooks) {
       return {};
     }
     return {
@@ -3591,20 +3571,8 @@ class ClaudeAgentSession implements AgentSession {
         ...(fastMode === null ? {} : { fastMode }),
         ...(input.ultracode ? { ultracode: true } : {}),
         ...(disableAllHooks ? { disableAllHooks: true } : {}),
-        ...(hooks ? { hooks } : {}),
       }),
     };
-  }
-
-  // The SDK sends exactly one --settings, so user hooks go into this object. Project layers load
-  // as plugins that run their own hooks/hooks.json, so adding them here would run them twice.
-  private resolveUserLayerHooks(): HooksByEvent | null {
-    const userLayers = (this.config.workspaceContract?.hooks ?? []).filter(
-      (layer) => layer.kind === "user",
-    );
-    return userLayers.length > 0
-      ? concatHooksByEvent(userLayers.map((layer) => layer.hooks))
-      : null;
   }
 
   private resolveFastModeSetting(): boolean | null {

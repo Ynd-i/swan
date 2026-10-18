@@ -4,15 +4,13 @@ You keep shared agent configuration in `.agents/` directories and log in to each
 
 ## What `.agents/` holds
 
-| Path                             | Level   | Read natively by        | Bridged by the daemon                                                     |
-| -------------------------------- | ------- | ----------------------- | ------------------------------------------------------------------------- |
-| `~/.agents/.mcp.json`            | user    | nobody                  | MCP registry, every provider                                              |
-| `<dir>/.agents/.mcp.json`        | project | nobody                  | MCP registry, trusted repos only                                          |
-| `~/.agents/AGENTS.md`            | user    | nobody                  | Appended instructions (see below)                                         |
-| `~/.agents/hooks/hooks.json`     | user    | nobody                  | Claude and Codex hooks (see [Hooks](#hooks))                              |
-| `<dir>/.agents/hooks/hooks.json` | project | nobody                  | Claude and Codex hooks, trusted repos only                                |
-| `~/.agents/skills/<name>/`       | user    | Codex, OpenCode, Gemini | Symlinked into `~/.claude/skills` for Claude                              |
-| `<repo>/.agents/skills/<name>/`  | project | Codex, OpenCode, Gemini | Claude plugin, trusted repos only (see [Project skills](#project-skills)) |
+| Path                            | Level   | Read natively by        | Bridged by the daemon                        |
+| ------------------------------- | ------- | ----------------------- | -------------------------------------------- |
+| `~/.agents/.mcp.json`           | user    | nobody                  | MCP registry, every provider                 |
+| `<dir>/.agents/.mcp.json`       | project | nobody                  | MCP registry, trusted repos only             |
+| `~/.agents/AGENTS.md`           | user    | nobody                  | Appended instructions (see below)            |
+| `~/.agents/skills/<name>/`      | user    | Codex, OpenCode, Gemini | Symlinked into `~/.claude/skills` for Claude |
+| `<repo>/.agents/skills/<name>/` | project | Codex, OpenCode, Gemini | Not bridged                                  |
 
 `.mcp.json` uses the Claude Code and Codex plugin shape, `{ "mcpServers": { "<name>": { ... } } }`. An entry with `command` is stdio, and `"type": "http"` or `"type": "sse"` with `url` is remote. Entries with `"enabled": false` are skipped. Fields the launch config does not carry, such as Codex's `cwd` or `startup_timeout_sec`, are dropped. `${VAR}` references are passed through as literal text. A malformed file or entry logs a warning in `daemon.log` and is skipped. It never fails agent creation.
 
@@ -78,49 +76,6 @@ The daemon reads the file from the directory the provider process uses. `CLAUDE_
 Claude Code discovers personal skills only in `~/.claude/skills`. Before a Claude-based session opens, the daemon links `~/.claude/skills/<name>` to `~/.agents/skills/<name>` for every skill directory that has a `SKILL.md`. It skips dotfiles, `synced`, and names starting with `anthropic-skills`.
 
 The mirror never replaces a real directory or file in `~/.claude/skills`. Paseo's bundled skill sync writes real directories there, and a skill you created by hand belongs to you. It only replaces or removes symlinks that point into `~/.agents/skills`, and removes them once their target is gone.
-
-## Project skills
-
-Codex reads `<repo>/.agents/skills` itself. For Claude, the daemon passes every trusted project `.agents` directory to the Claude Agent SDK as a local plugin. Claude then loads that directory's `skills/`, `hooks/hooks.json`, `agents/` and `commands/`. It does not read the plugin's `.mcp.json`, because the daemon already registers those servers.
-
-- Claude names a project skill `.agents:<name>`, so the composer lists `/.agents:<name>`. Typing `/<name>` also works. A `name` in `.agents/.claude-plugin/plugin.json` replaces the `.agents` prefix.
-- Every layer becomes a plugin named `.agents`. When a repo has `.agents` directories at the root and below it, Claude loads the skills of all of them but runs the hooks of the repo root's only, and logs `Skipping duplicate hook registration for plugin ".agents"`. Codex runs the hooks of every layer.
-- A repo that also links a skill into `.claude/skills` lists it twice, as `/<name>` and `/.agents:<name>`.
-
-## Hooks
-
-Keep hooks in `~/.agents/hooks/hooks.json` and `<dir>/.agents/hooks/hooks.json`, in the Claude Code hooks format:
-
-```json
-{
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "^(Bash|shell|functions.exec_command)$",
-        "hooks": [{ "type": "command", "command": "$HOME/.agents/hooks/check.sh", "timeout": 30 }]
-      }
-    ]
-  }
-}
-```
-
-The file must use this wrapped form. The daemon keeps `command` handlers with their `command`, `timeout`, `async` and `statusMessage`. It drops other handler types, such as `prompt` and `agent`, and other fields, because those differ between vendors. A malformed file, group or handler logs a warning in `daemon.log` and is skipped. Hooks from all layers add up, user layer first. Project files apply only to trusted repos, and internal agents, such as the one that names a branch, get no hooks.
-
-| Provider | User layer                                    | Project layers                                                    |
-| -------- | --------------------------------------------- | ----------------------------------------------------------------- |
-| Claude   | Merged into the `--settings` the daemon sends | Run by the layer's plugin (see [Project skills](#project-skills)) |
-| Codex    | Thread config                                 | Thread config                                                     |
-
-Codex runs a hook only when it is trusted. The daemon sends each bridged hook together with the trust hash Codex computes for it, so trusting a repo in Paseo also trusts its hooks in Codex, without Codex's own review. Codex does not document that hash. The formula in `providers/codex/session-hooks.ts` matches Codex 0.159.0, and if a release changes it, Codex skips the bridged hooks without a message. `workspace-contract/hooks.real.e2e.test.ts` fails in that case, so run it after a Codex upgrade.
-
-When you write a hook for both vendors:
-
-- Match tool names for both. Claude calls its shell tool `Bash`, and Codex calls it `shell` or `functions.exec_command`, so use a matcher such as `^(Bash|shell|functions.exec_command)$`. The daemon passes matchers through unchanged.
-- An event that one vendor does not know runs only in the other. Codex ignores `Notification`, and Claude ignores `Interrupt`. Neither reports it.
-- Handle both stdin shapes. The JSON a hook receives, and the output it may print, differ between vendors.
-- Do not rely on `${CLAUDE_PLUGIN_ROOT}`. Claude sets it only for project hooks, and Codex never does. Commands run in the session's cwd, so use absolute paths, `$HOME/...` or `$(git rev-parse --show-toplevel)/.agents/...`.
-- Keep `SessionEnd` and `Interrupt` hooks short. Codex gives them a 1 second default and a 3 second limit.
-- A hook that you also keep in `~/.claude/settings.json` or `~/.codex/hooks.json` runs twice. The daemon does not compare them.
 
 ## What is not covered
 

@@ -1713,69 +1713,6 @@ Screenshots stayed in the gitignored `.tasks/` directory. Cleanup archived the p
 deleted the proof project and restored the dev `config.json` bytes. The packaged app was not
 rebuilt.
 
-### `.agents` workspace contract, phase 2c: hooks and project skills — 2026-10-10
-
-This bridges `.agents/hooks/hooks.json` and project skills into Claude and Codex sessions,
-under the same `.agents` exception as phase 1. Protocol is untouched. The server change
-adds `workspace-contract/hooks-json.ts` and `providers/codex/session-hooks.ts` and edits
-`load-workspace-contract.ts`, `workspace-contract/types.ts`, `agent-sdk-types.ts`,
-`agent-manager.ts`, `providers/claude/agent.ts` and `codex-app-server-agent.ts`. Expect
-conflicts in Claude's `buildOptions`, `buildSettingsOptions` and `describePersistence` and in
-Codex's `buildCodexInnerConfig` when upstream edits them. Behavior is in
-[workspace-contract.md](../workspace-contract.md#hooks).
-
-Decisions:
-
-- The contract keeps hooks per layer. `prepareSessionConfig` puts `{ projectLayers, hooks }`
-  on the launch config as `workspaceContract` and sets the key at every launch, to
-  `undefined` when there is nothing to launch. Codex lays the launch config over the resume
-  handle's metadata, which the resume RPC takes from the client, so a missing key would let
-  a client-supplied contract, trust hashes included, reach Codex. Internal agents and
-  history loads get none.
-- Claude's `describePersistence` copies its whole launch config into the stored record, so
-  it now leaves `workspaceContract` out, as it already did for `providerOptions`. The design
-  had covered Codex metadata only.
-- Claude gets user-layer hooks in the SDK `settings` object, which the SDK sends as the one
-  `--settings` flag, and each trusted project layer as a local plugin with
-  `skipMcpDiscovery`. Project hooks stay out of `settings`, because the plugin runs them.
-- Codex gets every layer's groups in the thread config, user layer first and split to one
-  handler per group, with a `hooks.state` trust hash per group. The research memo assumed a
-  600 second default timeout everywhere. Codex hashes the timeout it runs with, and gives
-  `SessionEnd` and `Interrupt` a 1 second default and a 3 second limit, so the hash reads a
-  per-event table. A handler inside a multi-handler group hashes like a one-handler group
-  under the key `group:handler`. The split stays, as designed.
-- No `${CLAUDE_PLUGIN_ROOT}` substitution, no dedupe against vendor hook files, and no
-  generated plugin manifest.
-
-Validation: `session-hooks.test.ts` pins 14 hook samples (13 distinct hashes) that
-`hooks/list` reported on Codex 0.159.0, measured in a temp `CODEX_HOME` holding only
-`auth.json`. Unit tests pass
-in `hooks-json.test.ts` (7), `load-workspace-contract.test.ts` (17),
-`agent-manager.test.ts` (206), `claude/agent.test.ts` (96),
-`codex-app-server-agent.test.ts` (179) and `session-hooks.test.ts` (14). Each new behavior
-test failed with the expected diff when its behavior was removed. `hooks.real.e2e.test.ts`
-passed with this machine's logins. Codex reported one `hook/started` run with source
-`sessionFlags` for the injected `UserPromptSubmit` hook, next to runs of the user's own Codex
-and plugin hooks, and Claude wrote the user-layer marker. Repo-wide typecheck, lint and
-format check pass. Proof on this worktree's dev daemon (port 6769) with a trusted temp repo:
-Codex (`gpt-5.6-luna`) read `.agents/skills/demo-skill/SKILL.md` itself and replied with the
-skill's token, and the repo's `UserPromptSubmit` hook wrote one line, with
-`CLAUDE_PLUGIN_ROOT` unset. Claude (haiku) called the `.agents:demo-skill` skill and replied
-with the token, answered a later `/demo-skill` prompt the same way, and the hook wrote one
-line per prompt with `CLAUDE_PLUGIN_ROOT` set to the repo's `.agents`. `daemon.log` showed
-`Loaded .agents workspace contract` with `hookEvents: ["UserPromptSubmit"]` for both. The
-`~/.claude/skills` mirror changed nothing, and Claude created an empty
-`~/.claude/plugins/data/-agents-inline/`.
-
-Open:
-
-- `listDraftCommands` does not go through `prepareSessionConfig`, so a draft Claude composer
-  probably lists no project skills until the agent exists. Not checked.
-- Claude reads a `.agents` directory with nothing at its top that marks a plugin, such as
-  one holding only `AGENTS.md`, as a folder of plugins. Not measured.
-- A Claude Code build without `--plugin-dir-no-mcp` exits on the unknown flag. The installed
-  2.1.290 has it.
-
 ### Desktop notifications not appearing — 2026-10-04
 
 The user saw no notifications. In `com.apple.ncprefs.plist`, `local.paseo.custom.desktop`

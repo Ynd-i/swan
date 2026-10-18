@@ -120,8 +120,6 @@ import {
   CodexProviderOptionsSchema,
   type CodexProviderOptions,
 } from "./codex/options.js";
-import { buildCodexSessionHooks } from "./codex/session-hooks.js";
-import { concatHooksByEvent } from "../workspace-contract/hooks-json.js";
 
 function assertChildWithPipes(
   child: ChildProcess,
@@ -5398,12 +5396,6 @@ export class CodexAppServerAgentSession implements AgentSession {
         mcpServers[name] = toCodexMcpConfig(serverConfig);
       }
       innerConfig.mcp_servers = mcpServers;
-    }
-    const contractHooks = this.config.workspaceContract?.hooks ?? [];
-    if (contractHooks.length > 0) {
-      innerConfig.hooks = buildCodexSessionHooks(
-        concatHooksByEvent(contractHooks.map((layer) => layer.hooks)),
-      );
     }
     const configured = applyCodexToolPolicy(innerConfig, this.config.toolPolicy);
     return Object.keys(configured).length > 0 ? configured : null;

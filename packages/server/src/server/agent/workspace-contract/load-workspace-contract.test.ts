@@ -13,15 +13,6 @@ function stdio(command: string) {
   return { command };
 }
 
-function writeHooksJson(dir: string, hooks: Record<string, unknown>): void {
-  mkdirSync(join(dir, ".agents", "hooks"), { recursive: true });
-  writeFileSync(join(dir, ".agents", "hooks", "hooks.json"), JSON.stringify({ hooks }));
-}
-
-function onPrompt(command: string) {
-  return { UserPromptSubmit: [{ hooks: [{ type: "command", command }] }] };
-}
-
 function createRoots(): { home: string; repo: string } {
   const root = mkdtempSync(join(tmpdir(), "workspace-contract-"));
   const home = join(root, "home");
@@ -96,51 +87,7 @@ describe("loadWorkspaceContract", () => {
       onWarning: () => {},
     });
 
-    expect(contract).toEqual({ layers: [], mcpServers: {}, instructions: null, hooks: [] });
-  });
-
-  test("keeps hooks per layer in layer order and skips layers without hooks", async () => {
-    const { home, repo } = createRoots();
-    const cwd = join(repo, "packages", "app");
-    mkdirSync(cwd, { recursive: true });
-    writeHooksJson(home, onPrompt("echo user"));
-    writeMcpJson(repo, { repo: stdio("repo") });
-    writeHooksJson(cwd, onPrompt("echo cwd"));
-    const warnings: string[] = [];
-
-    const contract = await loadWorkspaceContract({
-      home,
-      cwd,
-      trustedRoots: [repo],
-      onWarning: (message) => warnings.push(message),
-    });
-
-    expect(contract.hooks).toEqual([
-      { kind: "user", dir: join(home, ".agents"), hooks: onPrompt("echo user") },
-      { kind: "project", dir: join(cwd, ".agents"), hooks: onPrompt("echo cwd") },
-    ]);
-    expect(warnings).toEqual([]);
-  });
-
-  test("a malformed hooks file warns with its path and keeps the other layers", async () => {
-    const { home, repo } = createRoots();
-    writeHooksJson(home, onPrompt("echo user"));
-    mkdirSync(join(repo, ".agents", "hooks"), { recursive: true });
-    writeFileSync(join(repo, ".agents", "hooks", "hooks.json"), "{ not json");
-    const warnings: string[] = [];
-
-    const contract = await loadWorkspaceContract({
-      home,
-      cwd: repo,
-      trustedRoots: [repo],
-      onWarning: (message) => warnings.push(message),
-    });
-
-    expect(contract.hooks).toEqual([
-      { kind: "user", dir: join(home, ".agents"), hooks: onPrompt("echo user") },
-    ]);
-    expect(warnings).toHaveLength(1);
-    expect(warnings[0]).toContain(join(repo, ".agents", "hooks", "hooks.json"));
+    expect(contract).toEqual({ layers: [], mcpServers: {}, instructions: null });
   });
 
   test("the reserved paseo name is dropped with a warning", async () => {
@@ -225,31 +172,6 @@ describe("loadWorkspaceContract trusted roots", () => {
     expect(warnings).toHaveLength(1);
     expect(warnings[0]).toContain(repo);
     expect(warnings[0]).toContain("daemon.workspaceContract.trustedRoots");
-  });
-
-  test("an untrusted repo contributes no hooks", async () => {
-    const { home, repo, cwd } = createRepoWithLayers();
-    writeHooksJson(home, onPrompt("echo user"));
-    writeHooksJson(repo, onPrompt("echo repo"));
-
-    const untrusted = await loadWorkspaceContract({
-      home,
-      cwd,
-      trustedRoots: [],
-      onWarning: () => {},
-    });
-    const trusted = await loadWorkspaceContract({
-      home,
-      cwd,
-      trustedRoots: [repo],
-      onWarning: () => {},
-    });
-
-    expect(untrusted.hooks.map((layer) => layer.dir)).toEqual([join(home, ".agents")]);
-    expect(trusted.hooks.map((layer) => layer.dir)).toEqual([
-      join(home, ".agents"),
-      join(repo, ".agents"),
-    ]);
   });
 
   test("no project .agents means no warning", async () => {
