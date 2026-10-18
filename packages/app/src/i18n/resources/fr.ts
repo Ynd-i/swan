@@ -51,6 +51,8 @@ export const fr: TranslationResources = {
     suggested: "Chat suggéré",
     start: "Démarrer",
     startFailed: "Impossible de démarrer : {{error}}",
+    unknownModel: "Modèle inconnu : {{model}}",
+    unknownThinking: "Niveau de réflexion inconnu : {{thinking}}",
     open: "Ouvrir {{title}}",
     archived: "Archivé",
     task: "Tâche",

@@ -51,6 +51,8 @@ export const zhCN: TranslationResources = {
     suggested: "建议的对话",
     start: "开始",
     startFailed: "无法开始：{{error}}",
+    unknownModel: "未知模型：{{model}}",
+    unknownThinking: "未知思考强度：{{thinking}}",
     open: "打开 {{title}}",
     archived: "已归档",
     task: "任务",

@@ -245,7 +245,13 @@ describe("desktop turn activity", () => {
   });
 
   it("keeps a final reply that is only a chat proposal visible after its folded activity", () => {
-    const proposal = { title: "Fix the gate", task: "Gate tools/list.", context: null };
+    const proposal = {
+      title: "Fix the gate",
+      task: "Gate tools/list.",
+      context: null,
+      model: null,
+      thinking: null,
+    };
     const turn: StreamItem[] = [
       ...items.slice(0, 4),
       {

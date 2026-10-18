@@ -4,9 +4,11 @@ import { useTranslation } from "react-i18next";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { ChevronRight, MessageSquarePlus } from "lucide-react-native";
 import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
+import type { AgentModelDefinition } from "@getpaseo/protocol/agent-types";
 import { AgentStatusDot } from "@/components/agent-status-dot";
 import { Button } from "@/components/ui/button";
 import { getStatusBucketLabel } from "@/hooks/sidebar-status-view-model";
+import { useProvidersSnapshot } from "@/hooks/use-providers-snapshot";
 import { useSessionStore, type Agent, type SessionState } from "@/stores/session-store";
 import { settingsStyles } from "@/styles/settings";
 import type { Theme } from "@/styles/theme";
@@ -14,7 +16,7 @@ import { navigateToAgent } from "@/utils/navigate-to-agent";
 import { deriveSidebarStateBucket } from "@/utils/sidebar-agent-state";
 import { ChatBriefRows } from "./brief-rows";
 import { proposalKey, STARTED_FROM_PROPOSAL_LABEL, type ChatProposal } from "./proposal";
-import { startProposedChat } from "./start";
+import { resolveProposalRuntime, startProposedChat, type ProposalRuntime } from "./start";
 
 const ProposalIcon = withUnistyles(MessageSquarePlus);
 const ChevronRightIcon = withUnistyles(ChevronRight);
@@ -85,6 +87,46 @@ function StartedChatRow({ chat, title }: { chat: Agent; title: string }) {
   );
 }
 
+/** Resolves a proposal's model and thinking against the source provider's catalog. */
+function useProposalRuntime(
+  serverId: string,
+  source: Agent | undefined,
+  proposal: ChatProposal,
+): ProposalRuntime | null {
+  const named = Boolean(proposal.model || proposal.thinking);
+  const snapshot = useProvidersSnapshot(serverId, { cwd: source?.cwd, enabled: named });
+  if (!source) return null;
+  return resolveProposalRuntime(source, proposal, catalogModels(snapshot, source.provider));
+}
+
+/** Undefined while the catalog loads. A host without one, or a failed fetch, matches nothing. */
+function catalogModels(
+  snapshot: ReturnType<typeof useProvidersSnapshot>,
+  provider: string,
+): AgentModelDefinition[] | undefined {
+  if (snapshot.entries) {
+    return snapshot.entries.find((entry) => entry.provider === provider)?.models ?? [];
+  }
+  if (!snapshot.supportsSnapshot || snapshot.error !== null) return [];
+  return undefined;
+}
+
+function proposalSubtitle(
+  runtime: ProposalRuntime | null,
+  error: string | null,
+  t: ReturnType<typeof useTranslation>["t"],
+): string {
+  if (error) return t("chatProposals.startFailed", { error });
+  if (runtime?.kind === "unknown-model") {
+    return t("chatProposals.unknownModel", { model: runtime.requested });
+  }
+  if (runtime?.kind === "unknown-thinking") {
+    return t("chatProposals.unknownThinking", { thinking: runtime.requested });
+  }
+  const labels = runtime?.kind === "ready" ? runtime.labels : [];
+  return [t("chatProposals.suggested"), ...labels].join(" · ");
+}
+
 /** Like Claude's linked-session card: nothing runs until the user starts the chat. */
 export const ChatProposalCard = memo(function ChatProposalCard({
   serverId,
@@ -101,19 +143,20 @@ export const ChatProposalCard = memo(function ChatProposalCard({
   const key = proposalKey(sourceAgentId, proposal);
   const source = useSessionStore(selectAgent(serverId, sourceAgentId));
   const started = useSessionStore(selectStartedChat(serverId, key));
+  const runtime = useProposalRuntime(serverId, source, proposal);
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const start = useCallback(async () => {
-    if (!client || !source) return;
+    if (!client || !source || runtime?.kind !== "ready") return;
     setStarting(true);
     setError(null);
     try {
-      await startProposedChat(client, source, proposal);
+      await startProposedChat(client, source, proposal, runtime);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
       setStarting(false);
     }
-  }, [client, proposal, source]);
+  }, [client, proposal, runtime, source]);
 
   if (started) {
     return (
@@ -131,14 +174,14 @@ export const ChatProposalCard = memo(function ChatProposalCard({
             {proposal.title}
           </Text>
           <Text style={styles.subtitle} numberOfLines={1}>
-            {error ? t("chatProposals.startFailed", { error }) : t("chatProposals.suggested")}
+            {proposalSubtitle(runtime, error, t)}
           </Text>
         </View>
         <Button
           variant="outline"
           size="sm"
           loading={starting}
-          disabled={starting || !client || !source}
+          disabled={starting || !client || runtime?.kind !== "ready"}
           onPress={start}
           testID="chat-proposal-start"
         >

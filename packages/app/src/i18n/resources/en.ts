@@ -48,6 +48,8 @@ export const en = {
     suggested: "Suggested chat",
     start: "Start",
     startFailed: "Couldn't start: {{error}}",
+    unknownModel: "Unknown model: {{model}}",
+    unknownThinking: "Unknown thinking level: {{thinking}}",
     open: "Open {{title}}",
     archived: "Archived",
     task: "Task",
