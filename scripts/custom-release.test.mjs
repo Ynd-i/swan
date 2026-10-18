@@ -6,6 +6,7 @@ import {
   nextBetaTag,
   obsoletePrereleases,
   planRelease,
+  releaseTitle,
   updateVersion,
 } from "./custom-release.mjs";
 
@@ -83,6 +84,12 @@ test("update versions order betas, then their stable release, then the next rele
   assert.equal(oneOffs[0], "0.11.0-beta.3.custom.1.beta.2");
   assert.ok(semver.lt(oneOffs[0], oneOffs[1]));
   assert.ok(semver.lt(oneOffs[1], updateVersion("v0.11.0-v1-beta1")));
+});
+
+test("release titles name only our release and beta numbers", () => {
+  assert.equal(releaseTitle("v0.11.4-v1-beta7"), "Swan v1 beta 7");
+  assert.equal(releaseTitle("v0.11.4-v2"), "Swan v2");
+  assert.equal(releaseTitle("v0.11.0-beta.3-v1-beta2"), "Swan v1 beta 2");
 });
 
 test("a release deletes betas on older upstream releases and keeps what planning and updates read", () => {

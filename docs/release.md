@@ -75,6 +75,8 @@ at `-v1-beta1`. While the branch is on an upstream beta, as it is until upstream
 `mode=stable -f upstream_beta=true` to `v<upstream-beta>-v<N>` (`v0.11.0-beta.3-v1`) and
 is a full GitHub release. One-offs sort before every release on the stable version, so
 their installs update to it in-app. `scripts/custom-release.mjs` computes the plan.
+Release titles name only our numbers, `Swan v1 beta 2` and `Swan v1`, so titles repeat
+across upstream releases; the tag tells them apart.
 
 `.github/workflows/upstream-pr.yml` checks upstream once a day. When upstream has a
 stable release newer than `main`, it pushes that tag's commit as `upstream-pr/<stable>` and
