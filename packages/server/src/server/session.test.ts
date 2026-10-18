@@ -3,16 +3,7 @@ import {
   createTestCreationService,
 } from "./test-utils/session-stubs.js";
 import { execSync } from "child_process";
-import {
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  realpathSync,
-  rmSync,
-  symlinkSync,
-  writeFileSync,
-} from "fs";
+import { existsSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join, resolve as resolvePath } from "path";
 import pino from "pino";
@@ -24,10 +15,7 @@ import {
 } from "../services/github-service.js";
 import { PARENT_AGENT_ID_LABEL } from "@getpaseo/protocol/agent-labels";
 import { CLIENT_CAPS } from "@getpaseo/protocol/client-capabilities";
-import {
-  MutableDaemonConfigSchema,
-  type WorkspaceDescriptorPayload,
-} from "@getpaseo/protocol/messages";
+import type { WorkspaceDescriptorPayload } from "@getpaseo/protocol/messages";
 import {
   decodeFileTransferFrame,
   encodeFileTransferFrame,
@@ -35,7 +23,6 @@ import {
   type FileTransferFrame,
 } from "@getpaseo/protocol/binary-frames/index";
 import { Session } from "./session.js";
-import { DaemonConfigStore } from "./daemon-config-store.js";
 import { OWNER_PERMISSIONS, type DaemonPermission } from "./authorization/index.js";
 import { DownloadTokenStore } from "./file-download/token-store.js";
 import { StructuredAgentFallbackError } from "./agent/agent-response-loop.js";
@@ -345,7 +332,6 @@ interface SessionForTestOptions {
   pluginRuntime?: SessionOptions["pluginRuntime"];
   orchestrationSkills?: SessionOptions["orchestrationSkills"];
   workspaceLabelService?: WorkspaceLabelService;
-  daemonConfigStore?: SessionOptions["daemonConfigStore"];
 }
 
 function createSessionForTest(options: SessionForTestOptions = {}): Session {
@@ -430,15 +416,13 @@ function createSessionForTest(options: SessionForTestOptions = {}): Session {
     checkoutDiffManager: asCheckoutDiffManager(checkoutDiffManager),
     github: asGitHubService(github),
     workspaceGitService: asWorkspaceGitService(workspaceGitService),
-    daemonConfigStore:
-      options.daemonConfigStore ??
-      asDaemonConfigStore({
-        get: vi.fn(() => ({
-          mcp: { injectIntoAgents: false },
-          providers: {},
-        })),
-        onChange: vi.fn(() => () => {}),
-      }),
+    daemonConfigStore: asDaemonConfigStore({
+      get: vi.fn(() => ({
+        mcp: { injectIntoAgents: false },
+        providers: {},
+      })),
+      onChange: vi.fn(() => () => {}),
+    }),
     pluginRuntime: options.pluginRuntime,
     orchestrationSkills: options.orchestrationSkills,
     stt: options.stt ?? null,
@@ -1953,177 +1937,6 @@ test("push token revocation only acknowledges durable removal", async () => {
       error: "Request failed: disk full",
       code: "handler_error",
     },
-  });
-});
-
-describe("workspace contract trust RPCs", () => {
-  const tempDirs: string[] = [];
-
-  afterEach(() => {
-    for (const dir of tempDirs.splice(0)) {
-      rmSync(dir, { recursive: true, force: true });
-    }
-  });
-
-  function createRepo(): { root: string; repo: string; paseoHome: string } {
-    const root = realpathSync(mkdtempSync(join(tmpdir(), "workspace-contract-session-")));
-    tempDirs.push(root);
-    const repo = join(root, "repo");
-    const paseoHome = join(root, "paseo-home");
-    mkdirSync(join(repo, ".git"), { recursive: true });
-    mkdirSync(join(repo, ".agents"));
-    mkdirSync(paseoHome);
-    return { root, repo, paseoHome };
-  }
-
-  function createTrustSession(options: {
-    paseoHome: string;
-    trustedRoots: string[];
-    permissions?: DaemonPermission[];
-  }) {
-    const { paseoHome, trustedRoots } = options;
-    const configPath = join(paseoHome, "config.json");
-    const persisted = { version: 1, daemon: { workspaceContract: { trustedRoots } } };
-    writeFileSync(configPath, `${JSON.stringify(persisted, null, 2)}\n`);
-    const toMutable = (roots: string[]) =>
-      MutableDaemonConfigSchema.parse({
-        mcp: { injectIntoAgents: false },
-        workspaceContract: { trustedRoots: roots },
-      });
-    const daemonConfigStore = new DaemonConfigStore(paseoHome, toMutable(trustedRoots), undefined, {
-      reloadSource: {
-        resolve: (next) => ({
-          mutable: toMutable(next.daemon?.workspaceContract?.trustedRoots ?? []),
-          overrideControlledPaths: [],
-        }),
-      },
-    });
-    const messages: SessionOutboundMessage[] = [];
-    const session = createSessionForTest({
-      messages,
-      paseoHome,
-      daemonConfigStore,
-      permissions: options.permissions,
-    });
-    return { configPath, messages, session };
-  }
-
-  function readTrustedRoots(configPath: string): unknown {
-    return JSON.parse(readFileSync(configPath, "utf8")).daemon.workspaceContract.trustedRoots;
-  }
-
-  test("trust appends the repo root to config.json and inspect then reports it trusted", async () => {
-    const { repo, paseoHome } = createRepo();
-    const cwd = join(repo, "packages", "app");
-    mkdirSync(cwd, { recursive: true });
-    const { configPath, messages, session } = createTrustSession({
-      paseoHome,
-      trustedRoots: ["~/elsewhere"],
-    });
-
-    await session.handleMessage({
-      type: "workspace.contract.inspect.request",
-      cwd,
-      requestId: "inspect-before",
-    });
-    await session.handleMessage({
-      type: "workspace.contract.trust.request",
-      cwd,
-      requestId: "trust",
-    });
-    await session.handleMessage({
-      type: "workspace.contract.inspect.request",
-      cwd,
-      requestId: "inspect-after",
-    });
-
-    const projectLayers = [join(repo, ".agents")];
-    expect(messages).toEqual([
-      {
-        type: "workspace.contract.inspect.response",
-        payload: { requestId: "inspect-before", repoRoot: repo, trusted: false, projectLayers },
-      },
-      {
-        type: "workspace.contract.trust.response",
-        payload: { requestId: "trust", repoRoot: repo, trustedRoots: ["~/elsewhere", repo] },
-      },
-      {
-        type: "workspace.contract.inspect.response",
-        payload: { requestId: "inspect-after", repoRoot: repo, trusted: true, projectLayers },
-      },
-    ]);
-    expect(readTrustedRoots(configPath)).toEqual(["~/elsewhere", repo]);
-  });
-
-  test("trusting a repo that is already trusted leaves config.json untouched", async () => {
-    const { root, repo, paseoHome } = createRepo();
-    const { configPath, messages, session } = createTrustSession({
-      paseoHome,
-      trustedRoots: [root],
-    });
-    const before = readFileSync(configPath, "utf8");
-
-    await session.handleMessage({
-      type: "workspace.contract.trust.request",
-      cwd: repo,
-      requestId: "trust",
-    });
-
-    expect(messages).toEqual([
-      {
-        type: "workspace.contract.trust.response",
-        payload: { requestId: "trust", repoRoot: repo, trustedRoots: [root] },
-      },
-    ]);
-    expect(readFileSync(configPath, "utf8")).toBe(before);
-  });
-
-  test("concurrent trust requests write each repo root once", async () => {
-    const { root, repo, paseoHome } = createRepo();
-    const other = join(root, "other");
-    mkdirSync(join(other, ".git"), { recursive: true });
-    const { configPath, session } = createTrustSession({ paseoHome, trustedRoots: [] });
-
-    await Promise.all(
-      [repo, repo, other].map((cwd, index) =>
-        session.handleMessage({
-          type: "workspace.contract.trust.request",
-          cwd,
-          requestId: `trust-${index}`,
-        }),
-      ),
-    );
-
-    expect(readTrustedRoots(configPath)).toEqual(expect.arrayContaining([repo, other]));
-    expect(readTrustedRoots(configPath)).toHaveLength(2);
-  });
-
-  test("trust needs daemon.manage", async () => {
-    const { repo, paseoHome } = createRepo();
-    const { configPath, messages, session } = createTrustSession({
-      paseoHome,
-      trustedRoots: [],
-      permissions: ["workspace.read", "workspace.write", "workspace.manage"],
-    });
-
-    await session.handleMessage({
-      type: "workspace.contract.trust.request",
-      cwd: repo,
-      requestId: "trust",
-    });
-
-    expect(messages).toEqual([
-      {
-        type: "rpc_error",
-        payload: {
-          requestId: "trust",
-          requestType: "workspace.contract.trust.request",
-          error: "Session is not authorized for workspace.contract.trust.request",
-          code: "access_denied",
-        },
-      },
-    ]);
-    expect(readTrustedRoots(configPath)).toEqual([]);
   });
 });
 

@@ -824,14 +824,6 @@ export type WorkspaceLabelDeleteInspectPayload = Extract<
   SessionOutboundMessage,
   { type: "workspace.label.delete.inspect.response" }
 >["payload"];
-export type WorkspaceContractInspectPayload = Extract<
-  SessionOutboundMessage,
-  { type: "workspace.contract.inspect.response" }
->["payload"];
-export type WorkspaceContractTrustPayload = Extract<
-  SessionOutboundMessage,
-  { type: "workspace.contract.trust.response" }
->["payload"];
 export type ProjectListPayload = Extract<
   SessionOutboundMessage,
   { type: "project.list.response" }
@@ -3138,23 +3130,6 @@ export class DaemonClient {
     if (!payload.accepted) {
       throw new Error(payload.error ?? "Workspace recovery was rejected by the host");
     }
-  }
-
-  inspectWorkspaceContract(
-    cwd: string,
-    requestId?: string,
-  ): Promise<WorkspaceContractInspectPayload> {
-    return this.sendNamespacedCorrelatedSessionRequest<"workspace.contract.inspect.response">({
-      requestId,
-      message: { type: "workspace.contract.inspect.request", cwd },
-    });
-  }
-
-  trustWorkspaceContract(cwd: string, requestId?: string): Promise<WorkspaceContractTrustPayload> {
-    return this.sendNamespacedCorrelatedSessionRequest<"workspace.contract.trust.response">({
-      requestId,
-      message: { type: "workspace.contract.trust.request", cwd },
-    });
   }
 
   async resumeAgent(

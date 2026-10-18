@@ -20,7 +20,6 @@ import { streamSession } from "../test-utils/session-stream-adapter.js";
 import type {
   AgentPromptInput,
   AgentSession,
-  AgentSessionConfig,
   AgentTimelineItem,
   AgentStreamEvent,
 } from "../../agent-sdk-types.js";
@@ -1093,74 +1092,6 @@ describe("ClaudeAgentSession features", () => {
 
     await internalSession.close();
     await userSession.close();
-  });
-
-  describe("launch workspace contract", () => {
-    const userHooks = {
-      UserPromptSubmit: [{ hooks: [{ type: "command" as const, command: "echo user" }] }],
-    };
-    const repoHooks = { Stop: [{ hooks: [{ type: "command" as const, command: "echo repo" }] }] };
-    const pluginHooks = {
-      SessionStart: [{ hooks: [{ type: "command" as const, command: "echo plugin" }] }],
-    };
-    const workspaceContract = {
-      projectLayers: ["/repo/.agents", "/repo/packages/app/.agents"],
-      plugins: [{ name: "kit", dir: "/home/.agents/plugins/kit" }],
-      hooks: [
-        { kind: "plugin" as const, dir: "/home/.agents/plugins/kit", hooks: pluginHooks },
-        { kind: "user" as const, dir: "/home/.agents", hooks: userHooks },
-        { kind: "project" as const, dir: "/repo/.agents", hooks: repoHooks },
-      ],
-    };
-
-    async function launchOptions(config: Partial<AgentSessionConfig>) {
-      const { queryFactory } = createQueryMock();
-      const client = new ClaudeAgentClient({
-        logger,
-        queryFactory,
-        resolveBinary: async () => "/test/claude/bin",
-      });
-      const session = await client.createSession({
-        provider: "claude",
-        cwd: process.cwd(),
-        workspaceContract,
-        ...config,
-      });
-      await session.startTurn("hello");
-      await session.close();
-      return queryFactory.mock.calls[0]?.[0].options;
-    }
-
-    test("sends user hooks in settings, and plugins and project layers as plugins, while fast mode is on", async () => {
-      const options = await launchOptions({
-        model: "claude-opus-4-8",
-        featureValues: { fast_mode: true },
-      });
-
-      // Plugin and project hooks stay out of settings, because each plugin runs its own hooks file.
-      expect(options.settings).toEqual({ fastMode: true, hooks: userHooks });
-      expect(options.plugins).toEqual([
-        { type: "local", path: "/home/.agents/plugins/kit", skipMcpDiscovery: true },
-        { type: "local", path: "/repo/.agents", skipMcpDiscovery: true },
-        { type: "local", path: "/repo/packages/app/.agents", skipMcpDiscovery: true },
-      ]);
-    });
-
-    test("sends user hooks for a model without fast mode", async () => {
-      const options = await launchOptions({ model: "claude-sonnet-4-6" });
-
-      expect(options.settings).toEqual({ hooks: userHooks });
-    });
-
-    test("sends neither without a launch contract", async () => {
-      const options = await launchOptions({
-        model: "claude-sonnet-4-6",
-        workspaceContract: undefined,
-      });
-
-      expect(options.settings).toBeUndefined();
-      expect(options.plugins).toBeUndefined();
-    });
   });
 
   test("turns Claude thinking off without retaining an effort level", async () => {
@@ -2368,36 +2299,6 @@ describe("ClaudeAgentSession context window usage", () => {
     await persistedSession.close();
 
     expect(persistedQueryFactory.mock.calls[0]?.[0].options.persistSession).toBe(true);
-  });
-
-  test("keeps the launch workspace contract out of the persistence handle", async () => {
-    const client = new ClaudeAgentClient({
-      logger,
-      queryFactory: createQueryFactoryForTurns([[createInitMessage(), createSuccessResult()]]),
-      resolveBinary: async () => "/test/claude/bin",
-    });
-    const session = await client.createSession({
-      provider: "claude",
-      cwd: process.cwd(),
-      workspaceContract: {
-        projectLayers: ["/repo/.agents"],
-        hooks: [
-          {
-            kind: "user",
-            dir: "/home/.agents",
-            hooks: { Stop: [{ hooks: [{ type: "command", command: "echo stop" }] }] },
-          },
-        ],
-      },
-    });
-
-    await session.run("turn");
-    const handle = session.describePersistence();
-    await session.close();
-
-    expect(handle?.sessionId).toBe("session-1");
-    expect(handle?.metadata?.cwd).toBe(process.cwd());
-    expect(handle?.metadata).not.toHaveProperty("workspaceContract");
   });
 
   test("classifies Claude root-only commands separately from inline skills", async () => {

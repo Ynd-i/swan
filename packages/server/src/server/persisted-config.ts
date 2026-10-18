@@ -263,12 +263,6 @@ export const PersistedConfigSchema = z
         appendSystemPrompt: z.string().optional(),
         terminalProfiles: z.array(TerminalProfileSchema).optional(),
         agentProfiles: z.array(AgentProfileSchema).optional(),
-        workspaceContract: z
-          .object({
-            trustedRoots: z.array(z.string()).optional(),
-          })
-          .strict()
-          .optional(),
         cors: z
           .object({
             allowedOrigins: z.array(z.string()).optional(),
