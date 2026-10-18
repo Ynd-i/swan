@@ -138,7 +138,6 @@ export function useWorkspaceTabLaunchCatalog(input: {
         disabled: false,
         panelKind: "draft",
         toggleTarget: null,
-        hidden: isExplorerMenu,
         launch: launchSelection(BUILT_IN_SELECTIONS.agent),
       },
       terminal: {
