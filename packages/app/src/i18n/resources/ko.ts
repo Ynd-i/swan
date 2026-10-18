@@ -2444,6 +2444,44 @@ export const ko: TranslationResources = {
           auto: "시스템",
         },
       },
+      colors: {
+        title: "{{theme}} 색상",
+        info: "앱 주요 영역의 색상을 선택합니다. 비워 두면 테마 색상을 사용합니다.",
+        reset: "재설정",
+        resetLabel: "{{theme}} 색상 재설정",
+        pickerAccessibility: "{{role}} 색상 선택",
+        fieldAccessibility: "{{role}} 16진수 색상",
+        roles: {
+          main: {
+            title: "메인 화면",
+            hint: "대화 및 작업 공간 배경",
+          },
+          sidebar: {
+            title: "사이드바",
+            hint: "사이드바 배경",
+          },
+          selection: {
+            title: "선택된 행",
+            hint: "사이드바에서 선택된 행의 강조 표시",
+          },
+          accent: {
+            title: "강조 색상",
+            hint: "버튼, 토글 및 기타 강조 표시",
+          },
+          text: {
+            title: "텍스트",
+            hint: "기본 텍스트",
+          },
+          mutedText: {
+            title: "보조 텍스트",
+            hint: "레이블 및 설명",
+          },
+          border: {
+            title: "테두리",
+            hint: "구분선 및 윤곽선",
+          },
+        },
+      },
       detailLevel: {
         title: "세부 수준",
       },

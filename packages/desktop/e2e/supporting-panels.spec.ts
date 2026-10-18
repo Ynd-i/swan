@@ -172,8 +172,8 @@ test("macOS terminal content inset retains PTY input through resize and reopenin
     await expect.poll(() => getTerminalBufferText(page)).toMatch(/^TERMINAL_WIDE_OK$/m);
     // Save the actual baseline before any visual assertion can fail.
     await page.screenshot({ path: testInfo.outputPath("terminal-content-wide.png") });
-    await expect(surface).toHaveCSS("background-color", "rgb(38, 38, 38)");
-    await expect(surface.locator("..")).toHaveCSS("background-color", "rgb(38, 38, 38)");
+    await expect(surface).toHaveCSS("background-color", "rgb(21, 21, 21)");
+    await expect(surface.locator("..")).toHaveCSS("background-color", "rgb(21, 21, 21)");
     const dockBox = await dock.boundingBox();
     const surfaceBox = await surface.boundingBox();
     const screenBox = await surface.locator(".xterm-screen").boundingBox();

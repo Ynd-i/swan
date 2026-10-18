@@ -802,15 +802,15 @@ const styles = StyleSheet.create((theme, rt) => ({
     gap: theme.spacing[2],
   },
   macOptionHighlight: {
-    backgroundColor: rt.themeName === "dark" ? "#575755" : theme.colors.surface2,
+    backgroundColor: rt.themeName === "dark" ? theme.colors.surface3 : theme.colors.surface2,
   },
-  macSubmitText: { color: rt.themeName === "dark" ? "#2c2c2b" : theme.colors.surface0 },
+  macSubmitText: { color: theme.colors.surface0 },
   macContainer: {
     padding: 16,
     borderRadius: 20,
     gap: 12,
-    backgroundColor: rt.themeName === "dark" ? "#4c4c4a" : theme.colors.surface1,
-    borderColor: rt.themeName === "dark" ? "#676765" : theme.colors.border,
+    backgroundColor: rt.themeName === "dark" ? theme.colors.surface2 : theme.colors.surface1,
+    borderColor: rt.themeName === "dark" ? theme.colors.borderAccent : theme.colors.border,
   },
   macTitleRow: {
     flexDirection: "row",
@@ -1000,7 +1000,7 @@ const styles = StyleSheet.create((theme, rt) => ({
     borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: rt.themeName === "dark" ? "#575755" : theme.colors.surface2,
+    backgroundColor: rt.themeName === "dark" ? theme.colors.surface3 : theme.colors.surface2,
   },
   macSubmitButton: {
     minHeight: 28,
@@ -1008,7 +1008,7 @@ const styles = StyleSheet.create((theme, rt) => ({
     borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: rt.themeName === "dark" ? "#f9f9f7" : theme.colors.foreground,
+    backgroundColor: theme.colors.foreground,
   },
   macActionButtonDisabled: {
     opacity: theme.opacity[50],

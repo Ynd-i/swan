@@ -70,7 +70,7 @@ test("macOS project editor shows its real source folder and preserves name and i
     });
     await expect(dialog).toHaveCSS("max-width", "520px");
     expect(await dialog.evaluate((node) => getComputedStyle(node).borderRadius)).toBe("20px");
-    await expect(dialog).toHaveCSS("background-color", "rgb(63, 63, 63)");
+    await expect(dialog).toHaveCSS("background-color", "rgb(38, 38, 38)");
     await expect(modal).toHaveCSS("background-color", "rgba(0, 0, 0, 0.12)");
     const modalTitle = dialog.getByText("Edit project", { exact: true });
     await expect(modalTitle).toHaveCSS("font-size", "17px");

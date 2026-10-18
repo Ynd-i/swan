@@ -2557,6 +2557,44 @@ export const en = {
           auto: "System",
         },
       },
+      colors: {
+        title: "{{theme}} colors",
+        info: "Pick the colors for the main parts of the app. Leave a field empty to keep the theme's color.",
+        reset: "Reset",
+        resetLabel: "Reset {{theme}} colors",
+        pickerAccessibility: "Pick {{role}} color",
+        fieldAccessibility: "{{role}} hex color",
+        roles: {
+          main: {
+            title: "Main screen",
+            hint: "Conversation and workspace background",
+          },
+          sidebar: {
+            title: "Sidebar",
+            hint: "Sidebar background",
+          },
+          selection: {
+            title: "Selected row",
+            hint: "Highlight behind the selected sidebar row",
+          },
+          accent: {
+            title: "Accent",
+            hint: "Buttons, toggles and other highlights",
+          },
+          text: {
+            title: "Text",
+            hint: "Primary text",
+          },
+          mutedText: {
+            title: "Secondary text",
+            hint: "Labels and descriptions",
+          },
+          border: {
+            title: "Borders",
+            hint: "Dividers and outlines",
+          },
+        },
+      },
       detailLevel: {
         title: "Detail level",
       },

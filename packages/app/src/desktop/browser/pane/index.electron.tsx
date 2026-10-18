@@ -1952,9 +1952,10 @@ const styles = StyleSheet.create((theme) => ({
     borderColor: macToolbar ? "transparent" : theme.colors.border,
   }),
   urlBarFocused: (defaultDarkTheme: boolean) => ({
-    // Sampled from the supplied focused macOS reference; other palettes keep their own tokens.
-    backgroundColor: defaultDarkTheme ? "#6e6e6c" : theme.colors.surface4,
-    borderColor: defaultDarkTheme ? "#80807e" : theme.colors.foregroundMuted,
+    backgroundColor: defaultDarkTheme ? theme.colors.surface3 : theme.colors.surface4,
+    borderColor: defaultDarkTheme
+      ? theme.colors.foregroundExtraMuted
+      : theme.colors.foregroundMuted,
   }),
   urlInput: {
     flex: 1,

@@ -44,8 +44,11 @@ describe("createMarkdownStyles", () => {
     }
   });
 
-  it("colors links and inline code on the macOS dark theme", () => {
-    const desktopDark = { ...darkTheme, colors: { ...darkTheme.colors, surface0: "#2c2c2b" } };
+  it("colors links and inline code from their theme tokens", () => {
+    const desktopDark = {
+      ...darkTheme,
+      colors: { ...darkTheme.colors, link: "#7aa6e7", inlineCode: "#de8481" },
+    };
     const styles = createMarkdownStyles(desktopDark);
     expect(styles.link.color).toBe("#7aa6e7");
     expect(styles.code_inline.color).toBe("#de8481");

@@ -2482,6 +2482,44 @@ export const fr: TranslationResources = {
           auto: "Système",
         },
       },
+      colors: {
+        title: "Couleurs de {{theme}}",
+        info: "Choisissez les couleurs des principales parties de l’app. Laissez un champ vide pour garder la couleur du thème.",
+        reset: "Réinitialiser",
+        resetLabel: "Réinitialiser les couleurs de {{theme}}",
+        pickerAccessibility: "Choisir la couleur : {{role}}",
+        fieldAccessibility: "Couleur hexadécimale : {{role}}",
+        roles: {
+          main: {
+            title: "Écran principal",
+            hint: "Fond de la conversation et de l’espace de travail",
+          },
+          sidebar: {
+            title: "Barre latérale",
+            hint: "Fond de la barre latérale",
+          },
+          selection: {
+            title: "Ligne sélectionnée",
+            hint: "Surbrillance de la ligne sélectionnée dans la barre latérale",
+          },
+          accent: {
+            title: "Accent",
+            hint: "Boutons, interrupteurs et autres mises en évidence",
+          },
+          text: {
+            title: "Texte",
+            hint: "Texte principal",
+          },
+          mutedText: {
+            title: "Texte secondaire",
+            hint: "Libellés et descriptions",
+          },
+          border: {
+            title: "Bordures",
+            hint: "Séparateurs et contours",
+          },
+        },
+      },
       detailLevel: {
         title: "Niveau de détail",
       },

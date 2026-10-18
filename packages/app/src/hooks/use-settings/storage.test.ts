@@ -215,6 +215,40 @@ describe("loadAppSettingsFromStorage", () => {
     expect(result.theme).toBe(name);
   });
 
+  it("keeps valid theme colors and drops invalid ones", async () => {
+    const deps = makeDeps({
+      storage: createInMemoryKeyValueStorage({
+        [APP_SETTINGS_KEY]: JSON.stringify({
+          themeColors: {
+            dark: { sidebar: "#000000", main: "red", accent: "#D97757" },
+            light: "not an object",
+          },
+        }),
+      }),
+    });
+
+    const result = await loadAppSettingsFromStorage(deps);
+
+    expect(result.themeColors).toEqual({
+      dark: { sidebar: "#000000", accent: "#D97757" },
+      light: {},
+    });
+  });
+
+  it("drops theme colors stored under an unknown theme", async () => {
+    const deps = makeDeps({
+      storage: createInMemoryKeyValueStorage({
+        [APP_SETTINGS_KEY]: JSON.stringify({
+          themeColors: { retired: { main: "#000000" }, dark: { sidebar: "#000000" } },
+        }),
+      }),
+    });
+
+    expect((await loadAppSettingsFromStorage(deps)).themeColors).toEqual({
+      dark: { sidebar: "#000000" },
+    });
+  });
+
   it("seeds storage with the client defaults when nothing is persisted", async () => {
     const deps = makeDeps();
 

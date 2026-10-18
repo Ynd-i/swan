@@ -1,39 +1,50 @@
 import { getIsElectronMac } from "@/constants/platform";
-import { buildDarkSemanticColors, buildDarkTheme, REGISTERED_THEMES as upstream } from "./theme";
+import {
+  buildDarkSemanticColors,
+  buildDarkTheme,
+  REGISTERED_THEMES as upstreamThemes,
+  THEME_TINTS as upstreamTints,
+  type ThemeTint,
+} from "./theme";
 
-// Only the default macOS dark theme follows the supplied Codex reference.
+// Only the default macOS dark theme follows the Claude desktop reference: a near-black
+// sidebar beside a slightly lighter conversation surface.
 // Keep every other built-in theme and contributed theme under upstream ownership.
-const desktopDarkColors = buildDarkSemanticColors({
-  surface0: "#2c2c2b",
-  surface1: "#393937",
-  surface2: "#454543",
-  surface3: "#535351",
-  surface4: "#60605e",
-  surfaceDiffEmpty: "#30302e",
-  surfaceSidebar: "#323230",
-  foreground: "#eeeeec",
-  foregroundMuted: "#b5b5b2",
-  foregroundExtraMuted: "#949490",
-  border: "#41413f",
-  borderAccent: "#50504d",
-  accent: "#dededb",
-  accentBright: "#f3f3f0",
-  accentForeground: "#2c2c2b",
-  destructive: upstream.dark.colors.destructive,
-  terminalBlack: "#2c2c2b",
-  terminalBrightBlack: "#747471",
-});
-
-const desktopDark = buildDarkTheme({
-  ...desktopDarkColors,
-  terminal: {
-    ...desktopDarkColors.terminal,
-    background: "#262626",
-    cursorAccent: "#262626",
-    black: "#262626",
+const desktopDarkTint = {
+  colorScheme: "dark",
+  config: {
+    surface0: "#151515",
+    surface1: "#1d1d1d",
+    surface2: "#262626",
+    surface3: "#343434",
+    surface4: "#484848",
+    surfaceDiffEmpty: "#1a1a1a",
+    surfaceSidebar: "#111111",
+    surfaceWorkspace: "#151515",
+    foreground: "#f0efec",
+    foregroundMuted: "#c3c2b7",
+    foregroundExtraMuted: "#898781",
+    border: "#292929",
+    borderAccent: "#343434",
+    accent: "#f0efec",
+    accentBright: "#ffffff",
+    accentForeground: "#151515",
+    success: upstreamThemes.dark.colors.success,
+    // The near-white accent cannot mark prose links and inline code.
+    link: "#7aa6e7",
+    inlineCode: "#de8481",
+    destructive: upstreamThemes.dark.colors.destructive,
+    terminalBlack: "#151515",
+    terminalBrightBlack: "#6b6b69",
   },
-  surfaceWorkspace: "#2c2c2b",
-  success: upstream.dark.colors.success,
-});
+} as const satisfies ThemeTint;
 
-export const REGISTERED_THEMES = getIsElectronMac() ? { ...upstream, dark: desktopDark } : upstream;
+const desktopDark = buildDarkTheme(buildDarkSemanticColors(desktopDarkTint.config));
+
+export const REGISTERED_THEME_TINTS = getIsElectronMac()
+  ? { ...upstreamTints, dark: desktopDarkTint }
+  : upstreamTints;
+
+export const REGISTERED_THEMES = getIsElectronMac()
+  ? { ...upstreamThemes, dark: desktopDark }
+  : upstreamThemes;

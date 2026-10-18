@@ -2467,6 +2467,44 @@ export const ptBR: TranslationResources = {
           auto: "Sistema",
         },
       },
+      colors: {
+        title: "Cores de {{theme}}",
+        info: "Escolha as cores das principais partes do app. Deixe um campo vazio para usar a cor do tema.",
+        reset: "Redefinir",
+        resetLabel: "Redefinir as cores de {{theme}}",
+        pickerAccessibility: "Escolher a cor de {{role}}",
+        fieldAccessibility: "Cor hexadecimal de {{role}}",
+        roles: {
+          main: {
+            title: "Tela principal",
+            hint: "Fundo da conversa e do espaço de trabalho",
+          },
+          sidebar: {
+            title: "Barra lateral",
+            hint: "Fundo da barra lateral",
+          },
+          selection: {
+            title: "Linha selecionada",
+            hint: "Destaque da linha selecionada na barra lateral",
+          },
+          accent: {
+            title: "Destaque",
+            hint: "Botões, chaves e outros destaques",
+          },
+          text: {
+            title: "Texto",
+            hint: "Texto principal",
+          },
+          mutedText: {
+            title: "Texto secundário",
+            hint: "Rótulos e descrições",
+          },
+          border: {
+            title: "Bordas",
+            hint: "Divisores e contornos",
+          },
+        },
+      },
       detailLevel: {
         title: "Nível de detalhe",
       },

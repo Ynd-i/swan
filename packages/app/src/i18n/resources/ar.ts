@@ -2432,6 +2432,44 @@ export const ar: TranslationResources = {
           auto: "نظام",
         },
       },
+      colors: {
+        title: "ألوان {{theme}}",
+        info: "اختر ألوان الأجزاء الرئيسية في التطبيق. اترك الحقل فارغًا لاستخدام لون السمة.",
+        reset: "إعادة تعيين",
+        resetLabel: "إعادة تعيين ألوان {{theme}}",
+        pickerAccessibility: "اختيار لون {{role}}",
+        fieldAccessibility: "لون {{role}} بالنظام الست عشري",
+        roles: {
+          main: {
+            title: "الشاشة الرئيسية",
+            hint: "خلفية المحادثة ومساحة العمل",
+          },
+          sidebar: {
+            title: "الشريط الجانبي",
+            hint: "خلفية الشريط الجانبي",
+          },
+          selection: {
+            title: "الصف المحدد",
+            hint: "تمييز الصف المحدد في الشريط الجانبي",
+          },
+          accent: {
+            title: "لون التمييز",
+            hint: "الأزرار ومفاتيح التبديل وعناصر التمييز الأخرى",
+          },
+          text: {
+            title: "النص",
+            hint: "النص الأساسي",
+          },
+          mutedText: {
+            title: "النص الثانوي",
+            hint: "التسميات والأوصاف",
+          },
+          border: {
+            title: "الحدود",
+            hint: "الفواصل والحواف",
+          },
+        },
+      },
       detailLevel: {
         title: "مستوى التفاصيل",
       },

@@ -80,6 +80,7 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
       uiFontWeight: settings.uiFontWeight,
       contentMaxWidth: resolveContentMaxWidth({ contentMaxWidth: settings.contentMaxWidth }),
       syntaxTheme: settings.syntaxTheme,
+      themeColors: settings.themeColors,
     });
     setHasAppliedAppearance(true);
   }, [
@@ -97,6 +98,7 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
     settings.uiFontWeight,
     settings.contentMaxWidth,
     settings.syntaxTheme,
+    settings.themeColors,
   ]);
 
   const select = useCallback(

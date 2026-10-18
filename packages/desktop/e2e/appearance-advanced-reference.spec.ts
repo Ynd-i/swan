@@ -292,8 +292,8 @@ test("macOS Advanced resets only its fields and refreshes dirty controls", async
       height: 28,
       align: "left",
       radius: "8px",
-      border: "rgb(116, 116, 114)",
-      background: "rgb(75, 75, 73)",
+      border: "rgb(52, 52, 52)",
+      background: "rgb(38, 38, 38)",
     }),
   );
   await expect(
@@ -308,8 +308,8 @@ test("macOS Advanced resets only its fields and refreshes dirty controls", async
   for (const field of familyControls) {
     await expect(field).toHaveCSS("height", "28px");
     await expect(field).toHaveCSS("border-radius", "14px");
-    await expect(field).toHaveCSS("background-color", "rgb(73, 73, 71)");
-    await expect(field).toHaveCSS("border-color", "rgb(97, 97, 95)");
+    await expect(field).toHaveCSS("background-color", "rgb(38, 38, 38)");
+    await expect(field).toHaveCSS("border-color", "rgb(52, 52, 52)");
     await expect(field).toHaveAttribute("placeholder", "System default");
   }
   await fields.monoFontFamily.scrollIntoViewIfNeeded();

@@ -63,6 +63,7 @@ import { settingsStyles } from "@/styles/settings";
 import { REGISTERED_THEMES } from "@/styles/registered-themes";
 import { useToast } from "@/contexts/toast-context";
 import { AppearancePreview } from "./appearance-preview";
+import { ThemeColorsSection } from "./theme-colors-section";
 
 // ---------------------------------------------------------------------------
 // Theme-reactive leaf icons (withUnistyles + uniProps color mapping — no
@@ -1152,6 +1153,7 @@ export function AppearanceSection() {
           {showThemeModes ? interfaceFont : null}
         </View>
       </SettingsSection>
+      {selectedPluginTheme ? null : <ThemeColorsSection />}
       {showThemeModes ? (
         <AppearanceAdvanced resetting={resetting} onReset={resetAdvanced}>
           <View style={settingsStyles.section}>
@@ -1326,10 +1328,12 @@ const styles = StyleSheet.create((theme, rt) => ({
     paddingHorizontal: theme.spacing[3],
     borderRadius: getIsElectronMac() ? CONTROL_HEIGHTS.tight / 2 : theme.borderRadius.md,
     borderWidth: theme.borderWidth[1],
-    borderColor: getIsElectronMac() && rt.themeName === "dark" ? "#61615f" : theme.colors.border,
-    backgroundColor:
-      getIsElectronMac() && rt.themeName === "dark" ? "#494947" : theme.colors.surface2,
-    color: getIsElectronMac() && rt.themeName === "dark" ? "#f9f9f7" : theme.colors.foreground,
+    borderColor:
+      getIsElectronMac() && rt.themeName === "dark"
+        ? theme.colors.borderAccent
+        : theme.colors.border,
+    backgroundColor: theme.colors.surface2,
+    color: theme.colors.foreground,
     fontSize: theme.fontSize.base,
     textAlign: "left",
   },
@@ -1345,9 +1349,11 @@ const styles = StyleSheet.create((theme, rt) => ({
     paddingHorizontal: getIsElectronMac() ? theme.spacing[2] : theme.spacing[3],
     borderRadius: getIsElectronMac() ? theme.borderRadius.lg : theme.borderRadius.md,
     borderWidth: theme.borderWidth[1],
-    borderColor: getIsElectronMac() && rt.themeName === "dark" ? "#747472" : theme.colors.border,
-    backgroundColor:
-      getIsElectronMac() && rt.themeName === "dark" ? "#4b4b49" : theme.colors.surface2,
+    borderColor:
+      getIsElectronMac() && rt.themeName === "dark"
+        ? theme.colors.borderAccent
+        : theme.colors.border,
+    backgroundColor: theme.colors.surface2,
     color: theme.colors.foreground,
     fontSize: theme.fontSize.base,
     textAlign: getIsElectronMac() ? "left" : "right",

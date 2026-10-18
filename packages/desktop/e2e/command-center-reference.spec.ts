@@ -56,8 +56,8 @@ test("macOS chat search keeps compact geometry and real chat and file navigation
     await expect(panel.getByText("Search files", { exact: true })).toBeVisible();
     await expect(panel.getByText("Settings", { exact: true })).toBeInViewport({ ratio: 1 });
     await expect(panel.getByText("History", { exact: true })).toHaveCount(0);
-    await expect(panel).toHaveCSS("background-color", "rgb(76, 76, 74)");
-    await expect(panel).toHaveCSS("border-color", "rgb(99, 99, 97)");
+    await expect(panel).toHaveCSS("background-color", "rgb(38, 38, 38)");
+    await expect(panel).toHaveCSS("border-color", "rgb(52, 52, 52)");
     await expect(chats.first().locator("..")).toHaveCSS("height", "30px");
     await page.mouse.move(20, 30);
     await page.screenshot({
