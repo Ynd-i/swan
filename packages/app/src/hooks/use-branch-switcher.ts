@@ -22,6 +22,8 @@ interface UseBranchSwitcherInput {
 
 interface UseBranchSwitcherResult {
   branchOptions: ComboboxOption[];
+  /** Branch a switch is heading to, until the refreshed checkout status lands. */
+  pendingBranch: string | null;
   isOpen: boolean;
   setIsOpen: (open: boolean) => void;
   handleBranchSelect: (branchId: string) => void;
@@ -41,6 +43,9 @@ export function useBranchSwitcher({
 }: UseBranchSwitcherInput): UseBranchSwitcherResult {
   const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
+  // The daemon answers a switch only after its forced snapshot refresh, which waits on
+  // forge status and can take seconds; show the target branch meanwhile.
+  const [pendingBranch, setPendingBranch] = useState<string | null>(null);
 
   // Git operations are bound to the workspace directory; the opaque workspace id is
   // used only for query cache identity below, never as a cwd.
@@ -129,6 +134,7 @@ export function useBranchSwitcher({
       });
       if (!shouldStash) return;
 
+      setPendingBranch(branchId);
       try {
         const stashPayload = await operations.saveStash(currentBranchName ?? undefined);
         if (stashPayload.error) {
@@ -144,6 +150,8 @@ export function useBranchSwitcher({
         await invalidateStashAndCheckout();
       } catch (err) {
         toast.error(err instanceof Error ? err.message : t("branchSwitcher.failedToStash"));
+      } finally {
+        setPendingBranch(null);
       }
     },
     [operations, currentBranchName, invalidateStashAndCheckout, toast, t],
@@ -155,11 +163,13 @@ export function useBranchSwitcher({
 
       void (async () => {
         if (!operations) return;
+        setPendingBranch(branchId);
         try {
           const payload = await operations.switchBranch(branchId);
           if (payload.error) {
             // If the error is about uncommitted changes, offer the stash dialog
             if (payload.error.message.toLowerCase().includes("uncommitted")) {
+              setPendingBranch(null);
               await stashAndSwitch(branchId);
               return;
             }
@@ -168,9 +178,12 @@ export function useBranchSwitcher({
           }
           // Success — refresh and check for stashes on the target branch
           await invalidateStashAndCheckout();
+          setPendingBranch(null);
           await maybeRestoreStashForBranch(branchId);
         } catch (err) {
           toast.error(err instanceof Error ? err.message : t("branchSwitcher.failedToSwitch"));
+        } finally {
+          setPendingBranch(null);
         }
       })();
     },
@@ -185,5 +198,12 @@ export function useBranchSwitcher({
     ],
   );
 
-  return { branchOptions, isOpen, setIsOpen, handleBranchSelect, invalidateStashAndCheckout };
+  return {
+    branchOptions,
+    pendingBranch,
+    isOpen,
+    setIsOpen,
+    handleBranchSelect,
+    invalidateStashAndCheckout,
+  };
 }

@@ -816,25 +816,28 @@ function useLocalBranchControl(input: {
   sourceDirectory: string | null;
   checkoutStatus: { currentBranch: string | null } | null;
   anchorRef: RefObject<View | null>;
+  isPending: boolean;
 }): NewWorkspaceFormStackInput["localBranch"] {
-  const { enabled, serverId, sourceDirectory, anchorRef } = input;
+  const { enabled, serverId, sourceDirectory, anchorRef, isPending } = input;
   const currentBranch =
     enabled && sourceDirectory ? (input.checkoutStatus?.currentBranch ?? null) : null;
   const client = useHostRuntimeClient(serverId);
   const isConnected = useHostRuntimeIsConnected(serverId);
   const toast = useToast();
   const queryClient = useQueryClient();
-  const { branchOptions, isOpen, setIsOpen, handleBranchSelect } = useBranchSwitcher({
-    client,
-    normalizedServerId: serverId,
-    normalizedWorkspaceId: sourceDirectory ?? "",
-    workspaceDirectory: sourceDirectory,
-    currentBranchName: currentBranch,
-    isGitCheckout: currentBranch !== null,
-    isConnected,
-    toast,
-    queryClient,
-  });
+  const { branchOptions, pendingBranch, isOpen, setIsOpen, handleBranchSelect } = useBranchSwitcher(
+    {
+      client,
+      normalizedServerId: serverId,
+      normalizedWorkspaceId: sourceDirectory ?? "",
+      workspaceDirectory: sourceDirectory,
+      currentBranchName: currentBranch,
+      isGitCheckout: currentBranch !== null,
+      isConnected,
+      toast,
+      queryClient,
+    },
+  );
   const open = useCallback(() => setIsOpen(true), [setIsOpen]);
 
   if (!currentBranch) return null;
@@ -844,6 +847,8 @@ function useLocalBranchControl(input: {
     openState: isOpen,
     onOpenChange: setIsOpen,
     currentBranch,
+    triggerLabel: pendingBranch ?? currentBranch,
+    disabled: isPending || pendingBranch !== null,
     options: branchOptions,
     onSelect: handleBranchSelect,
   };
@@ -1584,6 +1589,9 @@ interface NewWorkspaceFormStackInput {
   localBranch:
     | (FormPickerControl & {
         currentBranch: string;
+        /** The current branch, or the target branch while a switch is in flight. */
+        triggerLabel: string;
+        disabled: boolean;
         options: ComboboxOptionType[];
         onSelect: (id: string) => void;
       })
@@ -1795,12 +1803,12 @@ function useNewWorkspaceFormStack(input: NewWorkspaceFormStackInput): ReactEleme
         testID="new-workspace-local-branch-trigger"
         pickerAnchorRef={localBranch.anchorRef}
         onPress={localBranch.open}
-        disabled={isPending}
+        disabled={localBranch.disabled}
         badgePressableStyle={badgePressableStyle}
         selectedItem={null}
-        triggerLabel={localBranch.currentBranch}
+        triggerLabel={localBranch.triggerLabel}
         accessibilityLabel={t("branchSwitcher.currentBranch", {
-          branchName: localBranch.currentBranch,
+          branchName: localBranch.triggerLabel,
         })}
         tooltipLabel={t("branchSwitcher.triggerTooltip")}
         iconColor={theme.colors.foregroundMuted}
@@ -2108,6 +2116,7 @@ export function NewWorkspaceScreen({
     sourceDirectory: selectedSourceDirectory,
     checkoutStatus,
     anchorRef: localBranchPickerAnchorRef,
+    isPending,
   });
 
   const branchSuggestionsQuery = useQuery({
