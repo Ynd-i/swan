@@ -2456,6 +2456,37 @@ browser font-size case also passes. The capture above was refreshed. Logs:
 `/private/tmp/paseo-size-input-red.log`, `/private/tmp/paseo-size-input.log`, and
 `/private/tmp/paseo-size-input-browser.log`.
 
+### Claude desktop dark palette and theme colors — 2026-10-18
+
+The default macOS dark theme now follows a Claude desktop screenshot instead of
+the Codex warm grays: `#111111` sidebar, `#151515` conversation and terminal,
+`#1d1d1d`/`#262626`/`#343434` raised surfaces, `#292929` borders and `#f0efec`
+text. Colors were sampled after converting the PNG's Display profile to sRGB;
+the neutrals match the raw bytes. This supersedes the sampled warm-gray values
+recorded above for the composer placeholder, capsules, dialog, terminal and
+browser address bar. Those sites now read theme tokens (`surface2`, `surface3`,
+`borderAccent`, `foregroundExtraMuted`), so they follow both the palette and the
+user's colors. Markdown links and inline code use the new `link` and `inlineCode`
+tokens; the old `surface0 === "#2c2c2b"` check broke as soon as the palette moved.
+
+Appearance gains a Colors section for the visible built-in theme: main screen,
+sidebar, selected row, accent, text, secondary text and border. `themeColors`
+stores them per theme name. Each built-in theme is built from a named tint
+(`THEME_TINTS`, or `REGISTERED_THEME_TINTS` on Mac), and `applyAppearance`
+rebuilds its semantic colors from that tint plus the user's colors on every
+apply. Rebuilding keeps derived aliases (`background`, `surfaceWorkspace`,
+terminal, `primaryForeground`) coherent and makes clearing a color restore the
+original. Contributed themes have no tint, keep their palette, and hide the
+section. System resolves to Light or Dark through `useColorScheme`.
+
+Known gap: the Electron main process still opens the window on the upstream
+`#181B1A` until the renderer sends its chrome color.
+
+Validation: `theme`, `registered-themes`, `markdown-styles`, `apply`, `storage`
+and locale-resource unit files pass; root typecheck and lint pass. The new
+`packages/desktop/e2e/theme-colors.spec.ts` and the reference specs whose
+expected colors moved have not been run in this sandbox.
+
 ### Usage data foundation
 
 The existing usage-source contract already supplies provider/account labels, quota
