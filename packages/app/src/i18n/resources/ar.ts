@@ -51,6 +51,8 @@ export const ar: TranslationResources = {
     suggested: "محادثة مقترحة",
     start: "بدء",
     startFailed: "تعذّر البدء: {{error}}",
+    unknownModel: "نموذج غير معروف: {{model}}",
+    unknownThinking: "مستوى تفكير غير معروف: {{thinking}}",
     open: "فتح {{title}}",
     archived: "مؤرشف",
     task: "المهمة",

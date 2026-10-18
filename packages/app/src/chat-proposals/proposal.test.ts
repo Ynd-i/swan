@@ -25,6 +25,8 @@ const proposal = {
   title: "Make first tools/list wait for startup health",
   task: "Gate the first tools/list on the startup check.\n\n## Done when\n- the stdio test passes",
   context: "Codex lists tools once per connection.",
+  model: null,
+  thinking: null,
 };
 
 describe("splitChatProposals", () => {
@@ -49,9 +51,19 @@ describe("splitChatProposals", () => {
     const split = splitChatProposals(`${block}\n${second}`);
     expect(split.proposals).toEqual([
       proposal,
-      { title: "Docs", task: "Update docs.", context: null },
+      { title: "Docs", task: "Update docs.", context: null, model: null, thinking: null },
     ]);
     expect(split.text).toBe("");
+  });
+
+  it("reads the model and thinking a proposal asks for", () => {
+    const named = block.replace(
+      "<task>",
+      "<model>Opus 5.5</model>\n<thinking> xhigh </thinking>\n<task>",
+    );
+    expect(splitChatProposals(named).proposals).toEqual([
+      { ...proposal, model: "Opus 5.5", thinking: "xhigh" },
+    ]);
   });
 
   it("hides an unclosed proposal while it streams", () => {

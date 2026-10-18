@@ -51,6 +51,8 @@ export const ko: TranslationResources = {
     suggested: "제안된 채팅",
     start: "시작",
     startFailed: "시작할 수 없음: {{error}}",
+    unknownModel: "알 수 없는 모델: {{model}}",
+    unknownThinking: "알 수 없는 사고 수준: {{thinking}}",
     open: "{{title}} 열기",
     archived: "보관됨",
     task: "작업",

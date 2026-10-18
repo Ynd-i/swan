@@ -16,6 +16,10 @@ export interface ChatBrief {
 /** A follow-up chat an agent suggests in its reply; nothing runs until the user starts it. */
 export interface ChatProposal extends ChatBrief {
   title: string;
+  /** A model of the source's provider, by ID, alias or label; null keeps the source's model. */
+  model: string | null;
+  /** A thinking option, by ID or label; null keeps the source's when the model is kept. */
+  thinking: string | null;
 }
 
 export interface ChatProposalSplit {
@@ -34,7 +38,13 @@ function parseProposalBody(body: string): ChatProposal | null {
   const title = tagged(body, "title");
   const task = tagged(body, "task");
   if (!title || !task) return null;
-  return { title: title.replace(/\s+/g, " "), task, context: tagged(body, "context") };
+  return {
+    title: title.replace(/\s+/g, " "),
+    task,
+    context: tagged(body, "context"),
+    model: tagged(body, "model"),
+    thinking: tagged(body, "thinking"),
+  };
 }
 
 const FENCE = /^ {0,3}(`{3,}|~{3,})/;

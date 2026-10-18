@@ -17,6 +17,8 @@ The agent writes one block per proposal. Each tag sits on a line of its own:
 ```text
 <paseo_chat_proposal>
 <title>Make first tools/list wait for startup health</title>
+<model>Opus 5.5</model>
+<thinking>xhigh</thinking>
 <task>
 The brief for a fresh agent: the task, the files, what done looks like.
 </task>
@@ -25,6 +27,8 @@ Background the new chat needs from this one. Optional.
 </context>
 </paseo_chat_proposal>
 ```
+
+`model`, `thinking` and `context` are optional.
 
 `splitChatProposals` takes complete blocks out of the reply before the reply is split into Markdown
 blocks (`agent-stream/presentation.ts`), so a block never spans display rows. The cards hang off the
@@ -44,11 +48,14 @@ prompt when a chat's session starts, so start a new chat after you change it:
 
 ```text
 When follow-up work belongs in its own chat (a separate fix, a piece you could not finish or verify,
-a follow-up PR), propose it instead of only mentioning it. End your reply with one block per
-proposal, each tag on its own line:
+a follow-up PR), propose it instead of only mentioning it. When the user asks you to hand off or to
+continue in a new chat, propose that chat instead of creating an agent. End your reply with one
+block per proposal, each tag on its own line:
 
 <paseo_chat_proposal>
 <title>Short imperative title</title>
+<model>Optional. A model of your provider, only when the user named one or the work needs it.</model>
+<thinking>Optional. A thinking level of that model, such as high or xhigh.</thinking>
 <task>
 A complete brief for an agent with no context: the task, the files, what done looks like.
 </task>
@@ -67,6 +74,16 @@ Start creates the chat in the source's workspace with the source's provider, mod
 option and feature values (`buildProposedChatRequest` in `chat-proposals/start.ts`). The first prompt
 wraps the task and context in `<paseo_started_chat>`, and the chat view shows that prompt as the
 Task and Context rows instead of a user bubble (`presentUserMessage`). The model reads the same tags.
+
+A `model` or `thinking` tag overrides the source's setting. The provider never changes, so a
+proposal can't move work from Claude to Codex. Agents write names the way people say them, so the
+card matches a model by ID, alias or label and a thinking option by ID or label, case-insensitively,
+against the source provider's catalog (`resolveProposalRuntime`). The card shows the matched labels
+next to "Suggested chat". A name the catalog doesn't have disables Start and says which name failed,
+so a typo never starts a chat on the wrong model.
+
+A new model without a `thinking` tag runs at its own default thinking, because the source's option
+may not exist on it.
 
 ## Linking, not parenting
 

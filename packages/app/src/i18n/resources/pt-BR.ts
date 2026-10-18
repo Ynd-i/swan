@@ -51,6 +51,8 @@ export const ptBR: TranslationResources = {
     suggested: "Chat sugerido",
     start: "Iniciar",
     startFailed: "Não foi possível iniciar: {{error}}",
+    unknownModel: "Modelo desconhecido: {{model}}",
+    unknownThinking: "Nível de raciocínio desconhecido: {{thinking}}",
     open: "Abrir {{title}}",
     archived: "Arquivado",
     task: "Tarefa",

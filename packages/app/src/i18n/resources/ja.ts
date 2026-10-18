@@ -51,6 +51,8 @@ export const ja: TranslationResources = {
     suggested: "提案されたチャット",
     start: "開始",
     startFailed: "開始できません: {{error}}",
+    unknownModel: "不明なモデル: {{model}}",
+    unknownThinking: "不明な思考レベル: {{thinking}}",
     open: "{{title}} を開く",
     archived: "アーカイブ済み",
     task: "タスク",

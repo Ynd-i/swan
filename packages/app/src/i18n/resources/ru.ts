@@ -51,6 +51,8 @@ export const ru: TranslationResources = {
     suggested: "Предложенный чат",
     start: "Начать",
     startFailed: "Не удалось начать: {{error}}",
+    unknownModel: "Неизвестная модель: {{model}}",
+    unknownThinking: "Неизвестный уровень размышления: {{thinking}}",
     open: "Открыть {{title}}",
     archived: "В архиве",
     task: "Задача",
