@@ -314,7 +314,7 @@ test("macOS composer placeholder follows the default dark override through theme
       input.evaluate((node) => getComputedStyle(node, "::placeholder").color);
     await expect(input).toHaveValue("");
     await expect(input).toHaveAttribute("placeholder", "Ask anything");
-    await expect.poll(placeholderColor).toBe("rgb(132, 132, 129)");
+    await expect.poll(placeholderColor).toBe("rgb(137, 135, 129)");
     await page.getByTestId("workspace-explorer-toggle").click();
     await page
       .getByTestId("workspace-explorer-sidebar")
@@ -327,7 +327,7 @@ test("macOS composer placeholder follows the default dark override through theme
     await page.screenshot({ path: testInfo.outputPath("composer-placeholder-dark-wide.png") });
     await page.setViewportSize({ width: 900, height: 781 });
     await expect(input).toBeInViewport();
-    await expect.poll(placeholderColor).toBe("rgb(132, 132, 129)");
+    await expect.poll(placeholderColor).toBe("rgb(137, 135, 129)");
     await page.screenshot({ path: testInfo.outputPath("composer-placeholder-dark-narrow.png") });
     await page.setViewportSize({ width: 1352, height: 781 });
 
@@ -342,9 +342,9 @@ test("macOS composer placeholder follows the default dark override through theme
     for (const [theme, color] of [
       ["Light", "rgb(212, 212, 216)"],
       ["Pure black", "rgb(45, 45, 45)"],
-      ["Dark", "rgb(132, 132, 129)"],
+      ["Dark", "rgb(137, 135, 129)"],
       ["Pure black", "rgb(45, 45, 45)"],
-      ["Dark", "rgb(132, 132, 129)"],
+      ["Dark", "rgb(137, 135, 129)"],
     ]) {
       await openSettings(page);
       await openSettingsSection(page, "appearance");
@@ -371,7 +371,7 @@ test("macOS composer placeholder follows the default dark override through theme
     await expect(chineseInput).toHaveCSS("font-family", "Georgia");
     await expect
       .poll(() => chineseInput.evaluate((node) => getComputedStyle(node, "::placeholder").color))
-      .toBe("rgb(132, 132, 129)");
+      .toBe("rgb(137, 135, 129)");
   } finally {
     await fixture.cleanup();
   }

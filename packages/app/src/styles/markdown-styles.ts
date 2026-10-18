@@ -24,10 +24,6 @@ function contentHeadingLineHeight(contentSize: number, tier: keyof typeof FONT_S
  */
 export function createMarkdownStyles(theme: Theme) {
   const codeFontWeight = theme.codeFontWeight ?? (theme.contentFontWeight ? "400" : null);
-  // The macOS dark theme (registered-themes.electron.ts) has a near-white accent, so prose
-  // links and inline code take the reference's blue and red instead.
-  const isDesktopDark = theme.colors.surface0 === "#2c2c2b";
-  const linkColor = isDesktopDark ? "#7aa6e7" : theme.colors.accentBright;
   const paragraph = {
     marginTop: 0,
     marginBottom: theme.spacing[3],
@@ -173,7 +169,7 @@ export function createMarkdownStyles(theme: Theme) {
 
     link: {
       ...webSelectableTextStyle,
-      color: linkColor,
+      color: theme.colors.link,
       textDecorationLine: "none" as const,
       flexShrink: 1,
       minWidth: 0,
@@ -182,7 +178,7 @@ export function createMarkdownStyles(theme: Theme) {
 
     blocklink: {
       ...webSelectableTextStyle,
-      color: linkColor,
+      color: theme.colors.link,
       textDecorationLine: "none" as const,
       flexShrink: 1,
       minWidth: 0,
@@ -196,7 +192,7 @@ export function createMarkdownStyles(theme: Theme) {
     code_inline: {
       ...webSelectableTextStyle,
       backgroundColor: theme.colors.surface2,
-      color: isDesktopDark ? "#de8481" : theme.colors.foreground,
+      color: theme.colors.inlineCode,
       paddingHorizontal: theme.spacing[1],
       paddingVertical: 2,
       borderRadius: theme.borderRadius.md,
@@ -370,7 +366,7 @@ export function createMarkdownStyles(theme: Theme) {
         ? {
             backgroundColor: "transparent",
             borderLeftWidth: 3,
-            borderLeftColor: isDesktopDark ? "#5d5d5a" : theme.colors.foregroundExtraMuted,
+            borderLeftColor: theme.colors.foregroundExtraMuted,
             paddingTop: 0,
             borderRadius: 0,
           }

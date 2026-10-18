@@ -38,8 +38,8 @@ test("macOS browser toolbar retains its address and tools when resized", async (
     await expect(addressFrame).toHaveCSS("height", "32px");
     await expect(addressFrame).toHaveCSS("border-radius", "16px");
     await address.focus();
-    await expect(addressFrame).toHaveCSS("background-color", "rgb(110, 110, 108)");
-    await expect(addressFrame).toHaveCSS("border-top-color", "rgb(128, 128, 126)");
+    await expect(addressFrame).toHaveCSS("background-color", "rgb(52, 52, 52)");
+    await expect(addressFrame).toHaveCSS("border-top-color", "rgb(137, 135, 129)");
     await expect(address).toHaveValue("");
     await expect
       .poll(() => address.evaluate((input) => getComputedStyle(input, "::placeholder").textAlign))
@@ -65,7 +65,7 @@ test("macOS browser toolbar retains its address and tools when resized", async (
     await expect(address).toHaveCSS("text-align", /^(left|start)$/);
     await page.getByTestId("browser-tools-menu-trigger").focus();
     await expect(address).toHaveValue("https://example.test/unsubmitted");
-    await expect(addressFrame).toHaveCSS("background-color", "rgb(69, 69, 67)");
+    await expect(addressFrame).toHaveCSS("background-color", "rgb(38, 38, 38)");
     await page.keyboard.press("Meta+l");
     await expect(address).toBeFocused();
     await expect
@@ -91,7 +91,7 @@ test("macOS browser toolbar retains its address and tools when resized", async (
       await expect(address).toBeInViewport();
       await expect(address).toHaveValue("https://example.test/retained-draft");
       await address.focus();
-      await expect(addressFrame).toHaveCSS("background-color", "rgb(110, 110, 108)");
+      await expect(addressFrame).toHaveCSS("background-color", "rgb(52, 52, 52)");
       await address.fill("https://example.test/temporary");
       await address.press("Escape");
       await expect(address).toHaveValue("https://example.test/retained-draft");

@@ -2,6 +2,7 @@ import { Platform } from "react-native";
 import { darkHighlightColors, lightHighlightColors } from "@getpaseo/highlight";
 import { getIsElectronMac } from "@/constants/platform";
 import { resolveSyntaxColors } from "@/appearance/syntax-theme";
+import { isLightHexColor } from "@/utils/color";
 
 export const baseColors = {
   // Base colors
@@ -219,7 +220,16 @@ const darkStatusDotColors = {
   statusDotRunning: "#5caaf6",
 };
 
-export interface LightThemeConfig {
+/** Tokens the builders derive from the ramp unless a palette sets them. */
+interface DerivedColorConfig {
+  surfaceWorkspace?: string;
+  surfaceSidebarSelected?: string;
+  success?: string;
+  link?: string;
+  inlineCode?: string;
+}
+
+export interface LightThemeConfig extends DerivedColorConfig {
   surface0: string;
   surface1: string;
   surface2: string;
@@ -270,8 +280,8 @@ export function buildLightSemanticColors(tint: LightThemeConfig) {
     surfaceDiffEmpty: tint.surfaceDiffEmpty,
     surfaceSidebar: tint.surfaceSidebar,
     surfaceSidebarHover: tint.surface1,
-    surfaceSidebarSelected: tint.surface3,
-    surfaceWorkspace: tint.surface0,
+    surfaceSidebarSelected: tint.surfaceSidebarSelected ?? tint.surface3,
+    surfaceWorkspace: tint.surfaceWorkspace ?? tint.surface0,
     interactionHighlight: "rgba(0, 0, 0, 0.06)",
 
     foreground: tint.foreground,
@@ -284,10 +294,12 @@ export function buildLightSemanticColors(tint: LightThemeConfig) {
     accent: tint.accent,
     accentBright: tint.accentBright,
     accentForeground: tint.accentForeground ?? tint.surface0,
+    link: tint.link ?? tint.accentBright,
+    inlineCode: tint.inlineCode ?? tint.foreground,
 
     destructive: tint.destructive,
     destructiveForeground: tint.surface0,
-    success: tint.accent,
+    success: tint.success ?? tint.accent,
     successForeground: tint.surface0,
 
     background: tint.surface0,
@@ -322,7 +334,7 @@ export function buildLightSemanticColors(tint: LightThemeConfig) {
   };
 }
 
-const lightSemanticColors = buildLightSemanticColors({
+const lightTint: LightThemeConfig = {
   surface0: "#ffffff",
   surface1: "#fafafa",
   surface2: "#f4f4f5",
@@ -344,13 +356,13 @@ const lightSemanticColors = buildLightSemanticColors({
   terminalBlack: "#1a1a1e",
   terminalBrightBlack: "#3f3f46",
   ring: "#18181b",
-});
+};
 
 // ---------------------------------------------------------------------------
 // Dark theme variant builder
 // ---------------------------------------------------------------------------
 
-export interface DarkThemeConfig {
+export interface DarkThemeConfig extends DerivedColorConfig {
   surface0: string;
   surface1: string;
   surface2: string;
@@ -401,8 +413,8 @@ export function buildDarkSemanticColors(tint: DarkThemeConfig) {
     surfaceDiffEmpty: tint.surfaceDiffEmpty,
     surfaceSidebar: tint.surfaceSidebar,
     surfaceSidebarHover: tint.surface1,
-    surfaceSidebarSelected: tint.surface2,
-    surfaceWorkspace: tint.surface1,
+    surfaceSidebarSelected: tint.surfaceSidebarSelected ?? tint.surface2,
+    surfaceWorkspace: tint.surfaceWorkspace ?? tint.surface1,
     interactionHighlight: "rgba(255, 255, 255, 0.08)",
 
     foreground,
@@ -415,10 +427,12 @@ export function buildDarkSemanticColors(tint: DarkThemeConfig) {
     accent: tint.accent,
     accentBright: tint.accentBright,
     accentForeground: tint.accentForeground ?? "#ffffff",
+    link: tint.link ?? tint.accentBright,
+    inlineCode: tint.inlineCode ?? foreground,
 
     destructive: tint.destructive,
     destructiveForeground: "#ffffff",
-    success: tint.accent,
+    success: tint.success ?? tint.accent,
     successForeground: "#ffffff",
 
     // Legacy aliases (for gradual migration)
@@ -459,7 +473,7 @@ export function buildDarkSemanticColors(tint: DarkThemeConfig) {
 // ---------------------------------------------------------------------------
 
 // Paseo — subtle teal-green tint (default)
-const paseoDarkColors = buildDarkSemanticColors({
+const paseoDarkTint: DarkThemeConfig = {
   surface0: "#181B1A",
   surface1: "#1E2120",
   surface2: "#272A29",
@@ -476,10 +490,10 @@ const paseoDarkColors = buildDarkSemanticColors({
   destructive: "#c64f43", // warm red, hue ~7 — reads as red (not pink) against the green tint
   terminalBlack: "#141716",
   terminalBrightBlack: "#434645",
-});
+};
 
 // Zinc — neutral gray, no tint
-const zincDarkColors = buildDarkSemanticColors({
+const zincDarkTint: DarkThemeConfig = {
   surface0: "#18181b",
   surface1: "#1f1f22",
   surface2: "#27272a",
@@ -497,10 +511,10 @@ const zincDarkColors = buildDarkSemanticColors({
   destructive: "#c44a4a", // neutral red, hue 0 — clearly red without screaming
   terminalBlack: "#131316",
   terminalBrightBlack: "#3f3f46",
-});
+};
 
 // Midnight — subtle blue tint
-const midnightDarkColors = buildDarkSemanticColors({
+const midnightDarkTint: DarkThemeConfig = {
   surface0: "#161820",
   surface1: "#1c1e27",
   surface2: "#252731",
@@ -517,10 +531,10 @@ const midnightDarkColors = buildDarkSemanticColors({
   destructive: "#c44a52", // red with a hint of cool lean against the blue tint
   terminalBlack: "#121420",
   terminalBrightBlack: "#3c3e4c",
-});
+};
 
 // Claude — warm neutral with subtle orange undertone
-const claudeDarkColors = buildDarkSemanticColors({
+const claudeDarkTint: DarkThemeConfig = {
   surface0: "#1f1f1e",
   surface1: "#262523",
   surface2: "#2f2d2b",
@@ -537,10 +551,10 @@ const claudeDarkColors = buildDarkSemanticColors({
   destructive: "#cf513e", // warm orange-red, hue ~10 — sits with the Claude orange accent
   terminalBlack: "#1a1918",
   terminalBrightBlack: "#4a4745",
-});
+};
 
 // Ghostty — blue-tinted dark based on Ghostty default background
-const ghosttyDarkColors = buildDarkSemanticColors({
+const ghosttyDarkTint: DarkThemeConfig = {
   surface0: "#282c34",
   surface1: "#2f333d",
   surface2: "#383c48",
@@ -557,7 +571,7 @@ const ghosttyDarkColors = buildDarkSemanticColors({
   destructive: "#c44a55", // red with slight cool lean against the slate-blue surfaces
   terminalBlack: "#21252d",
   terminalBrightBlack: "#4a4f5e",
-});
+};
 
 export const SPACING = {
   0: 0,
@@ -734,14 +748,14 @@ export function buildDarkTheme(semanticColors: ReturnType<typeof buildDarkSemant
   } as const;
 }
 
-export const darkTheme = buildDarkTheme(paseoDarkColors);
-export const darkZincTheme = buildDarkTheme(zincDarkColors);
-export const darkMidnightTheme = buildDarkTheme(midnightDarkColors);
-export const darkClaudeTheme = buildDarkTheme(claudeDarkColors);
-export const darkGhosttyTheme = buildDarkTheme(ghosttyDarkColors);
+export const darkTheme = buildDarkTheme(buildDarkSemanticColors(paseoDarkTint));
+export const darkZincTheme = buildDarkTheme(buildDarkSemanticColors(zincDarkTint));
+export const darkMidnightTheme = buildDarkTheme(buildDarkSemanticColors(midnightDarkTint));
+export const darkClaudeTheme = buildDarkTheme(buildDarkSemanticColors(claudeDarkTint));
+export const darkGhosttyTheme = buildDarkTheme(buildDarkSemanticColors(ghosttyDarkTint));
 
 // Pure black — zero-luminance background with high-contrast surfaces.
-const pureBlackDarkColors = buildDarkSemanticColors({
+const pureBlackDarkTint: DarkThemeConfig = {
   surface0: "#000000",
   surface1: "#0a0a0a",
   surface2: "#111111",
@@ -758,9 +772,9 @@ const pureBlackDarkColors = buildDarkSemanticColors({
   destructive: "#c44a4a",
   terminalBlack: "#595959",
   terminalBrightBlack: "#8a8a8a",
-});
+};
 
-export const darkPureBlackTheme = buildDarkTheme(pureBlackDarkColors);
+export const darkPureBlackTheme = buildDarkTheme(buildDarkSemanticColors(pureBlackDarkTint));
 
 const lightShadow = {
   sm: {
@@ -796,7 +810,7 @@ export function buildLightTheme(semanticColors: ReturnType<typeof buildLightSema
   } as const;
 }
 
-export const lightTheme = buildLightTheme(lightSemanticColors);
+export const lightTheme = buildLightTheme(buildLightSemanticColors(lightTint));
 
 // Keep compatibility with existing code
 export const theme = darkTheme;
@@ -901,6 +915,84 @@ export const REGISTERED_THEMES = {
   [PLUGIN_THEME_NAMES.light]: lightTheme,
   [PLUGIN_THEME_NAMES.dark]: darkTheme,
 } as RegisteredThemes;
+
+/** The palette each built-in theme is built from, so user colors can rebuild it. */
+export type ThemeTint =
+  | { colorScheme: "light"; config: LightThemeConfig }
+  | { colorScheme: "dark"; config: DarkThemeConfig };
+
+export const THEME_TINTS: Record<ThemeName, ThemeTint> = {
+  light: { colorScheme: "light", config: lightTint },
+  dark: { colorScheme: "dark", config: paseoDarkTint },
+  zinc: { colorScheme: "dark", config: zincDarkTint },
+  midnight: { colorScheme: "dark", config: midnightDarkTint },
+  claude: { colorScheme: "dark", config: claudeDarkTint },
+  ghostty: { colorScheme: "dark", config: ghosttyDarkTint },
+  pureBlack: { colorScheme: "dark", config: pureBlackDarkTint },
+};
+
+export const THEME_COLOR_ROLES = [
+  "main",
+  "sidebar",
+  "selection",
+  "accent",
+  "text",
+  "mutedText",
+  "border",
+] as const;
+export type ThemeColorRole = (typeof THEME_COLOR_ROLES)[number];
+export type ThemeColorOverrides = Partial<Record<ThemeColorRole, string>>;
+
+export const HEX_COLOR_PATTERN = /^#[0-9a-f]{6}$/i;
+
+const THEME_COLOR_ROLE_TOKENS = {
+  main: "surface0",
+  sidebar: "surfaceSidebar",
+  selection: "surfaceSidebarSelected",
+  accent: "accent",
+  text: "foreground",
+  mutedText: "foregroundMuted",
+  border: "border",
+} as const satisfies Record<ThemeColorRole, keyof Theme["colors"]>;
+
+function withColorOverrides<Config extends LightThemeConfig | DarkThemeConfig>(
+  config: Config,
+  overrides: ThemeColorOverrides,
+): Config {
+  const { main, sidebar, selection, accent, text, mutedText, border } = overrides;
+  return {
+    ...config,
+    ...(main ? { surface0: main, surfaceWorkspace: main } : {}),
+    ...(sidebar ? { surfaceSidebar: sidebar } : {}),
+    ...(selection ? { surfaceSidebarSelected: selection } : {}),
+    ...(accent
+      ? {
+          accent,
+          accentBright: accent,
+          accentForeground: isLightHexColor(accent) ? "#151515" : "#ffffff",
+        }
+      : {}),
+    ...(text ? { foreground: text } : {}),
+    ...(mutedText ? { foregroundMuted: mutedText } : {}),
+    ...(border ? { border } : {}),
+  };
+}
+
+export function buildThemeColors(tint: ThemeTint, overrides: ThemeColorOverrides) {
+  return tint.colorScheme === "light"
+    ? buildLightSemanticColors(withColorOverrides(tint.config, overrides))
+    : buildDarkSemanticColors(withColorOverrides(tint.config, overrides));
+}
+
+export function resolveThemeColorRoles(
+  tint: ThemeTint,
+  overrides: ThemeColorOverrides,
+): Record<ThemeColorRole, string> {
+  const colors = buildThemeColors(tint, overrides);
+  return Object.fromEntries(
+    THEME_COLOR_ROLES.map((role) => [role, colors[THEME_COLOR_ROLE_TOKENS[role]]]),
+  ) as Record<ThemeColorRole, string>;
+}
 
 export function getNextThemePreference(current: ThemePreference): ThemePreference {
   const currentIndex = THEME_OPTIONS.findIndex((option) => option.name === current);

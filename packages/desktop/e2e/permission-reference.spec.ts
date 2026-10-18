@@ -37,7 +37,7 @@ for (const action of ["allow-session", "allow-once", "deny-once"] as const) {
       await expect(composer).toHaveCount(0);
       expect(await originalInput.evaluate((node) => node.isConnected)).toBe(true);
       await expect(card).toHaveCSS("border-radius", "20px");
-      await expect(card).toHaveCSS("background-color", "rgb(76, 76, 74)");
+      await expect(card).toHaveCSS("background-color", "rgb(38, 38, 38)");
       await expect(card.getByTestId("shell-output-horizontal-scroll")).toContainText(
         "/bin/echo permission-fixture",
       );
@@ -47,7 +47,7 @@ for (const action of ["allow-session", "allow-once", "deny-once"] as const) {
       const boxes = await Promise.all([session, deny, once].map((button) => button.boundingBox()));
       expect(boxes[0]!.x).toBeLessThan(boxes[1]!.x);
       expect(boxes[1]!.x).toBeLessThan(boxes[2]!.x);
-      await expect(once).toHaveCSS("background-color", "rgb(249, 249, 247)");
+      await expect(once).toHaveCSS("background-color", "rgb(240, 239, 236)");
       await page.getByTestId("desktop-chat-title").click();
       await page.keyboard.press("Enter");
       expect(gate.getClientRequestCount("agent_permission_response")).toBe(0);

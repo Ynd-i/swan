@@ -78,7 +78,7 @@ const NATIVE_DIALOG_SNAP_POINTS = ["100%"];
 const styles = StyleSheet.create((theme, rt) => ({
   macDesktopOverlay: { backgroundColor: "rgba(0,0,0,0.12)" },
   macDesktopCard: {
-    backgroundColor: rt.themeName === "dark" ? "#3f3f3f" : theme.colors.surface1,
+    backgroundColor: rt.themeName === "dark" ? theme.colors.surface2 : theme.colors.surface1,
     borderRadius: 20,
     borderWidth: 0,
   },

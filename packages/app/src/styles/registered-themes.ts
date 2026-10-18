@@ -1,1 +1,1 @@
-export { REGISTERED_THEMES } from "./theme";
+export { REGISTERED_THEMES, THEME_TINTS as REGISTERED_THEME_TINTS } from "./theme";

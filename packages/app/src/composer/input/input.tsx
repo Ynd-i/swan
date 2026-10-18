@@ -71,7 +71,9 @@ import {
 
 const ComposerTextInput = withUnistyles(EditingTextInput, (theme, rt) => ({
   placeholderTextColor:
-    getIsElectronMac() && rt.themeName === "dark" ? "#848481" : theme.colors.surface4,
+    getIsElectronMac() && rt.themeName === "dark"
+      ? theme.colors.foregroundExtraMuted
+      : theme.colors.surface4,
 }));
 import {
   resolveSendTooltipLabel,

@@ -146,7 +146,7 @@ for (const platform of ["darwin", "win32"] as const) {
             return first && second ? second.y - first.y : null;
           })
           .toBe(21);
-        await expect(plain).toHaveCSS("background-color", "rgb(69, 69, 67)");
+        await expect(plain).toHaveCSS("background-color", "rgb(29, 29, 29)");
         await expect(plain.getByText("Plain text", { exact: true })).toBeVisible();
         await expect(typed.getByText("ts", { exact: true })).toBeVisible();
         const scroll = typed.getByTestId("markdown-code-scroll");

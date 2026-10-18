@@ -363,8 +363,8 @@ const macStyles = StyleSheet.create((theme, rt) => ({
   container: {
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: rt.themeName === "dark" ? "#555553" : theme.colors.border,
-    backgroundColor: rt.themeName === "dark" ? "#454543" : theme.colors.surface2,
+    borderColor: theme.colors.border,
+    backgroundColor: rt.themeName === "dark" ? theme.colors.surface1 : theme.colors.surface2,
     paddingHorizontal: 20,
     paddingTop: 8,
     paddingBottom: 14,
