@@ -13,7 +13,6 @@ import { join } from "node:path";
 import { describe, expect, test } from "vitest";
 import { createTestLogger } from "../../../test-utils/test-logger.js";
 import { mirrorAgentsSkillsIntoClaude } from "./claude-skills-mirror.js";
-import { linkPluginSkills } from "./plugins.js";
 
 const logger = createTestLogger();
 
@@ -84,20 +83,6 @@ describe("mirrorAgentsSkillsIntoClaude", () => {
     const changes = await mirrorAgentsSkillsIntoClaude({ home, logger });
 
     expect(changes).toBe(3);
-    expect(readdirSync(claudeSkills)).toEqual(["review"]);
-    expect(readlinkSync(join(claudeSkills, "review"))).toBe(review);
-  });
-
-  test("skills that plugins link into ~/.agents/skills stay out of ~/.claude/skills", async () => {
-    const { home, agentsSkills, claudeSkills } = createHome();
-    const review = addSkill(agentsSkills, "review");
-    const plugin = join(home, ".agents", "plugins", "kit");
-    addSkill(join(plugin, "skills"), "how");
-    await linkPluginSkills({ home, plugins: [{ name: "kit", dir: plugin }], logger });
-
-    await mirrorAgentsSkillsIntoClaude({ home, logger });
-
-    // Claude loads the plugin itself and lists `/kit:how`, so a mirrored `/how` would repeat it.
     expect(readdirSync(claudeSkills)).toEqual(["review"]);
     expect(readlinkSync(join(claudeSkills, "review"))).toBe(review);
   });

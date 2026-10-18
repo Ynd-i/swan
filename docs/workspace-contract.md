@@ -13,13 +13,12 @@ You keep shared agent configuration in `.agents/` directories and log in to each
 | `<dir>/.agents/hooks/hooks.json` | project | nobody                  | Claude and Codex hooks, trusted repos only                                |
 | `~/.agents/skills/<name>/`       | user    | Codex, OpenCode, Gemini | Symlinked into `~/.claude/skills` for Claude                              |
 | `<repo>/.agents/skills/<name>/`  | project | Codex, OpenCode, Gemini | Claude plugin, trusted repos only (see [Project skills](#project-skills)) |
-| `~/.agents/plugins/<name>/`      | user    | nobody                  | Every provider (see [Plugins](#plugins))                                  |
 
 `.mcp.json` uses the Claude Code and Codex plugin shape, `{ "mcpServers": { "<name>": { ... } } }`. An entry with `command` is stdio, and `"type": "http"` or `"type": "sse"` with `url` is remote. Entries with `"enabled": false` are skipped. Fields the launch config does not carry, such as Codex's `cwd` or `startup_timeout_sec`, are dropped. `${VAR}` references are passed through as literal text. A malformed file or entry logs a warning in `daemon.log` and is skipped. It never fails agent creation.
 
 ## Precedence
 
-The daemon reads `~/.agents`, then every `.agents` directory from the git repo root down to the agent's cwd. A later layer overrides an earlier one by server name, so the nearest directory wins and the user level is lowest. Servers from [plugins](#plugins) rank below the user level. Outside a git repo, only `~/.agents` and `<cwd>/.agents` apply. A worktree's `.git` file counts as a repo root.
+The daemon reads `~/.agents`, then every `.agents` directory from the git repo root down to the agent's cwd. A later layer overrides an earlier one by server name, so the nearest directory wins and the user level is lowest. Outside a git repo, only `~/.agents` and `<cwd>/.agents` apply. A worktree's `.git` file counts as a repo root.
 
 Explicit `mcpServers` on the agent (from the UI, SDK, CLI, or a plugin `agent.create` hook) override registry entries with the same name. Registry servers reach the launch config only. They are not in the agent's stored config or in `paseo inspect`; the `Loaded .agents workspace contract` line in `daemon.log` lists them. Codex copies its launch servers into the record's provider persistence metadata, the same way it copies the runtime `paseo` server. Because the stored config does not hold them, a `toolPolicy` preapproval cannot name a registry-only server.
 
@@ -105,12 +104,12 @@ Keep hooks in `~/.agents/hooks/hooks.json` and `<dir>/.agents/hooks/hooks.json`,
 }
 ```
 
-The file must use this wrapped form. The daemon keeps `command` handlers with their `command`, `timeout`, `async` and `statusMessage`. It drops other handler types, such as `prompt` and `agent`, and other fields, because those differ between vendors. A malformed file, group or handler logs a warning in `daemon.log` and is skipped. Hooks from all layers and [plugins](#plugins) add up. Project files apply only to trusted repos, and internal agents, such as the one that names a branch, get no hooks.
+The file must use this wrapped form. The daemon keeps `command` handlers with their `command`, `timeout`, `async` and `statusMessage`. It drops other handler types, such as `prompt` and `agent`, and other fields, because those differ between vendors. A malformed file, group or handler logs a warning in `daemon.log` and is skipped. Hooks from all layers add up, user layer first. Project files apply only to trusted repos, and internal agents, such as the one that names a branch, get no hooks.
 
-| Provider | User layer                                    | Project layers                                                    | Plugins                                 |
-| -------- | --------------------------------------------- | ----------------------------------------------------------------- | --------------------------------------- |
-| Claude   | Merged into the `--settings` the daemon sends | Run by the layer's plugin (see [Project skills](#project-skills)) | Run by the plugin                       |
-| Codex    | Thread config                                 | Thread config                                                     | Thread config, `CLAUDE_PLUGIN_ROOT` set |
+| Provider | User layer                                    | Project layers                                                    |
+| -------- | --------------------------------------------- | ----------------------------------------------------------------- |
+| Claude   | Merged into the `--settings` the daemon sends | Run by the layer's plugin (see [Project skills](#project-skills)) |
+| Codex    | Thread config                                 | Thread config                                                     |
 
 Codex runs a hook only when it is trusted. The daemon sends each bridged hook together with the trust hash Codex computes for it, so trusting a repo in Paseo also trusts its hooks in Codex, without Codex's own review. Codex does not document that hash. The formula in `providers/codex/session-hooks.ts` matches Codex 0.159.0, and if a release changes it, Codex skips the bridged hooks without a message. `workspace-contract/hooks.real.e2e.test.ts` fails in that case, so run it after a Codex upgrade.
 
@@ -119,47 +118,9 @@ When you write a hook for both vendors:
 - Match tool names for both. Claude calls its shell tool `Bash`, and Codex calls it `shell` or `functions.exec_command`, so use a matcher such as `^(Bash|shell|functions.exec_command)$`. The daemon passes matchers through unchanged.
 - An event that one vendor does not know runs only in the other. Codex ignores `Notification`, and Claude ignores `Interrupt`. Neither reports it.
 - Handle both stdin shapes. The JSON a hook receives, and the output it may print, differ between vendors.
-- In `.agents` hooks, do not rely on `${CLAUDE_PLUGIN_ROOT}`. Claude sets it only for project hooks, and Codex does not set it. Commands run in the session's cwd, so use absolute paths, `$HOME/...` or `$(git rev-parse --show-toplevel)/.agents/...`. Plugin hooks get the variable from both vendors.
+- Do not rely on `${CLAUDE_PLUGIN_ROOT}`. Claude sets it only for project hooks, and Codex never does. Commands run in the session's cwd, so use absolute paths, `$HOME/...` or `$(git rev-parse --show-toplevel)/.agents/...`.
 - Keep `SessionEnd` and `Interrupt` hooks short. Codex gives them a 1 second default and a 3 second limit.
 - A hook that you also keep in `~/.claude/settings.json` or `~/.codex/hooks.json` runs twice. The daemon does not compare them.
-
-## Plugins
-
-Install a third-party plugin once, by cloning it into `~/.agents/plugins/`, and every provider Paseo launches gets it. Each entry there is a plugin root, with `.claude-plugin/plugin.json`, or a Claude marketplace, with `.claude-plugin/marketplace.json`. From a marketplace the daemon loads each plugin whose `source` is a relative path inside the entry, and skips other sources with a warning in `daemon.log`. Entries with neither manifest are ignored. Plugins are user level only, so a repo cannot add one.
-
-A plugin is named by `name` in its `.claude-plugin/plugin.json`, or by its directory. When two plugins have the same name, the entry that sorts first wins, and the daemon logs a warning for the other.
-
-| Part                | Claude              | Codex              | OpenCode      |
-| ------------------- | ------------------- | ------------------ | ------------- |
-| Skills              | `/<plugin>:<skill>` | `<plugin>:<skill>` | `<skill>`     |
-| Agents and commands | `<plugin>:<name>`   | Not available      | Not available |
-| Hooks               | Run by Claude       | Thread config      | Not bridged   |
-| `.mcp.json`         | MCP registry        | MCP registry       | MCP registry  |
-
-Other providers, such as Pi, Copilot and the other ACP providers, get the plugin's MCP servers where they support MCP. Whether they find its skills was not measured.
-
-Claude gets each plugin through the Agent SDK `plugins` option, before the trusted project layers and with `skipMcpDiscovery`. Claude loads the plugin's skills, agents, commands and hooks itself, and sets `CLAUDE_PLUGIN_ROOT` for its hooks. A plugin passed this way replaces a marketplace install of the same name, so the `~/.agents/plugins` copy of pstack wins over `pstack@pstack-claude`.
-
-Codex and OpenCode read `~/.agents/skills` and the directories below it. At every launch the daemon links `~/.agents/skills/<plugin>` to the plugin's `skills/` directory. It creates and repoints only links that point into `~/.agents/plugins`, removes them once their target is gone, and never touches real directories, files or other links. Codex prefixes a skill with the name from the manifest above the skill's real path, and `.codex-plugin/plugin.json` wins over `.claude-plugin/plugin.json`. OpenCode uses bare names, so a plugin's `tdd` and your own `~/.agents/skills/tdd` both appear as `tdd`. Gemini CLI reads `~/.agents/skills` too, but whether it looks below a link was not measured. The Claude mirror passes over these links, because they hold no `SKILL.md` at their root.
-
-Codex takes a plugin's hooks from the file that `hooks` names in `.codex-plugin/plugin.json`, else from `hooks/hooks.json`. Codex sets `CLAUDE_PLUGIN_ROOT` only for plugins it installed itself, so the daemon starts each command with `export CLAUDE_PLUGIN_ROOT='<plugin dir>'; `. An `env CLAUDE_PLUGIN_ROOT=...` prefix would come too late, because the shell expands `"${CLAUDE_PLUGIN_ROOT}/..."` in the command before `env` runs. The trust hash covers the command with the prefix. The prefix is POSIX shell syntax, and Windows was not tested.
-
-The servers in a plugin's `.mcp.json` join the registry for every provider, below `~/.agents/.mcp.json` and the project layers. The daemon replaces `${CLAUDE_PLUGIN_ROOT}` in a stdio server's `command`, `args` and `env`, and adds the variable to its `env`. Claude does not start them a second time.
-
-### Install and update pstack
-
-```sh
-git clone https://github.com/michael-denyer/pstack-claude ~/.agents/plugins/pstack-claude
-```
-
-The repo root is a marketplace that lists `./plugins/pstack`. To update, run `git -C ~/.agents/plugins/pstack-claude pull`. The next launch uses the new files, because Claude loads the clone in place and the Codex link points into it.
-
-### Remove vendor copies
-
-A plugin that you also installed in a vendor can appear twice there.
-
-- Codex lists every pstack skill twice, once from its plugin cache and once from `~/.agents/skills/pstack`. Run `codex plugin remove pstack@pstack-claude`.
-- Claude needs no change, because the `~/.agents/plugins` copy replaces the marketplace install in Paseo sessions. If you no longer use pstack in Claude Code outside Paseo, run `claude plugin uninstall pstack@pstack-claude`.
 
 ## What is not covered
 

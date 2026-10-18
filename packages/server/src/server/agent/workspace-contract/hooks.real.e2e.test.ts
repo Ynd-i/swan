@@ -1,5 +1,5 @@
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { homedir, tmpdir } from "node:os";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import pino from "pino";
 import { afterEach, describe, expect, test } from "vitest";
@@ -114,83 +114,5 @@ describe(".agents hooks reach real provider sessions", () => {
     });
 
     expect(readFileSync(fixture.marker, "utf8")).toBe("claude-user-prompt\n");
-  }, 180_000);
-});
-
-describe("~/.agents plugins reach real provider sessions", () => {
-  const TOKEN = "PLUGIN-TOKEN-4417";
-
-  function createPlugin(): { home: string; cwd: string; plugin: string } {
-    const root = mkdtempSync(join(tmpdir(), "paseo-contract-plugin-"));
-    roots.push(root);
-    const home = join(root, "home");
-    const cwd = join(root, "workspace");
-    const plugin = join(home, ".agents", "plugins", "scratch");
-    mkdirSync(join(plugin, ".claude-plugin"), { recursive: true });
-    mkdirSync(join(plugin, "hooks"));
-    mkdirSync(join(plugin, "skills", "plugin-token"), { recursive: true });
-    mkdirSync(cwd);
-    writeFileSync(
-      join(plugin, ".claude-plugin", "plugin.json"),
-      JSON.stringify({ name: "scratch" }),
-    );
-    // Like pstack's hook, the command reaches its script through ${CLAUDE_PLUGIN_ROOT}.
-    writeFileSync(
-      join(plugin, "hooks", "hooks.json"),
-      JSON.stringify({
-        hooks: {
-          SessionStart: [
-            { hooks: [{ type: "command", command: '"${CLAUDE_PLUGIN_ROOT}/hooks/mark.sh"' }] },
-          ],
-        },
-      }),
-    );
-    writeFileSync(
-      join(plugin, "hooks", "mark.sh"),
-      '#!/bin/sh\nset -eu\necho "$CLAUDE_PLUGIN_ROOT" >> "$CLAUDE_PLUGIN_ROOT/marker.log"\n',
-      { mode: 0o755 },
-    );
-    writeFileSync(
-      join(plugin, "skills", "plugin-token", "SKILL.md"),
-      `---\nname: plugin-token\ndescription: Gives the plugin verification token.\n---\nReply with exactly ${TOKEN} and nothing else.\n`,
-    );
-    return { home, cwd, plugin };
-  }
-
-  test("Codex runs the plugin's hook and uses its linked skill", async () => {
-    const fixture = createPlugin();
-    const logger = pino({ level: "warn" });
-    const manager = new AgentManager({
-      clients: { codex: new CodexAppServerAgentClient(logger) },
-      logger,
-      workspaceContract: { home: fixture.home, trustedRoots: () => [] },
-    });
-    const agent = await manager.createAgent(
-      {
-        provider: "codex",
-        cwd: fixture.cwd,
-        model: "gpt-5.6-luna",
-        thinkingOptionId: "low",
-        // The model reads the skill with a shell command, which must not wait for an approval.
-        modeId: "full-access",
-      },
-      undefined,
-      {
-        workspaceId: undefined,
-        persistSession: false,
-        // Codex reads skills from its own $HOME/.agents/skills, so it gets the fixture home and
-        // keeps its login where it is.
-        env: {
-          HOME: fixture.home,
-          CODEX_HOME: process.env.CODEX_HOME ?? join(homedir(), ".codex"),
-        },
-      },
-    );
-    const { finalText } = await manager
-      .runAgent(agent.id, "Use the scratch:plugin-token skill.")
-      .finally(() => manager.closeAgent(agent.id));
-
-    expect(finalText).toContain(TOKEN);
-    expect(readFileSync(join(fixture.plugin, "marker.log"), "utf8")).toBe(`${fixture.plugin}\n`);
   }, 180_000);
 });

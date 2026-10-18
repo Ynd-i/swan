@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import type { McpServerConfig } from "../agent-sdk-types.js";
 import { parseHooksJson } from "./hooks-json.js";
@@ -8,8 +9,6 @@ import {
   isDirectory,
 } from "./inspect-workspace-contract.js";
 import { parseMcpJson } from "./mcp-json.js";
-import { parseOptionalFile, readOptionalFile } from "./optional-file.js";
-import { discoverPlugins, readPluginParts } from "./plugins.js";
 import type {
   WorkspaceContract,
   WorkspaceContractLayer,
@@ -19,10 +18,10 @@ import type {
 const RESERVED_MCP_SERVER_NAME = "paseo";
 
 /**
- * Reads the `.agents` contract that applies to `cwd`: the plugins under `home`, the user
- * layer under `home`, then every `.agents` directory from the git repo root down to `cwd`.
- * Project layers apply only when the repo root is at or below one of `trustedRoots`, because
- * they launch repo-defined commands. Unreadable or malformed files are reported through
+ * Reads the `.agents` contract that applies to `cwd`: the user layer under `home`,
+ * then every `.agents` directory from the git repo root down to `cwd`. Project layers
+ * apply only when the repo root is at or below one of `trustedRoots`, because they
+ * launch repo-defined commands. Unreadable or malformed files are reported through
  * `onWarning` and skipped.
  */
 export async function loadWorkspaceContract(params: {
@@ -34,18 +33,10 @@ export async function loadWorkspaceContract(params: {
 }): Promise<WorkspaceContract> {
   const { onWarning } = params;
   const home = resolve(params.home);
-  const plugins = await discoverPlugins({ home, onWarning });
   const layers = await resolveLayers(home, resolve(params.cwd), params.trustedRoots, onWarning);
 
   const entries: Array<[string, McpServerConfig]> = [];
   const hooks: WorkspaceContractLayerHooks[] = [];
-  for (const plugin of plugins) {
-    const parts = await readPluginParts(plugin, onWarning);
-    entries.push(...Object.entries(parts.mcpServers));
-    if (Object.keys(parts.hooks).length > 0) {
-      hooks.push({ kind: "plugin", dir: plugin.dir, hooks: parts.hooks });
-    }
-  }
   for (const layer of layers) {
     const servers = await parseOptionalFile(join(layer.dir, ".mcp.json"), parseMcpJson, onWarning);
     entries.push(...Object.entries(servers ?? {}));
@@ -58,7 +49,7 @@ export async function loadWorkspaceContract(params: {
       hooks.push({ ...layer, hooks: layerHooks });
     }
   }
-  // Later entries win, so a nearer layer overrides a farther one, and every layer a plugin.
+  // Later entries win, so a nearer layer overrides a farther one.
   const mcpServers = Object.fromEntries(entries);
   if (mcpServers[RESERVED_MCP_SERVER_NAME]) {
     onWarning(`MCP server name '${RESERVED_MCP_SERVER_NAME}' is reserved for Paseo; entry ignored`);
@@ -71,7 +62,7 @@ export async function loadWorkspaceContract(params: {
     ? { path: instructionsPath, text: instructionsText }
     : null;
 
-  return { layers, plugins, mcpServers, instructions, hooks };
+  return { layers, mcpServers, instructions, hooks };
 }
 
 async function resolveLayers(
@@ -96,4 +87,29 @@ async function resolveLayers(
     return userLayers;
   }
   return [...userLayers, ...projectLayers.map((dir) => ({ kind: "project" as const, dir }))];
+}
+
+async function parseOptionalFile<T>(
+  path: string,
+  parse: (text: string, options: { onWarning: (message: string) => void }) => T,
+  onWarning: (message: string) => void,
+): Promise<T | null> {
+  const text = await readOptionalFile(path, onWarning);
+  return text === null
+    ? null
+    : parse(text, { onWarning: (message) => onWarning(`${path}: ${message}`) });
+}
+
+async function readOptionalFile(
+  path: string,
+  onWarning: (message: string) => void,
+): Promise<string | null> {
+  try {
+    return await readFile(path, "utf8");
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+      onWarning(`${path}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+    return null;
+  }
 }

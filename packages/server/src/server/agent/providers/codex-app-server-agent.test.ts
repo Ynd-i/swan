@@ -1288,26 +1288,11 @@ describe("Codex app-server provider", () => {
   test("sends .agents hooks with their Codex trust in the thread config", async () => {
     const requests: Array<{ method: string; params: unknown }> = [];
     const guard = "^(Bash|shell|functions.exec_command)$";
-    const pluginDir = "/Users/me/.agents/plugins/pstack-claude/plugins/pstack";
-    const pluginStart = `export CLAUDE_PLUGIN_ROOT='${pluginDir}'; "\${CLAUDE_PLUGIN_ROOT}/hooks/session-start.sh" codex`;
     const session = createSession({
       thinkingOptionId: "medium",
       workspaceContract: {
         projectLayers: ["/repo/.agents"],
-        plugins: [{ name: "pstack", dir: pluginDir }],
         hooks: [
-          {
-            kind: "plugin",
-            dir: pluginDir,
-            hooks: {
-              SessionStart: [
-                {
-                  matcher: "startup|resume|clear|compact",
-                  hooks: [{ type: "command", command: pluginStart }],
-                },
-              ],
-            },
-          },
           {
             kind: "user",
             dir: "/home/.agents",
@@ -1381,12 +1366,6 @@ describe("Codex app-server provider", () => {
       | undefined;
     // The hashes are the ones Codex 0.159.0 reported for these hooks, see session-hooks.test.ts.
     expect(startParams?.config?.hooks).toEqual({
-      SessionStart: [
-        {
-          matcher: "startup|resume|clear|compact",
-          hooks: [{ type: "command", command: pluginStart }],
-        },
-      ],
       UserPromptSubmit: [
         {
           hooks: [
@@ -1416,9 +1395,6 @@ describe("Codex app-server provider", () => {
         { matcher: "", hooks: [{ type: "command", command: "echo second-of-two", timeout: 5 }] },
       ],
       state: {
-        "/<session-flags>/config.toml:session_start:0:0": {
-          trusted_hash: "sha256:c10ed059824f00af517e81862a829ea4198c9b9902365d990c54aacf16c20af1",
-        },
         "/<session-flags>/config.toml:user_prompt_submit:0:0": {
           trusted_hash: "sha256:0bee4aa1f31d7f80303efaa2afa1ba9c1a697605ea4cda7e914c21791d2afdc1",
         },

@@ -92,16 +92,6 @@ const MEASURED = [
     handler: { command: "echo Interrupt huge", timeout: 100000 },
     hash: "sha256:e8b048a8f3c3b9d38e62a636dd732168de0379eac2b7e300d28f53100c0814b4",
   },
-  // A plugin hook as the daemon sends it, with CLAUDE_PLUGIN_ROOT exported in the command.
-  {
-    eventName: "session_start",
-    matcher: "startup|resume|clear|compact",
-    handler: {
-      command:
-        "export CLAUDE_PLUGIN_ROOT='/Users/me/.agents/plugins/pstack-claude/plugins/pstack'; \"${CLAUDE_PLUGIN_ROOT}/hooks/session-start.sh\" codex",
-    },
-    hash: "sha256:c10ed059824f00af517e81862a829ea4198c9b9902365d990c54aacf16c20af1",
-  },
 ];
 
 describe("codexHookTrustHash", () => {
