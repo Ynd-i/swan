@@ -51,6 +51,7 @@ export const ar: TranslationResources = {
     handoffs: { toggle: "عمليات التسليم السابقة ({{count}})" },
     activity: "النشاط",
     workedFor: "المدة: {{duration}}",
+    failedCount: "فشل: {{count}}",
     thinking: "يفكر",
     startWork: "على ماذا نعمل؟",
     startInProject: "على ماذا نعمل في {{project}}؟",

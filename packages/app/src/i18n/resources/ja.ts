@@ -51,6 +51,7 @@ export const ja: TranslationResources = {
     handoffs: { toggle: "以前の引き継ぎ（{{count}}）" },
     activity: "アクティビティ",
     workedFor: "所要時間: {{duration}}",
+    failedCount: "{{count}} 件失敗",
     thinking: "考え中",
     startWork: "何をしましょうか？",
     startInProject: "{{project}} で何をしましょうか？",

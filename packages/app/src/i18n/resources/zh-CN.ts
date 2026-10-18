@@ -51,6 +51,7 @@ export const zhCN: TranslationResources = {
     handoffs: { toggle: "更早的交接（{{count}}）" },
     activity: "活动",
     workedFor: "用时 {{duration}}",
+    failedCount: "{{count}} 个失败",
     thinking: "思考中",
     startWork: "我们应该做些什么？",
     startInProject: "我们应该在{{project}}中做些什么？",

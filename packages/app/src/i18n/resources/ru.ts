@@ -51,6 +51,7 @@ export const ru: TranslationResources = {
     handoffs: { toggle: "Предыдущие передачи ({{count}})" },
     activity: "Действия",
     workedFor: "Время: {{duration}}",
+    failedCount: "Ошибок: {{count}}",
     thinking: "Размышляю",
     startWork: "Над чем поработаем?",
     startInProject: "Над чем поработаем в {{project}}?",

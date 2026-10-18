@@ -51,6 +51,7 @@ export const ptBR: TranslationResources = {
     handoffs: { toggle: "Transferências anteriores ({{count}})" },
     activity: "Atividade",
     workedFor: "Duração: {{duration}}",
+    failedCount: "{{count}} com falha",
     thinking: "Pensando",
     startWork: "Em que vamos trabalhar?",
     startInProject: "Em que vamos trabalhar em {{project}}?",

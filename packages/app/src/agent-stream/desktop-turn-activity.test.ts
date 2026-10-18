@@ -178,7 +178,7 @@ describe("desktop turn activity", () => {
     expect(projectDesktopActivityItems(nextLive, next).at(-1)).toBe(nextLive.at(-1));
   });
 
-  it("keeps plans and failed calls visible even inside an overview host", () => {
+  it("keeps plans visible and folds failed calls behind a counted header", () => {
     const read = items[3] as ToolCallItem;
     const failed: ToolCallItem = {
       ...read,
@@ -232,11 +232,16 @@ describe("desktop turn activity", () => {
       "user",
       "intro:0",
       "plan",
-      "overview",
       "error",
       "answer:0",
       "answer:1",
     ]);
+    expect(projection.byHostId.get("intro:0")?.state).toMatchObject({
+      kind: "complete",
+      failedCount: 1,
+    });
+    const unfolded = createDesktopTurnActivityProjection()(inputFor(items));
+    expect(unfolded.byHostId.get("intro:0")?.state).toMatchObject({ failedCount: 0 });
   });
 
   it("does not hide a completed response that has no text after its last activity", () => {
