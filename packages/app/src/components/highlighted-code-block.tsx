@@ -20,6 +20,7 @@ import { useRunInTerminal } from "@/panels/pane-context";
 import { syntaxTokenStyleFor } from "@/styles/syntax-token-styles";
 import { CODE_SURFACE_DATASET } from "@/styles/code-surface";
 import { highlightToKeyedLines, type KeyedLine } from "@/utils/highlight-cache";
+import { resolveRunnableShellCommand } from "@/utils/shell-command-block";
 import {
   markdownCopyCodeBlockDataSet,
   markdownCopyDataSet,
@@ -58,8 +59,6 @@ function fenceLanguageToExtension(info: string | null | undefined): string | nul
   const normalized = first.replace(/^\./, "");
   return LANGUAGE_ALIASES[normalized] ?? normalized;
 }
-
-const SHELL_LANGUAGES = new Set(["sh", "bash", "zsh", "fish", "shell", "shellscript"]);
 
 function stripTerminalFenceNewline(code: string): string {
   return code.endsWith("\n") ? code.slice(0, -1) : code;
@@ -104,12 +103,13 @@ export const HighlightedCodeBlock = React.memo(function HighlightedCodeBlock({
   // fence; pasting any of them into a terminal runs the last line.
   const getCode = useCallback(() => code.replace(TRAILING_CODE_LINE_BREAKS, ""), [code]);
   const runInTerminal = useRunInTerminal();
+  const shellCommand = useMemo(
+    () => resolveRunnableShellCommand(fenceLanguageToExtension(language), getCode()),
+    [getCode, language],
+  );
   const handleRun = useMemo(
-    () =>
-      runInTerminal && SHELL_LANGUAGES.has(fenceLanguageToExtension(language) ?? "")
-        ? () => runInTerminal(getCode())
-        : null,
-    [getCode, language, runInTerminal],
+    () => (runInTerminal && shellCommand ? () => runInTerminal(shellCommand) : null),
+    [runInTerminal, shellCommand],
   );
 
   const codeText = (
@@ -131,7 +131,9 @@ export const HighlightedCodeBlock = React.memo(function HighlightedCodeBlock({
         <>
           <View style={macStyles.header} dataSet={markdownCopyDataSet.ignore}>
             <Code size={16} color={macStyles.headerText.color} />
-            <Text style={macStyles.headerText}>{language || t("message.actions.plainText")}</Text>
+            <Text style={macStyles.headerText}>
+              {language || (shellCommand ? "shell" : t("message.actions.plainText"))}
+            </Text>
             <View style={macStyles.actions}>
               <Pressable
                 accessibilityRole="button"
