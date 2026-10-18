@@ -114,6 +114,7 @@ import {
   resolveRunnerTerminalId,
   setRunnerTerminalId,
   toTerminalCommandInput,
+  whenShellReady,
 } from "@/screens/workspace/terminals/command-runner";
 import { removeResidentBrowserWebview } from "@/desktop/browser/resident-webviews";
 import { BROWSER_NEW_TAB_URL } from "@/desktop/browser/new-tab-url";
@@ -1718,7 +1719,8 @@ function WorkspaceScreenContent({
     toast,
   });
   const runnerKey = `${normalizedServerId}:${normalizedWorkspaceId}`;
-  const pendingRunnerCommandsRef = useRef<string[] | null>(null);
+  // Commands clicked while the runner shell is being created or is still starting up.
+  const pendingRunnerRef = useRef<{ commands: string[]; terminalId: string | null } | null>(null);
   const sendRunnerCommands = useStableEvent((terminalId: string, commands: string[]) => {
     for (const command of commands) {
       client?.sendTerminalInput(terminalId, {
@@ -1730,14 +1732,38 @@ function WorkspaceScreenContent({
   const handleRunnerOrTerminalCreated = useStableEvent(
     (input: { terminalId: string; destination: TerminalTabDestination }) => {
       handleTerminalCreated(input);
-      const commands = pendingRunnerCommandsRef.current;
-      if (commands) {
-        pendingRunnerCommandsRef.current = null;
-        setRunnerTerminalId(runnerKey, input.terminalId);
-        sendRunnerCommands(input.terminalId, commands);
+      const pending = pendingRunnerRef.current;
+      if (!pending || pending.terminalId) {
+        return;
+      }
+      pending.terminalId = input.terminalId;
+      setRunnerTerminalId(runnerKey, input.terminalId);
+      const sendPending = () => {
+        pendingRunnerRef.current = null;
+        sendRunnerCommands(input.terminalId, pending.commands);
+      };
+      if (client) {
+        whenShellReady(client, input.terminalId, sendPending);
+      } else {
+        sendPending();
       }
     },
   );
+  // Only one terminal create runs at a time, so a create that never produces a terminal
+  // is the runner's. Drop its commands, or every later Run click would queue behind it.
+  const dropUncreatedRunner = () => {
+    if (pendingRunnerRef.current?.terminalId === null) {
+      pendingRunnerRef.current = null;
+    }
+  };
+  const handleRunnerOrWorkspacePathUnavailable = useStableEvent(() => {
+    dropUncreatedRunner();
+    handleWorkspacePathUnavailable();
+  });
+  const handleRunnerOrTerminalCreateFailed = useStableEvent((reason: string) => {
+    dropUncreatedRunner();
+    handleTerminalCreateFailed(reason);
+  });
   const queryClient = useQueryClient();
   const {
     createMutation: createTerminalMutation,
@@ -1765,9 +1791,9 @@ function WorkspaceScreenContent({
     isMissingWorkspaceDirectory,
     onTerminalCreated: handleRunnerOrTerminalCreated,
     onScriptTerminalSelected: handleScriptTerminalSelected,
-    onWorkspacePathUnavailable: handleWorkspacePathUnavailable,
+    onWorkspacePathUnavailable: handleRunnerOrWorkspacePathUnavailable,
     onTerminalCreateQueued: handleTerminalCreateQueued,
-    onTerminalCreateFailed: handleTerminalCreateFailed,
+    onTerminalCreateFailed: handleRunnerOrTerminalCreateFailed,
   });
   const { archiveAgent } = useArchiveAgent();
 
@@ -2449,17 +2475,17 @@ function WorkspaceScreenContent({
   });
 
   const handleRunInTerminal = useStableEvent((command: string) => {
+    if (pendingRunnerRef.current) {
+      pendingRunnerRef.current.commands.push(command);
+      return;
+    }
     const runnerId = resolveRunnerTerminalId(runnerKey, liveTerminalIds);
     if (runnerId) {
       handleScriptTerminalSelected(runnerId);
       sendRunnerCommands(runnerId, [command]);
       return;
     }
-    if (pendingRunnerCommandsRef.current) {
-      pendingRunnerCommandsRef.current.push(command);
-      return;
-    }
-    pendingRunnerCommandsRef.current = [command];
+    pendingRunnerRef.current = { commands: [command], terminalId: null };
     createTerminal({ destination: { kind: "open" }, name: RUNNER_TERMINAL_NAME });
   });
 

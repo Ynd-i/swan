@@ -13,7 +13,6 @@ export const SUPPORTING_LAUNCH_ORDER = [
   "terminal",
   "diff",
   "files",
-  "agent",
   "browser",
   "pullRequest",
 ] as const;
