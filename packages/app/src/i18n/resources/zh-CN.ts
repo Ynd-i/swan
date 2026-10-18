@@ -2408,6 +2408,44 @@ export const zhCN: TranslationResources = {
           auto: "系统",
         },
       },
+      colors: {
+        title: "{{theme}} 配色",
+        info: "自定义应用各主要区域的颜色。留空则使用主题自带的颜色。",
+        reset: "重置",
+        resetLabel: "重置 {{theme}} 配色",
+        pickerAccessibility: "选择{{role}}颜色",
+        fieldAccessibility: "{{role}}十六进制颜色",
+        roles: {
+          main: {
+            title: "主界面",
+            hint: "对话与工作区背景",
+          },
+          sidebar: {
+            title: "侧边栏",
+            hint: "侧边栏背景",
+          },
+          selection: {
+            title: "选中行",
+            hint: "侧边栏选中行的高亮",
+          },
+          accent: {
+            title: "强调色",
+            hint: "按钮、开关及其他高亮",
+          },
+          text: {
+            title: "文字",
+            hint: "主要文字",
+          },
+          mutedText: {
+            title: "次要文字",
+            hint: "标签与说明",
+          },
+          border: {
+            title: "边框",
+            hint: "分隔线与轮廓",
+          },
+        },
+      },
       detailLevel: {
         title: "详细程度",
       },

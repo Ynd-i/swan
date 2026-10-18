@@ -2452,6 +2452,44 @@ export const ja: TranslationResources = {
           auto: "システム",
         },
       },
+      colors: {
+        title: "{{theme}} のカラー",
+        info: "アプリの主要な部分の色を選びます。空欄にするとテーマの色を使います。",
+        reset: "リセット",
+        resetLabel: "{{theme}} のカラーをリセット",
+        pickerAccessibility: "{{role}}の色を選択",
+        fieldAccessibility: "{{role}}の16進カラー",
+        roles: {
+          main: {
+            title: "メイン画面",
+            hint: "会話とワークスペースの背景",
+          },
+          sidebar: {
+            title: "サイドバー",
+            hint: "サイドバーの背景",
+          },
+          selection: {
+            title: "選択中の行",
+            hint: "サイドバーで選択中の行のハイライト",
+          },
+          accent: {
+            title: "アクセント",
+            hint: "ボタン、トグルなどの強調表示",
+          },
+          text: {
+            title: "テキスト",
+            hint: "主要なテキスト",
+          },
+          mutedText: {
+            title: "補助テキスト",
+            hint: "ラベルと説明",
+          },
+          border: {
+            title: "境界線",
+            hint: "区切り線と枠線",
+          },
+        },
+      },
       detailLevel: {
         title: "詳細レベル",
       },

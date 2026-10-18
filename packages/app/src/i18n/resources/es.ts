@@ -2484,6 +2484,44 @@ export const es: TranslationResources = {
           auto: "Sistema",
         },
       },
+      colors: {
+        title: "Colores de {{theme}}",
+        info: "Elige los colores de las partes principales de la app. Deja un campo vacío para usar el color del tema.",
+        reset: "Restablecer",
+        resetLabel: "Restablecer los colores de {{theme}}",
+        pickerAccessibility: "Elegir el color de {{role}}",
+        fieldAccessibility: "Color hexadecimal de {{role}}",
+        roles: {
+          main: {
+            title: "Pantalla principal",
+            hint: "Fondo de la conversación y del espacio de trabajo",
+          },
+          sidebar: {
+            title: "Barra lateral",
+            hint: "Fondo de la barra lateral",
+          },
+          selection: {
+            title: "Fila seleccionada",
+            hint: "Resaltado de la fila seleccionada en la barra lateral",
+          },
+          accent: {
+            title: "Acento",
+            hint: "Botones, interruptores y otros resaltados",
+          },
+          text: {
+            title: "Texto",
+            hint: "Texto principal",
+          },
+          mutedText: {
+            title: "Texto secundario",
+            hint: "Etiquetas y descripciones",
+          },
+          border: {
+            title: "Bordes",
+            hint: "Separadores y contornos",
+          },
+        },
+      },
       detailLevel: {
         title: "Nivel de detalle",
       },

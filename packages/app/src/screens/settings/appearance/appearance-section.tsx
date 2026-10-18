@@ -63,6 +63,7 @@ import { settingsStyles } from "@/styles/settings";
 import { REGISTERED_THEMES } from "@/styles/registered-themes";
 import { useToast } from "@/contexts/toast-context";
 import { AppearancePreview } from "./appearance-preview";
+import { ThemeColorsSection } from "./theme-colors-section";
 
 // ---------------------------------------------------------------------------
 // Theme-reactive leaf icons (withUnistyles + uniProps color mapping — no
@@ -1152,6 +1153,7 @@ export function AppearanceSection() {
           {showThemeModes ? interfaceFont : null}
         </View>
       </SettingsSection>
+      {selectedPluginTheme ? null : <ThemeColorsSection />}
       {showThemeModes ? (
         <AppearanceAdvanced resetting={resetting} onReset={resetAdvanced}>
           <View style={settingsStyles.section}>
