@@ -1761,14 +1761,6 @@ export const ko: TranslationResources = {
     dialogTitle: "이미지 첨부",
     dialogFilterName: "이미지",
   },
-  workspaceContract: {
-    trustNotice: {
-      title: "이 프로젝트에 .agents 구성이 있습니다",
-      body: "이 프로젝트를 신뢰하지 않아 Swan가 MCP 서버, 스킬, 훅을 적용하지 않습니다.",
-      trust: "프로젝트 신뢰",
-      notNow: "지금은 아님",
-    },
-  },
   workspaceSetup: {
     title: "워크스페이스 생성",
     errors: {

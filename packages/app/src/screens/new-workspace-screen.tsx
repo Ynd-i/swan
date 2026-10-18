@@ -126,7 +126,6 @@ import type { AgentAttachment, ForgeSearchItem } from "@getpaseo/protocol/messag
 import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
 import type { AgentProvider } from "@getpaseo/protocol/agent-types";
 import type { WorkspaceDraftTabSetup, WorkspaceTabTarget } from "@/workspace-tabs/model";
-import { WorkspaceContractTrustNotice } from "@/workspace-contract/trust-notice";
 import { isEmptyWorkspaceSubmission, runCreateEmptyWorkspace } from "./new-workspace-empty";
 import {
   getWorkspaceNamingAttachments,
@@ -2862,7 +2861,6 @@ export function NewWorkspaceScreen({
         isCompact={isCompact}
         project={selectedProject}
         serverId={selectedServerId}
-        cwd={selectedSourceDirectory}
         title={t("newWorkspace.title")}
         formStack={formStack}
         errorMessage={errorMessage}
@@ -2880,7 +2878,6 @@ function NewWorkspaceLayout({
   isCompact,
   project,
   serverId,
-  cwd,
   title,
   formStack,
   errorMessage,
@@ -2891,7 +2888,6 @@ function NewWorkspaceLayout({
   isCompact: boolean;
   project: Pick<HostProjectListItem, "projectName"> | null;
   serverId: string | null;
-  cwd: string | null;
   title: string;
   formStack: ReactNode;
   errorMessage: string | null;
@@ -2904,7 +2900,6 @@ function NewWorkspaceLayout({
   const desktopChat = getIsElectronMac() && !isCompact;
   const projectName = project?.projectName;
   const importSessionButton = <ImportSessionButton compact={isCompact} onPress={onImportSession} />;
-  const trustNotice = <WorkspaceContractTrustNotice serverId={serverId} cwd={cwd} />;
   const composer = (
     <>
       {children}
@@ -2930,7 +2925,6 @@ function NewWorkspaceLayout({
                 : t("desktopChat.startWork")}
             </Text>
           </View>
-          {trustNotice}
           <View style={styles.desktopSetupRail}>
             <View style={styles.desktopSetup}>{formStack}</View>
           </View>
@@ -2944,7 +2938,6 @@ function NewWorkspaceLayout({
     const setupFields = (
       <>
         {isCompact ? <View style={styles.compactTopActions}>{importSessionButton}</View> : null}
-        {trustNotice}
         <View style={styles.composerTitleContainer} pointerEvents="none">
           <Text style={styles.composerTitle}>{title}</Text>
         </View>

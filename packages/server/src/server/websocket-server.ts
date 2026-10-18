@@ -1913,8 +1913,6 @@ export class VoiceAssistantWebSocketServer {
         projectCreateDirectoryParents: true,
         // COMPAT(agentContextUsage): added in Paseo Custom v0.11.0-beta.3-v1-beta6, remove gate after 2027-04-04.
         agentContextUsage: true,
-        // COMPAT(workspaceContractTrust): added in Paseo Custom v0.11.2-v1-beta1, remove gate after 2027-04-10.
-        workspaceContractTrust: true,
         // COMPAT(commitsList): added in v0.1.110, remove gate after 2027-01-16.
         commitsList: true,
         // COMPAT(commitBaseClassification): added in v0.2.0, remove gate after 2027-01-23.

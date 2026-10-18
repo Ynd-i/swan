@@ -204,7 +204,6 @@ export const MutableDaemonConfigSchema = z
     appendSystemPrompt: z.string().default(""),
     terminalProfiles: z.array(TerminalProfileSchema).optional(),
     agentProfiles: z.array(AgentProfileSchema).optional(),
-    workspaceContract: z.object({ trustedRoots: z.array(z.string()) }).optional(),
     skills: z.object({ selection: AgentSkillSelectionSchema.optional() }).strict().optional(),
     pluginsEnabled: z.boolean().optional(),
     plugins: z.record(PluginIdSchema, PluginSourceSchema).optional(),
@@ -2722,19 +2721,6 @@ export const WorkspaceMarkUnreadRequestSchema = z.object({
   requestId: z.string(),
 });
 
-// Both gated by features.workspaceContractTrust.
-export const WorkspaceContractInspectRequestSchema = z.object({
-  type: z.literal("workspace.contract.inspect.request"),
-  cwd: z.string(),
-  requestId: z.string(),
-});
-
-export const WorkspaceContractTrustRequestSchema = z.object({
-  type: z.literal("workspace.contract.trust.request"),
-  cwd: z.string(),
-  requestId: z.string(),
-});
-
 // Highlighted diff token schema
 // Note: style can be a compound class name (e.g., "heading meta") from the syntax highlighter
 const HighlightTokenSchema = z.object({
@@ -3393,8 +3379,6 @@ export const SessionInboundMessageSchema = z.discriminatedUnion("type", [
   CreationSubscribeRequestSchema,
   WorkspaceClearAttentionRequestSchema,
   WorkspaceMarkUnreadRequestSchema,
-  WorkspaceContractInspectRequestSchema,
-  WorkspaceContractTrustRequestSchema,
   FileExplorerRequestSchema,
   FileSubscribeRequestSchema,
   FileUnsubscribeRequestSchema,
@@ -3751,8 +3735,6 @@ export const ServerInfoStatusPayloadSchema = z
         projectCreateDirectoryParents: z.boolean().optional(),
         // COMPAT(agentContextUsage): added in Paseo Custom v0.11.0-beta.3-v1-beta6, remove gate after 2027-04-04.
         agentContextUsage: z.boolean().optional(),
-        // COMPAT(workspaceContractTrust): added in Paseo Custom v0.11.2-v1-beta1, remove gate after 2027-04-10.
-        workspaceContractTrust: z.boolean().optional(),
         // COMPAT(projectList): added in v0.2.4, drop the gate when floor >= v0.2.4.
         projectList: z.boolean().optional(),
         // COMPAT(commitsList): added in v0.1.110, remove gate after 2027-01-16.
@@ -5015,28 +4997,6 @@ export const WorkspaceMarkUnreadResponseSchema = z.object({
     markedAgentId: z.string().nullable(),
     success: z.boolean(),
     error: z.string().nullable(),
-  }),
-});
-
-export const WorkspaceContractInspectResponseSchema = z.object({
-  type: z.literal("workspace.contract.inspect.response"),
-  payload: z.object({
-    requestId: z.string(),
-    // The directory holding .git, or the cwd itself outside a repo.
-    repoRoot: z.string(),
-    trusted: z.boolean(),
-    // Existing project .agents directories, repo root first.
-    projectLayers: z.array(z.string()),
-  }),
-});
-
-export const WorkspaceContractTrustResponseSchema = z.object({
-  type: z.literal("workspace.contract.trust.response"),
-  payload: z.object({
-    requestId: z.string(),
-    repoRoot: z.string(),
-    // Entries as written in config.json, so they may start with ~/.
-    trustedRoots: z.array(z.string()),
   }),
 });
 
@@ -7050,8 +7010,6 @@ export const SessionOutboundMessageSchema = z.discriminatedUnion("type", [
   CreationSubscribeResponseSchema,
   WorkspaceClearAttentionResponseSchema,
   WorkspaceMarkUnreadResponseSchema,
-  WorkspaceContractInspectResponseSchema,
-  WorkspaceContractTrustResponseSchema,
   SendAgentMessageResponseMessageSchema,
   SetVoiceModeResponseMessageSchema,
   DaemonGetStatusResponseSchema,

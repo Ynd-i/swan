@@ -76,11 +76,7 @@ import {
   type WorkspaceScriptsService,
 } from "./session/workspace-scripts/workspace-scripts-service.js";
 import type { DaemonConfigStore } from "./daemon-config-store.js";
-import {
-  editPersistedConfig,
-  loadPersistedConfig,
-  readPersistedConfig,
-} from "./persisted-config.js";
+import { loadPersistedConfig } from "./persisted-config.js";
 import { releaseWorkspaceServicePortPlan } from "./workspace-service-port-registry.js";
 import { getErrorMessage, getErrorMessageOr } from "@getpaseo/protocol/error-utils";
 import { getAgentStatusPriority } from "@getpaseo/protocol/agent-state-bucket";
@@ -132,11 +128,6 @@ import { assertPluginTimelineDataSize } from "./agent/agent-timeline-content.js"
 import { parsePluginClientId } from "./plugins/plugin-session-identity.js";
 import { buildAgentForkContextAttachment } from "./agent/activity-curator.js";
 import { buildAgentPrompt } from "./agent/prompt-attachments.js";
-import {
-  TRUSTED_ROOTS_CONFIG_KEY,
-  inspectWorkspaceContract,
-  isTrustedRepoRoot,
-} from "./agent/workspace-contract/inspect-workspace-contract.js";
 import type { StructuredGenerationDaemonConfig } from "./agent/structured-generation-providers.js";
 import {
   getAgentStreamEventTurnId,
@@ -3007,10 +2998,6 @@ export class Session {
         return this.handleWorkspaceClearAttentionRequest(msg);
       case "workspace.mark_unread.request":
         return this.handleWorkspaceMarkUnreadRequest(msg);
-      case "workspace.contract.inspect.request":
-        return this.handleWorkspaceContractInspectRequest(msg);
-      case "workspace.contract.trust.request":
-        return this.handleWorkspaceContractTrustRequest(msg);
       default:
         return undefined;
     }
@@ -7630,56 +7617,6 @@ export class Session {
         },
       });
     }
-  }
-
-  private async handleWorkspaceContractInspectRequest(
-    msg: Extract<SessionInboundMessage, { type: "workspace.contract.inspect.request" }>,
-  ): Promise<void> {
-    const inspection = await inspectWorkspaceContract({
-      home: homedir(),
-      cwd: expandTilde(msg.cwd),
-      trustedRoots: this.workspaceContractTrustedRoots(),
-    });
-    this.emit({
-      type: "workspace.contract.inspect.response",
-      payload: { requestId: msg.requestId, ...inspection },
-    });
-  }
-
-  private async handleWorkspaceContractTrustRequest(
-    msg: Extract<SessionInboundMessage, { type: "workspace.contract.trust.request" }>,
-  ): Promise<void> {
-    const home = homedir();
-    const { repoRoot, trusted } = await inspectWorkspaceContract({
-      home,
-      cwd: expandTilde(msg.cwd),
-      trustedRoots: this.workspaceContractTrustedRoots(),
-    });
-    if (!trusted) {
-      // Read, check and write the file without an await in between, so concurrent requests
-      // neither drop nor repeat an entry.
-      const trustedRoots =
-        readPersistedConfig(this.paseoHome).daemon?.workspaceContract?.trustedRoots ?? [];
-      if (!isTrustedRepoRoot({ repoRoot, home, trustedRoots })) {
-        editPersistedConfig(this.paseoHome, TRUSTED_ROOTS_CONFIG_KEY, {
-          value: [...trustedRoots, repoRoot],
-        });
-        this.sessionLogger.info({ repoRoot }, "Trusted repo root for project .agents layers");
-      }
-      this.daemonConfigStore.reload();
-    }
-    this.emit({
-      type: "workspace.contract.trust.response",
-      payload: {
-        requestId: msg.requestId,
-        repoRoot,
-        trustedRoots: this.workspaceContractTrustedRoots(),
-      },
-    });
-  }
-
-  private workspaceContractTrustedRoots(): string[] {
-    return this.daemonConfigStore.get().workspaceContract?.trustedRoots ?? [];
   }
 
   private async handleFetchAgent(agentIdOrIdentifier: string, requestId: string): Promise<void> {

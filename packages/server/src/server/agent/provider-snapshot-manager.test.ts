@@ -367,30 +367,6 @@ describe("ProviderSnapshotManager public surface", () => {
     }
   });
 
-  test("agent manager state carries a profile's env merged over its base provider's", () => {
-    const manager = new ProviderSnapshotManager({
-      logger: createTestLogger(),
-      providerOverrides: {
-        claude: { env: { SHARED: "base", BASE_ONLY: "base" } },
-        "claude-work": {
-          extends: "claude",
-          label: "Work",
-          env: { SHARED: "work", CLAUDE_CONFIG_DIR: "/w" },
-        },
-      },
-    });
-    try {
-      const { providerDefinitions } = manager.getAgentManagerProviderState();
-      expect(providerDefinitions["claude-work"]?.env).toEqual({
-        SHARED: "work",
-        BASE_ONLY: "base",
-        CLAUDE_CONFIG_DIR: "/w",
-      });
-    } finally {
-      manager.destroy();
-    }
-  });
-
   test("getSnapshot returns loading entries for built-in providers before warmup", () => {
     const manager = new ProviderSnapshotManager({ logger: createTestLogger() });
     try {

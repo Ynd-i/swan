@@ -1796,14 +1796,6 @@ export const es: TranslationResources = {
     dialogTitle: "Adjuntar imágenes",
     dialogFilterName: "Imágenes",
   },
-  workspaceContract: {
-    trustNotice: {
-      title: "Este proyecto tiene configuración .agents",
-      body: "Swan no aplica sus servidores MCP, habilidades y hooks porque el proyecto no es de confianza.",
-      trust: "Confiar en el proyecto",
-      notNow: "Ahora no",
-    },
-  },
   workspaceSetup: {
     title: "Crear espacio de trabajo",
     errors: {
