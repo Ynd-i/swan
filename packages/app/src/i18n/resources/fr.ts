@@ -64,6 +64,7 @@ export const fr: TranslationResources = {
     handoffs: { toggle: "Passations précédentes ({{count}})" },
     activity: "Activité",
     workedFor: "Durée : {{duration}}",
+    failedCount: "{{count}} en échec",
     thinking: "Réflexion",
     startWork: "Sur quoi allons-nous travailler ?",
     startInProject: "Sur quoi allons-nous travailler dans {{project}} ?",

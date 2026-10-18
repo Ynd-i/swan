@@ -64,6 +64,7 @@ export const ko: TranslationResources = {
     handoffs: { toggle: "이전 인계 ({{count}})" },
     activity: "활동",
     workedFor: "소요 시간: {{duration}}",
+    failedCount: "{{count}}개 실패",
     thinking: "생각 중",
     startWork: "어떤 작업을 할까요?",
     startInProject: "{{project}}에서 어떤 작업을 할까요?",

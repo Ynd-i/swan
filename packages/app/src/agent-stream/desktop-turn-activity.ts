@@ -1,13 +1,13 @@
-import type { StreamItem } from "@/types/stream";
+import type { StreamItem, ToolCallItem } from "@/types/stream";
 import type { TurnTiming } from "@/timeline/turn-time";
 import type { ToolCallDetailProjection } from "@/tool-calls/detail-level/projection";
 import { describeToolCall, isGroupableToolCall } from "@/tool-calls/detail-level/grouping";
 import { getStreamItemMessageId } from "./presentation";
 import { startsNewTurn } from "./turn-membership";
 
-/** A finished turn folds behind its duration; a running turn shows its latest step. */
+/** A finished turn folds behind its duration and failure count; a running turn shows its latest step. */
 export type DesktopTurnActivityState =
-  | { kind: "complete"; timing: TurnTiming }
+  | { kind: "complete"; timing: TurnTiming; failedCount: number }
   | { kind: "working"; latestStep: StreamItem };
 
 export interface DesktopTurnActivity {
@@ -45,7 +45,18 @@ function isStep(item: StreamItem): boolean {
   return item.kind === "thought" || isGroupableToolCall(item);
 }
 
-// While working, replies in progress stay readable and unfinished steps fold.
+// An overview host can contain a failed call even when its latest call succeeded.
+function callsOf(item: ToolCallItem, groups: ProjectionInput["toolGroups"]) {
+  return groups.get(item.id)?.run.calls ?? [item];
+}
+
+function isFailed(call: ToolCallItem): boolean {
+  const detail = describeToolCall(call);
+  return Boolean(detail.error) || detail.status === "failed";
+}
+
+// While working, replies in progress stay readable, unfinished steps fold and failures stay out.
+// A finished turn folds its failures too; the header counts them.
 function canCollapse(
   item: StreamItem,
   groups: ProjectionInput["toolGroups"],
@@ -54,11 +65,9 @@ function canCollapse(
   if (item.kind === "assistant_message") return !working;
   if (item.kind === "thought") return working || item.status === "ready";
   if (!isGroupableToolCall(item)) return false;
-  // An overview host can contain a failed call even when its latest call succeeded.
-  const calls = groups.get(item.id)?.run.calls ?? [item];
-  return calls.every((call) => {
+  return callsOf(item, groups).every((call) => {
+    if (isFailed(call)) return !working;
     const detail = describeToolCall(call);
-    if (detail.error) return false;
     if (detail.status === "completed") return true;
     return working && (detail.status === "running" || detail.status === "executing");
   });
@@ -76,7 +85,8 @@ function sameState(left: DesktopTurnActivityState, right: DesktopTurnActivitySta
   if (left.kind === "complete" && right.kind === "complete") {
     return (
       left.timing.completedAt.getTime() === right.timing.completedAt.getTime() &&
-      left.timing.durationMs === right.timing.durationMs
+      left.timing.durationMs === right.timing.durationMs &&
+      left.failedCount === right.failedCount
     );
   }
   if (left.kind === "working" && right.kind === "working") {
@@ -98,7 +108,10 @@ function collectComplete(turn: StreamItem[], input: ProjectionInput) {
   const collapsible = hasReply
     ? turn.slice(0, boundary + 1).filter((item) => canCollapse(item, input.toolGroups, false))
     : [];
-  return { state: { kind: "complete", timing } as const, collapsible };
+  const failedCount = collapsible
+    .flatMap((item) => (item.kind === "tool_call" ? callsOf(item, input.toolGroups) : []))
+    .filter(isFailed).length;
+  return { state: { kind: "complete", timing, failedCount } as const, collapsible };
 }
 
 function collectWorking(turn: StreamItem[], input: ProjectionInput) {

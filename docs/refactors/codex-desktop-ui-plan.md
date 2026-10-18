@@ -916,8 +916,11 @@ Wide macOS conversations show elapsed headers for actual tool/thought activity
 and initially fold completed activity preceding the reply. Plain text replies
 have no activity header. The protocol has no universal commentary/final
 channel, so the display boundary is the last tool/reasoning item: all subsequent
-assistant blocks remain visible. Notifications, plans, plugin content and failed
-or unfinished tool rows/overview groups remain outside the fold. A response with
+assistant blocks remain visible. Notifications, plans, plugin content and
+unfinished tool rows/overview groups remain outside the fold. Failed calls fold
+with the rest and the header counts them in `statusDanger`, so a turn with
+denied commands does not leave a stack of error rows above the reply; an active
+turn keeps failures visible. A response with
 no assistant text after its activity stays fully visible. Active turns, compact
 layouts and other platforms retain their existing activity presentation.
 

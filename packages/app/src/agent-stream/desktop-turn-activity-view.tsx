@@ -149,6 +149,7 @@ export function DesktopTurnActivityHeader({
   ) : (
     <CompletedHeader
       timing={activity.state.timing}
+      failedCount={activity.state.failedCount}
       expanded={activity.expanded}
       onToggle={canExpand ? toggle : undefined}
     />
@@ -202,10 +203,12 @@ function WorkingHeader({
 
 function CompletedHeader({
   timing,
+  failedCount,
   expanded,
   onToggle,
 }: {
   timing: TurnTiming;
+  failedCount: number;
   expanded: boolean;
   onToggle?: () => void;
 }) {
@@ -215,19 +218,28 @@ function CompletedHeader({
     duration !== null && Number.isFinite(duration)
       ? t("desktopChat.workedFor", { duration: formatDuration(duration) })
       : t("desktopChat.activity");
+  const failed = failedCount > 0 ? t("desktopChat.failedCount", { count: failedCount }) : null;
   const timestamp = formatMessageTimestamp(timing.completedAt);
   return (
     <Tooltip enabledOnDesktop enabledOnMobile={false}>
       <TooltipTrigger
         onPress={onToggle}
         accessibilityRole={onToggle ? "button" : undefined}
-        accessibilityLabel={`${label} · ${timestamp}`}
+        accessibilityLabel={[label, failed, timestamp].filter(Boolean).join(" · ")}
         aria-expanded={onToggle ? expanded : undefined}
         style={styles.header}
         dataSet={ignoredMetadata}
         testID="desktop-turn-activity"
       >
-        <Text style={styles.label}>{label}</Text>
+        <Text style={styles.label}>
+          {label}
+          {failed ? (
+            <>
+              {" · "}
+              <Text style={styles.failed}>{failed}</Text>
+            </>
+          ) : null}
+        </Text>
         {onToggle ? (
           <Disclosure
             size={14}
@@ -259,6 +271,7 @@ const styles = StyleSheet.create((theme) => ({
     fontSize: STREAM_METADATA_FONT_SIZE,
     lineHeight: 20,
   },
+  failed: { color: theme.colors.statusDanger },
   workingHeader: {
     flexDirection: "row",
     alignItems: "center",

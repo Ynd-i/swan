@@ -61,6 +61,7 @@ export const en = {
     handoffs: { toggle: "Earlier handoffs ({{count}})" },
     activity: "Activity",
     workedFor: "Worked for {{duration}}",
+    failedCount: "{{count}} failed",
     thinking: "Thinking",
     startWork: "What should we work on?",
     startInProject: "What should we work on in {{project}}?",
