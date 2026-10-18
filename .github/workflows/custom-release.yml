@@ -44,6 +44,7 @@ jobs:
       backend: ${{ steps.plan.outputs.backend }}
       prerelease: ${{ steps.plan.outputs.prerelease }}
       version: ${{ steps.plan.outputs.version }}
+      title: ${{ steps.plan.outputs.title }}
       sha: ${{ steps.commit.outputs.sha }}
     steps:
       - uses: actions/checkout@v4
@@ -183,6 +184,7 @@ jobs:
       TAG: ${{ needs.plan.outputs.tag }}
       SHA: ${{ needs.plan.outputs.sha }}
       BACKEND: ${{ needs.plan.outputs.backend }}
+      TITLE: ${{ needs.plan.outputs.title }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -206,7 +208,7 @@ jobs:
           flags=()
           if [ "${{ needs.plan.outputs.prerelease }}" = "true" ]; then flags+=(--prerelease); fi
           gh release create "$TAG" "$base.dmg" "$base.dmg.sha256" "$base.zip" "$base.zip.sha256" \
-            --target "$SHA" --title "Swan $TAG" --notes-file notes.md "${flags[@]}"
+            --target "$SHA" --title "$TITLE" --notes-file notes.md "${flags[@]}"
       # The in-app updater reads beta-mac.yml on the beta channel and latest-mac.yml on stable.
       - name: Point the update feed at the release
         run: |

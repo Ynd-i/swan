@@ -17,7 +17,7 @@
 //                                                                 supersedes, one per line
 //
 // Prints key=value lines for $GITHUB_OUTPUT: merge, backend, tag, from, reason, prerelease,
-// version (the semver the in-app updater compares).
+// version (the semver the in-app updater compares), title (the GitHub release title).
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { isMainModule } from "./is-main-module.mjs";
@@ -98,6 +98,12 @@ export function updateVersion(tag) {
   const base = backend.slice(1);
   const separator = base.includes("-") ? "." : "-";
   return `${base}${separator}custom.${release}.${beta ? `beta.${beta}` : "stable"}`;
+}
+
+/** The GitHub release title: our release number only, since the tag names the backend. */
+export function releaseTitle(tag) {
+  const { release, beta } = releasePattern.exec(tag).groups;
+  return beta ? `Swan v${release} beta ${beta}` : `Swan v${release}`;
 }
 
 export function planRelease({
@@ -201,7 +207,8 @@ function main([mode, flag, ...rest]) {
   });
   const prerelease = String(/-beta\d+$/.test(plan.tag));
   const version = plan.tag ? updateVersion(plan.tag) : "";
-  for (const [key, value] of Object.entries({ ...plan, prerelease, version })) {
+  const title = plan.tag ? releaseTitle(plan.tag) : "";
+  for (const [key, value] of Object.entries({ ...plan, prerelease, version, title })) {
     console.log(`${key}=${value}`);
   }
 }
