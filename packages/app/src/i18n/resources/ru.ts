@@ -2058,6 +2058,11 @@ export const ru: TranslationResources = {
   menu: {
     backdrop: "Фон меню",
   },
+  backgroundTasks: {
+    title: "Фоновые задачи",
+    pillLabelOne: "1 фоновая задача",
+    pillLabelMany: "Фоновых задач: {{count}}",
+  },
   subagents: {
     title: "Субагенты",
     pillLabelOne: "1 субагент",

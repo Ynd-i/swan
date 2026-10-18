@@ -43,6 +43,7 @@ import {
   resolveClaudeDisabledThinkingForModel,
 } from "./model-manifest.js";
 import { parsePartialJsonObject } from "./partial-json.js";
+import { readClaudeBackgroundTasks } from "./background-tasks.js";
 import { ClaudeSidechainTracker } from "./sidechain-tracker.js";
 import { readClaudeSubagentHandback } from "./subagent-handback.js";
 import { ClaudeTaskState } from "./task-state.js";
@@ -3955,11 +3956,14 @@ class ClaudeAgentSession implements AgentSession {
   }
 
   private failRunningRuntimeTasks(): void {
-    this.dispatchEvents(
-      foldSubagentObservations(this.taskProtocolSource.failRunningTasks()).map(
+    this.dispatchEvents([
+      ...foldSubagentObservations(this.taskProtocolSource.failRunningTasks()).map(
         (event): AgentStreamEvent => ({ type: "provider_subagent", provider: "claude", event }),
       ),
-    );
+      // Background work dies with the process, and a new process announces nothing until its
+      // set changes.
+      { type: "background_tasks_changed", provider: "claude", tasks: [] },
+    ]);
   }
 
   private startQueryPump(): void {
@@ -4657,6 +4661,13 @@ class ClaudeAgentSession implements AgentSession {
     }
     if (message.subtype === "task_progress") {
       return;
+    }
+    if (message.subtype === "background_tasks_changed") {
+      events.push({
+        type: "background_tasks_changed",
+        provider: "claude",
+        tasks: readClaudeBackgroundTasks(message),
+      });
     }
   }
 

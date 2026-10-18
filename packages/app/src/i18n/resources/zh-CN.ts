@@ -2005,6 +2005,11 @@ export const zhCN: TranslationResources = {
   menu: {
     backdrop: "菜单背景",
   },
+  backgroundTasks: {
+    title: "后台任务",
+    pillLabelOne: "1 个后台任务",
+    pillLabelMany: "{{count}} 个后台任务",
+  },
   subagents: {
     title: "Subagent",
     pillLabelOne: "1 个 subagent",

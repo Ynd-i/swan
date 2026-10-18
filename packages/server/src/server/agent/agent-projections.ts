@@ -146,6 +146,9 @@ export function toAgentPayload(
     payload.lastUsage = usage;
   }
 
+  // Always sent, empty included, so a fresh snapshot replaces whatever set a client cached.
+  payload.backgroundTasks = agent.backgroundTasks ?? [];
+
   if (agent.lastError !== undefined) {
     payload.lastError = agent.lastError;
   }

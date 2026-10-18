@@ -1,12 +1,14 @@
 import { memo, useCallback, type ReactElement } from "react";
 import { WorkspaceDiffStatPill } from "@/composer/diff-stat-pill";
 import { useWorkspaceHasDiffStat } from "@/composer/workspace-diff-stat";
+import { AgentBackgroundTasks } from "@/composer/background-tasks";
 import { AgentTaskList } from "@/composer/task-list";
 import { ComposerTrackBar } from "@/composer/tracks";
 import { supportsDesktopPaneSplits, useIsCompactFormFactor } from "@/constants/layout";
 import { usePaneContext } from "@/panels/pane-context";
 import { useSettings } from "@/hooks/use-settings";
 import { PluginComposerPills } from "@/plugins";
+import type { AgentBackgroundTask } from "@getpaseo/protocol/agent-types";
 import { useSessionStore } from "@/stores/session-store";
 import {
   type ArchiveFinishedStatus,
@@ -22,7 +24,7 @@ import { openPreferredWorkspaceTarget } from "@/workspace-tabs/open-beside";
 import { openComposerChanges } from "@/workspace-tabs/open-supporting-view";
 
 /**
- * The pane's ambient context — workspace changes, subagents, and tasks — as a row of pills above
+ * The pane's ambient context — workspace changes, subagents, tasks, and background work — as a row of pills above
  * the composer.
  *
  * The row shares the composer's keyboard transform and owns the space between itself and the
@@ -35,6 +37,7 @@ export const AgentTracks = memo(function AgentTracks({
   cwd,
   subagentRows,
   tasks,
+  backgroundTasks,
   archiveFinishedStatus,
   onArchiveFinished,
   hasPluginComposerPills,
@@ -45,6 +48,7 @@ export const AgentTracks = memo(function AgentTracks({
   cwd: string;
   subagentRows: SubagentRow[];
   tasks: TodoEntry[] | undefined;
+  backgroundTasks: AgentBackgroundTask[] | undefined;
   archiveFinishedStatus: ArchiveFinishedStatus;
   onArchiveFinished: () => void;
   hasPluginComposerPills: boolean;
@@ -117,6 +121,7 @@ export const AgentTracks = memo(function AgentTracks({
     !hasAgentTracks({
       subagentRows,
       tasks,
+      backgroundTasks,
       archiveFinishedStatus,
       hasPluginComposerPills,
     })
@@ -127,6 +132,7 @@ export const AgentTracks = memo(function AgentTracks({
   return (
     <ComposerTrackBar>
       <AgentTaskList tasks={tasks} />
+      <AgentBackgroundTasks tasks={backgroundTasks} />
       <SubagentsTrack
         serverId={serverId}
         rows={subagentRows}
@@ -155,17 +161,20 @@ export const AgentTracks = memo(function AgentTracks({
 export function hasAgentTracks({
   subagentRows,
   tasks,
+  backgroundTasks,
   archiveFinishedStatus,
   hasPluginComposerPills = false,
 }: {
   subagentRows: readonly SubagentRow[];
   tasks: readonly TodoEntry[] | undefined;
+  backgroundTasks: readonly AgentBackgroundTask[] | undefined;
   archiveFinishedStatus: ArchiveFinishedStatus;
   hasPluginComposerPills?: boolean;
 }): boolean {
   return (
     subagentRows.length > 0 ||
     Boolean(tasks?.length) ||
+    Boolean(backgroundTasks?.length) ||
     archiveFinishedStatus.kind !== "idle" ||
     hasPluginComposerPills
   );

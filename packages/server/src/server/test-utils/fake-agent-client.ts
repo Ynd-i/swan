@@ -758,6 +758,14 @@ class FakeAgentSession implements AgentSession {
         this.notifySubscribers(child);
       }
 
+      if (textPrompt === "Emit a background task") {
+        this.notifySubscribers({
+          type: "background_tasks_changed",
+          provider: this.providerName,
+          tasks: [{ id: "fixture-shell", description: "Fixture background shell" }],
+        });
+      }
+
       if (textPrompt.toLowerCase().includes("emit a turn failure")) {
         const failed: AgentStreamEvent = {
           type: "turn_failed",

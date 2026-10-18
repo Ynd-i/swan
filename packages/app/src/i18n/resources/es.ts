@@ -2074,6 +2074,11 @@ export const es: TranslationResources = {
   menu: {
     backdrop: "Fondo del menú",
   },
+  backgroundTasks: {
+    title: "Tareas en segundo plano",
+    pillLabelOne: "1 tarea en segundo plano",
+    pillLabelMany: "{{count}} tareas en segundo plano",
+  },
   subagents: {
     title: "Subagentes",
     pillLabelOne: "1 subagente",

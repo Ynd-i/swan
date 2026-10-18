@@ -2046,6 +2046,11 @@ export const ja: TranslationResources = {
   menu: {
     backdrop: "メニューの背景",
   },
+  backgroundTasks: {
+    title: "バックグラウンドタスク",
+    pillLabelOne: "1 件のバックグラウンドタスク",
+    pillLabelMany: "{{count}} 件のバックグラウンドタスク",
+  },
   subagents: {
     title: "サブエージェント",
     pillLabelOne: "サブエージェント 1 件",
