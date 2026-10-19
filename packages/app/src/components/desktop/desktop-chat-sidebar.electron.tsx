@@ -2,6 +2,7 @@ import { useCallback, useMemo } from "react";
 import { Bell, Search } from "lucide-react-native";
 import { ScrollView, Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
+import { useShallow } from "zustand/shallow";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { HeaderToggleButton } from "@/components/headers/header-toggle-button";
 import { SidebarDisplayPreferencesMenu } from "@/components/sidebar/display-preferences/menu";
@@ -9,10 +10,19 @@ import type { DraggableListDragHandleProps } from "@/components/draggable-list.t
 import { useSidebarModel } from "@/components/sidebar/sidebar-model";
 import { Button } from "@/components/ui/button";
 import { useAggregatedAgents } from "@/hooks/use-aggregated-agents";
+import { useProviderSubagentStore } from "@/subagents/provider-store";
 import { useKeyboardShortcutsStore } from "@/stores/keyboard-shortcuts-store";
 import type { Theme } from "@/styles/theme";
-import { buildDesktopChatSidebar, partitionChatSections } from "./desktop-chat-model";
-import { HandoffChainsContext, StartedChatsContext } from "./desktop-chat-row";
+import {
+  buildDesktopChatSidebar,
+  partitionChatSections,
+  selectRunningProviderSubagentParents,
+} from "./desktop-chat-model";
+import {
+  HandoffChainsContext,
+  StartedChatsContext,
+  SubagentsRunningContext,
+} from "./desktop-chat-row";
 import { ChatInbox } from "./desktop-chat-inbox";
 import { SectionDialogsProvider } from "./desktop-chat-section-menus";
 import {
@@ -106,7 +116,13 @@ function ChatSidebarList({ onAddProject }: { onAddProject: () => void }) {
   const pinnedProjects = useChatSectionsStore((state) => state.pinnedProjects);
   const inboxOpen = useChatSectionsStore((state) => state.inboxOpen);
   const savedSectionOrder = useChatSectionsStore((state) => state.sectionOrder);
-  const model = useMemo(() => buildDesktopChatSidebar({ projects, agents }), [projects, agents]);
+  const runningProviderSubagentParents = useProviderSubagentStore(
+    useShallow((state) => selectRunningProviderSubagentParents(state.descriptors)),
+  );
+  const model = useMemo(
+    () => buildDesktopChatSidebar({ projects, agents, runningProviderSubagentParents }),
+    [projects, agents, runningProviderSubagentParents],
+  );
   const partition = useMemo(
     () =>
       partitionChatSections({
@@ -184,41 +200,45 @@ function ChatSidebarList({ onAddProject }: { onAddProject: () => void }) {
     >
       <HandoffChainsContext.Provider value={model.handoffs}>
         <StartedChatsContext.Provider value={model.started}>
-          {inboxOpen ? (
-            <ChatInbox chats={inboxChats} selectedKey={selectedKey} />
-          ) : (
-            <SidebarDndContext sectionOrder={sectionOrder}>
-              <PinnedSection
-                chats={model.pinned}
-                projects={partition.pinnedProjects}
-                selectedKey={selectedKey}
-              />
-              <SortableSections sectionIds={shownSections}>
-                {shownSections.map((sectionId) => (
-                  <SortableSection
-                    key={sectionId}
-                    sectionId={sectionId}
-                    label={sectionLabel(sectionId)}
-                    acceptsProjects={sectionId !== CHAT_SECTION.recent}
-                  >
-                    {(dragHandleProps) => renderSection(sectionId, dragHandleProps)}
-                  </SortableSection>
-                ))}
-              </SortableSections>
-            </SidebarDndContext>
-          )}
-          {model.projects.length === 0 && model.recent.length === 0 && model.pinned.length === 0 ? (
-            <View style={styles.empty}>
-              <Text style={styles.secondaryText}>
-                {t(allProjects.length > 0 ? "sidebar.filterEmpty.description" : "sessions.empty")}
-              </Text>
-              {allProjects.length === 0 ? (
-                <Button variant="ghost" onPress={onAddProject}>
-                  {t("sidebar.actions.addProject")}
-                </Button>
-              ) : null}
-            </View>
-          ) : null}
+          <SubagentsRunningContext.Provider value={model.subagentsRunning}>
+            {inboxOpen ? (
+              <ChatInbox chats={inboxChats} selectedKey={selectedKey} />
+            ) : (
+              <SidebarDndContext sectionOrder={sectionOrder}>
+                <PinnedSection
+                  chats={model.pinned}
+                  projects={partition.pinnedProjects}
+                  selectedKey={selectedKey}
+                />
+                <SortableSections sectionIds={shownSections}>
+                  {shownSections.map((sectionId) => (
+                    <SortableSection
+                      key={sectionId}
+                      sectionId={sectionId}
+                      label={sectionLabel(sectionId)}
+                      acceptsProjects={sectionId !== CHAT_SECTION.recent}
+                    >
+                      {(dragHandleProps) => renderSection(sectionId, dragHandleProps)}
+                    </SortableSection>
+                  ))}
+                </SortableSections>
+              </SidebarDndContext>
+            )}
+            {model.projects.length === 0 &&
+            model.recent.length === 0 &&
+            model.pinned.length === 0 ? (
+              <View style={styles.empty}>
+                <Text style={styles.secondaryText}>
+                  {t(allProjects.length > 0 ? "sidebar.filterEmpty.description" : "sessions.empty")}
+                </Text>
+                {allProjects.length === 0 ? (
+                  <Button variant="ghost" onPress={onAddProject}>
+                    {t("sidebar.actions.addProject")}
+                  </Button>
+                ) : null}
+              </View>
+            ) : null}
+          </SubagentsRunningContext.Provider>
         </StartedChatsContext.Provider>
       </HandoffChainsContext.Provider>
     </ScrollView>

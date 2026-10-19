@@ -13,6 +13,7 @@ import { isChatFolderPath } from "@/projects/chat-folder";
 import { applyStoredOrdering } from "@/hooks/sidebar-workspaces-view-model";
 import type { WorkspaceDescriptor } from "@/stores/session-store";
 import type { StreamItem } from "@/types/stream";
+import type { ProviderSubagentDescriptorPayload } from "@getpaseo/protocol/messages";
 import {
   DATE_SECTION_ORDER,
   deriveDateSectionKey,
@@ -134,6 +135,68 @@ function foldStartedChats(
   return { roots, started };
 }
 
+/** A chat's sidebar status: an open turn or a running subagent below it counts as running. */
+export function desktopChatStatus(
+  agent: Pick<AggregatedAgent, "serverId" | "id" | "status" | "turn">,
+  subagentsRunning: ReadonlySet<string>,
+): AggregatedAgent["status"] {
+  return agent.turn.phase === "open" || subagentsRunning.has(desktopChatKey(agent))
+    ? "running"
+    : agent.status;
+}
+
+/** Chat keys of the agents that own a running provider subagent, sorted for shallow equality. */
+export function selectRunningProviderSubagentParents(
+  descriptors: ReadonlyMap<
+    string,
+    Pick<ProviderSubagentDescriptorPayload, "parentAgentId" | "status">
+  >,
+): string[] {
+  const parents = new Set<string>();
+  for (const [key, descriptor] of descriptors) {
+    // providerSubagentKey starts with the server id.
+    const serverId = key.slice(0, key.indexOf("\0"));
+    if (descriptor.status === "running") parents.add(`${serverId}:${descriptor.parentAgentId}`);
+  }
+  return [...parents].sort();
+}
+
+/**
+ * The shown chats with a running subagent anywhere below them, so a chat whose own turn ended
+ * still reads as working. A subagent counts for its nearest shown ancestor.
+ */
+function chatsWithRunningSubagents(
+  agents: readonly AggregatedAgent[],
+  runningProviderSubagentParents: readonly string[],
+  visibleKeys: ReadonlySet<string>,
+  agentByKey: ReadonlyMap<string, AggregatedAgent>,
+): Set<string> {
+  const owners = new Set(runningProviderSubagentParents);
+  for (const agent of agents) {
+    const parentAgentId = getParentAgentIdFromLabels(agent.labels);
+    const running = agent.status === "running" || agent.turn.phase === "open";
+    if (parentAgentId && running && !agent.archivedAt) {
+      owners.add(`${agent.serverId}:${parentAgentId}`);
+    }
+  }
+  const marked = new Set<string>();
+  for (const owner of owners) {
+    const seen = new Set<string>();
+    let key: string | null = owner;
+    while (key && !seen.has(key)) {
+      if (visibleKeys.has(key)) {
+        marked.add(key);
+        break;
+      }
+      seen.add(key);
+      const agent = agentByKey.get(key);
+      const parentAgentId = agent ? getParentAgentIdFromLabels(agent.labels) : null;
+      key = agent && parentAgentId ? `${agent.serverId}:${parentAgentId}` : null;
+    }
+  }
+  return marked;
+}
+
 /** A chain is pinned while any of its chats is, so a handoff keeps the chat in Pinned. */
 export function chainPinnedAt(
   agent: Pick<AggregatedAgent, "labels">,
@@ -146,15 +209,18 @@ export function chainPinnedAt(
 export function buildDesktopChatSidebar({
   projects,
   agents,
+  runningProviderSubagentParents = [],
 }: {
   projects: readonly SidebarProjectEntry[];
   agents: readonly AggregatedAgent[];
+  runningProviderSubagentParents?: readonly string[];
 }): {
   projects: DesktopChatProject[];
   pinned: AggregatedAgent[];
   recent: AggregatedAgent[];
   handoffs: HandoffChains;
   started: StartedChats;
+  subagentsRunning: ReadonlySet<string>;
 } {
   const projectByWorkspace = new Map<string, string>();
   for (const project of projects) {
@@ -219,6 +285,12 @@ export function buildDesktopChatSidebar({
     recent: roots.filter((agent) => pinnedAt(agent) === null),
     handoffs: chains,
     started,
+    subagentsRunning: chatsWithRunningSubagents(
+      agents,
+      runningProviderSubagentParents,
+      new Set(visible.map(desktopChatKey)),
+      agentByKey,
+    ),
   };
 }
 
