@@ -1,5 +1,8 @@
-import type { PaseoAgentHandle, PaseoApi } from "@getpaseo/client";
-import type { PluginLifecycleEvents, PluginServerContext } from "@getpaseo/plugin/server";
+import type {
+  PluginHandlerContext,
+  PluginLifecycleEvents,
+  PluginServerContext,
+} from "@getpaseo/plugin/server";
 import {
   answersPluginNote,
   finalReplyText,
@@ -10,10 +13,13 @@ import {
 // Matches STARTED_FROM_AGENT_ID_LABEL in packages/app/src/chat-proposals/proposal.ts, which sets
 // it when the user starts a proposed chat.
 const STARTED_FROM_LABEL = "codex-ui.started-from-agent-id";
-// Matches HANDOFF_FROM_AGENT_ID_LABEL in @getpaseo/protocol/agent-labels; the bundle imports
-// protocol types only. Auto handoff sets it on the chat that continues another.
+// Matches HANDOFF_FROM_AGENT_ID_LABEL in @getpaseo/protocol/agent-labels; the bundle cannot
+// import protocol. Auto handoff sets it on the chat that continues another.
 const HANDOFF_FROM_LABEL = "paseo.handoff-from-agent-id";
 
+// Built-in plugins ship without node_modules, so every type comes from the host SDK.
+type PaseoApi = PluginHandlerContext["paseo"];
+type PaseoAgentHandle = ReturnType<PaseoApi["agents"]["ref"]>;
 type TurnEnded = PluginLifecycleEvents["agent.turn_ended"];
 type AgentSnapshot = NonNullable<ReturnType<PaseoAgentHandle["current"]>>;
 

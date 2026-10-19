@@ -1,5 +1,8 @@
-import type { PaseoAgentHandle, PaseoApi } from "@getpaseo/client";
-import type { PluginLifecycleEvents, PluginServerContext } from "@getpaseo/plugin/server";
+import type {
+  PluginHandlerContext,
+  PluginLifecycleEvents,
+  PluginServerContext,
+} from "@getpaseo/plugin/server";
 import { autoHandoffSettings, type AutoHandoffSettings } from "./shared/settings.js";
 import {
   briefingRequestPrompt,
@@ -18,13 +21,15 @@ import {
 } from "./server/policy.js";
 
 // Match HANDOFF_FROM_AGENT_ID_LABEL and PARENT_AGENT_ID_LABEL in @getpaseo/protocol/agent-labels.
-// The bundle imports protocol types only, so the values are repeated here; the e2e test covers
-// both.
+// The bundle cannot import protocol, so the values are repeated here; the e2e test covers both.
 const HANDOFF_FROM_LABEL = "paseo.handoff-from-agent-id";
 const PARENT_LABEL = "paseo.parent-agent-id";
 /** How many handoffs led to this agent, so titles survive a rename. */
 const GENERATION_LABEL = "auto-handoff.generation";
 
+// Built-in plugins ship without node_modules, so every type comes from the host SDK.
+type PaseoApi = PluginHandlerContext["paseo"];
+type PaseoAgentHandle = ReturnType<PaseoApi["agents"]["ref"]>;
 type TurnEnded = PluginLifecycleEvents["agent.turn_ended"];
 type AgentSnapshot = NonNullable<ReturnType<PaseoAgentHandle["current"]>>;
 
