@@ -1,4 +1,4 @@
-import { chmodSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import pino from "pino";
@@ -89,6 +89,60 @@ describe("ClaudeAgentSession persisted history load", () => {
         err: expect.objectContaining({ message: expect.stringContaining("EISDIR") }),
       }),
     );
+  });
+
+  test("replays a finished tool call as completed when an api-request-blob repeats its tool_use", async () => {
+    // Claude Code also records the request body as api-request-blob entries, which repeat earlier
+    // assistant blocks after their tool_result. Replaying them reopened finished calls as running.
+    const toolUse = { type: "tool_use", id: "toolu_blob", name: "Bash", input: { command: "ls" } };
+    const lines = [
+      {
+        type: "assistant",
+        uuid: "assistant-1",
+        message: { id: "msg_1", role: "assistant", content: [toolUse] },
+      },
+      {
+        type: "user",
+        uuid: "user-1",
+        message: {
+          role: "user",
+          content: [{ type: "tool_result", tool_use_id: "toolu_blob", content: "README.md" }],
+        },
+        toolUseResult: { stdout: "README.md", stderr: "" },
+      },
+      {
+        type: "api-request-blob",
+        sessionId: SESSION_ID,
+        hash: "blob-1",
+        message: { role: "assistant", content: [toolUse] },
+      },
+    ];
+    mkdirSync(path.dirname(transcriptPath()), { recursive: true });
+    writeFileSync(transcriptPath(), lines.map((line) => JSON.stringify(line)).join("\n"));
+
+    const client = new ClaudeAgentClient({
+      logger: pino({ level: "silent" }),
+      queryFactory: vi.fn(() => {
+        throw new Error("history load must not start a query");
+      }),
+      resolveVersion: async () => "2.1.220",
+    });
+    const session = await client.resumeSession(
+      { provider: "claude", sessionId: SESSION_ID },
+      { cwd },
+    );
+    const statuses: string[] = [];
+    try {
+      for await (const event of session.streamHistory()) {
+        if (event.type === "timeline" && event.item.type === "tool_call") {
+          statuses.push(event.item.status);
+        }
+      }
+    } finally {
+      await session.close();
+    }
+
+    expect(statuses.at(-1)).toBe("completed");
   });
 
   // chmod does not remove read access on Windows, or for root.

@@ -6368,6 +6368,12 @@ function mapAssistantHistoryBlocksWithMessageId(
   return items;
 }
 
+const CLAUDE_CONVERSATION_ENTRY_TYPES: ReadonlySet<unknown> = new Set([
+  "user",
+  "assistant",
+  "system",
+]);
+
 function convertClaudeHistoryEntryPreamble(
   entry: ClaudeHistoryEntry,
 ): { shortCircuit: AgentTimelineItem[] } | { proceed: { content: unknown } } {
@@ -6388,6 +6394,12 @@ function convertClaudeHistoryEntryPreamble(
   const taskNotificationItem = mapTaskNotificationSystemRecordToToolCall(entry);
   if (taskNotificationItem) {
     return { shortCircuit: [taskNotificationItem] };
+  }
+
+  // Bookkeeping records such as api-request-blob also carry message.content, repeating earlier
+  // blocks after their results; replaying them reopens finished tool calls as running.
+  if (!CLAUDE_CONVERSATION_ENTRY_TYPES.has(entry.type)) {
+    return { shortCircuit: [] };
   }
 
   if (entry.isCompactSummary) {
