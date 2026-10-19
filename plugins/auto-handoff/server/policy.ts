@@ -1,6 +1,10 @@
-import type { AgentUsage } from "@getpaseo/protocol/agent-types";
-import type { PluginTurnOutcome } from "@getpaseo/plugin/server";
+import type { PluginHandlerContext, PluginTurnOutcome } from "@getpaseo/plugin/server";
 import type { AutoHandoffSettings } from "../shared/settings.js";
+
+// Built-in plugins ship without node_modules, so every type comes from the host SDK.
+type AgentUsage = NonNullable<
+  ReturnType<PluginHandlerContext["paseo"]["agents"]["ref"]>["lastUsage"]
+>;
 import type { BriefingRequest } from "./briefing.js";
 
 /** Per source agent. Lives in memory: `lastUsage` is lost on daemon restart too. */

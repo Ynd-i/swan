@@ -1,4 +1,7 @@
-import type { AgentTimelineItem } from "@getpaseo/protocol/agent-types";
+import type { PluginLifecycleEvents } from "@getpaseo/plugin/server";
+
+// Built-in plugins ship without node_modules, so every type comes from the host SDK.
+type AgentTimelineItem = PluginLifecycleEvents["agent.turn_ended"]["timeline"][number];
 
 const MARKER = "paseo_auto_handoff";
 const HANDOFF_TITLE_PREFIX = /^(?:\[Handoff(?: \d+)?\]\s*)+/;

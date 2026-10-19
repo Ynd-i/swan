@@ -1,4 +1,7 @@
-import type { AgentTimelineItem } from "@getpaseo/protocol/agent-types";
+import type { PluginLifecycleEvents } from "@getpaseo/plugin/server";
+
+// Built-in plugins ship without node_modules, so every type comes from the host SDK.
+type AgentTimelineItem = PluginLifecycleEvents["agent.turn_ended"]["timeline"][number];
 
 // The app parses this format back in packages/app/src/chat-proposals/proposal.ts.
 const REPORT_TAG = "paseo_started_chat_report";
