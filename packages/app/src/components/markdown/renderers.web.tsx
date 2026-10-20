@@ -3,6 +3,7 @@ import {
   forwardRef,
   useCallback,
   useMemo,
+  useRef,
   useState,
   type ComponentProps,
   type MouseEvent,
@@ -55,11 +56,13 @@ function preventAnchorNavigation(event: MouseEvent<HTMLAnchorElement>): void {
 }
 
 function WebPullRequestLink({
-  link,
   anchorProps,
   target,
 }: LinkRendererProps & { target: PullRequestLinkTarget }) {
-  const { onPress } = useFileLink(markdownLinkSource(link.url, link.sourceType));
+  const anchorRef = useRef<HTMLAnchorElement>(null);
+  // The chip's Pressable stops the click; replay it on the anchor so the renderer's
+  // link handling opens the URL the same way as any other link.
+  const pressAnchor = useCallback(() => anchorRef.current?.click(), []);
   const { serverId, workspaceRoot } = useAssistantFileLinkEnvironment();
   const host = useMemo(
     () => ({ serverId: serverId ?? "", cwd: workspaceRoot ?? "" }),
@@ -69,6 +72,7 @@ function WebPullRequestLink({
     <PullRequestHoverCard host={host} target={target}>
       <a
         {...anchorProps}
+        ref={anchorRef}
         style={PULL_REQUEST_ANCHOR_STYLE}
         onClickCapture={preventAnchorNavigation}
       >
@@ -76,7 +80,7 @@ function WebPullRequestLink({
           host={host}
           target={target}
           linkStyle={styles.pullRequestLink}
-          onPress={onPress}
+          onPress={pressAnchor}
         />
       </a>
     </PullRequestHoverCard>

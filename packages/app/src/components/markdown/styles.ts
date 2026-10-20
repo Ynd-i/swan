@@ -13,6 +13,8 @@ export function createMarkdownStyles(
   // Every block is followed by the same gap; the library drops it after the last block.
   const block = { marginTop: 0, marginBottom: blockGap };
   const isMac = getIsElectronMac();
+  // A content weight would otherwise reach code blocks through the paragraph style.
+  const codeFontWeight = theme.codeFontWeight ?? (theme.contentFontWeight ? "400" : null);
   const paragraph = {
     fontSize,
     fontFamily: theme.fontFamily.content,
@@ -43,7 +45,7 @@ export function createMarkdownStyles(
         bulletColor: isMac ? theme.colors.foreground : theme.colors.foregroundMuted,
         markerColor: isMac ? theme.colors.foreground : theme.colors.foregroundMuted,
         gapWidth: 7,
-        itemSpacing: 4,
+        itemSpacing: isMac ? 0 : 4,
         marginLeft: 20,
       },
       blockquote: {
@@ -87,6 +89,7 @@ export function createMarkdownStyles(
       },
       codeBlock: {
         ...paragraph,
+        ...(codeFontWeight ? { fontWeight: codeFontWeight } : {}),
         fontFamily: theme.fontFamily.mono === "ui-monospace" && !isWeb ? "" : theme.fontFamily.mono,
         fontSize: theme.fontSize.code,
         backgroundColor: theme.colors.surface2,
