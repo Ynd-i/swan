@@ -1918,6 +1918,13 @@ export function createWorkspaceLayoutStore(
 
 export const useWorkspaceLayoutStore = createWorkspaceLayoutStore();
 
+export function selectExplorerSidebarWidth(
+  state: Pick<WorkspaceLayoutStore, "explorerSidebarWidthByWorkspace">,
+  workspaceKey: string,
+): number | undefined {
+  return state.explorerSidebarWidthByWorkspace[workspaceKey];
+}
+
 /**
  * The agent tabs that exist right now, across every workspace of this host, independently
  * of which workspace views are mounted. Timeline sync uses this to release a chat when its
