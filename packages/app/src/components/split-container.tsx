@@ -83,6 +83,7 @@ import type { WorkspaceTabDescriptor } from "@/screens/workspace/workspace-tabs-
 import {
   createDefaultLayout,
   findPaneById,
+  selectExplorerSidebarWidth,
   useWorkspaceLayoutStore,
   type SplitNode,
   type SplitPane,
@@ -419,8 +420,8 @@ export function SplitContainer({
       }),
     [focusModeEnabled, layout.focusedPaneId, mainRoot],
   );
-  const storedExplorerSidebarWidth = useWorkspaceLayoutStore(
-    (state) => state.explorerSidebarWidthByWorkspace[workspaceKey],
+  const storedExplorerSidebarWidth = useWorkspaceLayoutStore((state) =>
+    selectExplorerSidebarWidth(state, workspaceKey),
   );
   const resizeExplorerSidebar = useWorkspaceLayoutStore((state) => state.resizeExplorerSidebar);
   const [workspaceShellWidth, setWorkspaceShellWidth] = useState(0);

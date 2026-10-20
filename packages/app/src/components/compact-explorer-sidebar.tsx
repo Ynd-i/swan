@@ -46,7 +46,10 @@ import {
 } from "@/components/explorer-sidebar-layout";
 import { ToolbarButton } from "@/components/ui/pane-content-toolbar";
 import { mutedIconColorMapping } from "@/components/ui/icon-button-chrome";
-import { useWorkspaceLayoutStore } from "@/stores/workspace-layout-store";
+import {
+  selectExplorerSidebarWidth,
+  useWorkspaceLayoutStore,
+} from "@/stores/workspace-layout-store";
 
 const ThemedX = withUnistyles(X);
 
@@ -177,8 +180,8 @@ export function NativeExplorerSidebarDock({
   const insets = useSafeAreaInsets();
   const isOpen = usePanelStore(selectIsCompactFileExplorerOpen);
   const showMobileAgent = usePanelStore((state) => state.showMobileAgent);
-  const storedWidth = useWorkspaceLayoutStore(
-    (state) => state.explorerSidebarWidthByWorkspace[persistenceKey],
+  const storedWidth = useWorkspaceLayoutStore((state) =>
+    selectExplorerSidebarWidth(state, persistenceKey),
   );
   const resizeExplorerSidebar = useWorkspaceLayoutStore((state) => state.resizeExplorerSidebar);
   const visibleWidth = resolveExplorerSidebarWidth({

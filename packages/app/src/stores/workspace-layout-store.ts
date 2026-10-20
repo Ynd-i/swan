@@ -111,6 +111,8 @@ interface WorkspaceLayoutStore {
   layoutByWorkspace: Record<string, WorkspaceLayout>;
   splitSizesByWorkspace: Record<string, Record<string, number[]>>;
   explorerSidebarWidthByWorkspace: Record<string, number>;
+  /** macOS keeps one Explorer width for every chat, like its left sidebar. */
+  explorerSidebarWidth?: number;
   pinnedAgentIdsByWorkspace: Record<string, Set<string>>;
   hiddenAgentIdsByWorkspace: Record<string, Set<string>>;
   focusRestorationByWorkspace: Record<string, WorkspaceFocusRestorationState>;
@@ -1648,6 +1650,10 @@ export function createWorkspaceLayoutStore(
           if (!normalizedWorkspaceKey || !Number.isFinite(width) || width <= 0) {
             return;
           }
+          if (getIsElectronMac()) {
+            setWorkspaceLayout(set, { explorerSidebarWidth: width });
+            return;
+          }
 
           setWorkspaceLayout(set, (state) => ({
             explorerSidebarWidthByWorkspace: {
@@ -1844,6 +1850,7 @@ export function createWorkspaceLayoutStore(
             ),
             splitSizesByWorkspace: state.splitSizesByWorkspace,
             explorerSidebarWidthByWorkspace: state.explorerSidebarWidthByWorkspace,
+            explorerSidebarWidth: state.explorerSidebarWidth,
             explorerPaneIdByWorkspace: state.explorerSidebarPaneIdByWorkspace,
             sidePaneIdByWorkspace: state.sidePaneIdByWorkspace,
             pullRequestTabAutoOpenedByWorkspace: state.pullRequestTabAutoOpenedByWorkspace,
@@ -1900,6 +1907,7 @@ export function createWorkspaceLayoutStore(
                   result.data.sidePanelRatioByWorkspace ??
                   {},
               ),
+            explorerSidebarWidth: result.data.explorerSidebarWidth,
             explorerSidebarPaneIdByWorkspace,
             sidePaneIdByWorkspace: Object.fromEntries(
               Object.entries(result.data.sidePaneIdByWorkspace ?? {}).map(([key, paneId]) => [
@@ -1917,6 +1925,15 @@ export function createWorkspaceLayoutStore(
 }
 
 export const useWorkspaceLayoutStore = createWorkspaceLayoutStore();
+
+export function selectExplorerSidebarWidth(
+  state: Pick<WorkspaceLayoutStore, "explorerSidebarWidth" | "explorerSidebarWidthByWorkspace">,
+  workspaceKey: string,
+): number | undefined {
+  return getIsElectronMac()
+    ? state.explorerSidebarWidth
+    : state.explorerSidebarWidthByWorkspace[workspaceKey];
+}
 
 /**
  * The agent tabs that exist right now, across every workspace of this host, independently

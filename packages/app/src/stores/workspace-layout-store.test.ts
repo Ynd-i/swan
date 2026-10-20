@@ -43,6 +43,7 @@ import {
   normalizeLayout,
   removePaneFromTree,
   removeTabFromTree,
+  selectExplorerSidebarWidth,
   stripEphemeralTabsFromLayout,
   type SplitNode,
   type SplitPane,
@@ -87,6 +88,24 @@ describe("macOS single-chat placement", () => {
     return () => {
       desktop.mac = false;
     };
+  });
+
+  it("keeps one Explorer width for every chat, across restarts", async () => {
+    const store = createWorkspaceLayoutStore();
+    const dragged = buildWorkspaceTabPersistenceKey({
+      serverId: SERVER_ID,
+      workspaceId: "dragged",
+    })!;
+    const other = buildWorkspaceTabPersistenceKey({ serverId: SERVER_ID, workspaceId: "other" })!;
+    store.getState().resizeExplorerSidebar(dragged, 420);
+    expect(selectExplorerSidebarWidth(store.getState(), other)).toBe(420);
+
+    const restored = createWorkspaceLayoutStore();
+    await vi.waitFor(async () => {
+      await restored.persist.rehydrate();
+      expect(selectExplorerSidebarWidth(restored.getState(), other)).toBe(420);
+    });
+    await AsyncStorage.removeItem("workspace-layout-state");
   });
 
   it("registers Explorer when a terminal deep link initializes the workspace", () => {
@@ -1132,6 +1151,18 @@ describe("workspace-layout-store tree transforms", () => {
 });
 
 describe("workspace-layout-store actions", () => {
+  it("keeps each workspace's Explorer width outside macOS", () => {
+    const store = createWorkspaceLayoutStore();
+    const dragged = buildWorkspaceTabPersistenceKey({
+      serverId: SERVER_ID,
+      workspaceId: "dragged",
+    })!;
+    const other = buildWorkspaceTabPersistenceKey({ serverId: SERVER_ID, workspaceId: "other" })!;
+    store.getState().resizeExplorerSidebar(dragged, 420);
+    expect(selectExplorerSidebarWidth(store.getState(), dragged)).toBe(420);
+    expect(selectExplorerSidebarWidth(store.getState(), other)).toBeUndefined();
+  });
+
   it("creates duplicate Changes instances while reveal keeps the first instance", () => {
     const workspaceKey = createWorkspaceKey();
     const store = workspaceLayoutStore.getState();
