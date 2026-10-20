@@ -28,8 +28,9 @@ timing (`packages/app/src/components/use-animated-dock.ts`), and skip it under r
 
 Saved layouts are adapted without closing sessions or replacing tab instances.
 Chats and drafts remain available through workspace navigation; supporting tabs
-retain their IDs, panel state and underlying resources. The dock starts at 576px
-only when no width was saved, and still clamps to the available workspace width.
+retain their IDs, panel state and underlying resources. Every chat is its own
+workspace here, so the dock keeps one width for all of them, like the left sidebar.
+It starts at 576px until the user drags it, and still clamps to the available workspace width.
 
 On wide macOS windows, tool tabs and their plus menu share the window titlebar.
 The dock keeps its tabs inline in compact windows, while the main area remains a

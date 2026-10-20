@@ -99,6 +99,7 @@ export const WorkspaceLayoutPersistedStateSchema = z.strictObject({
   layoutByWorkspace: z.record(z.string(), WorkspaceLayoutStorageSchema),
   splitSizesByWorkspace: z.record(z.string(), z.record(z.string(), z.array(z.number()))).optional(),
   explorerSidebarWidthByWorkspace: z.record(z.string(), z.number()).optional(),
+  explorerSidebarWidth: z.number().optional(),
   // COMPAT(explorerSidebarWidth): added in v0.6, remove after 2027-08-25.
   explorerSidebarRatioByWorkspace: z.record(z.string(), z.number()).optional(),
   // COMPAT(explorerSidebarNaming): accepted from builds that called this dock the Side panel.

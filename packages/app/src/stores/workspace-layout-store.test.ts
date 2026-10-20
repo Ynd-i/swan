@@ -105,6 +105,7 @@ describe("macOS single-chat placement", () => {
       await restored.persist.rehydrate();
       expect(selectExplorerSidebarWidth(restored.getState(), other)).toBe(420);
     });
+    await AsyncStorage.removeItem("workspace-layout-state");
   });
 
   it("registers Explorer when a terminal deep link initializes the workspace", () => {
