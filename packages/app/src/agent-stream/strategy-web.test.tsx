@@ -533,7 +533,7 @@ describe("createWebStreamStrategy", () => {
       );
     });
 
-    expect(onReadingPositionChange).toHaveBeenLastCalledWith("message-2");
+    expect(onReadingPositionChange).toHaveBeenLastCalledWith("message-2", true);
   });
 
   it("keeps bottom anchoring through subpixel browser rounding", () => {
@@ -1535,7 +1535,7 @@ describe("createWebStreamStrategy", () => {
     const viewportObservation = observed.get(scrollContainer);
     expect(viewportObservation).toBeDefined();
     act(() => notifyResize(scrollContainer, contentNode));
-    expect(onReadingPositionChange).toHaveBeenLastCalledWith("message-1");
+    expect(onReadingPositionChange).toHaveBeenLastCalledWith("message-1", true);
 
     act(() => root?.render(renderWithActivity(false)));
     expect(container.querySelector('[data-testid="agent-chat-scroll"]')).toBe(scrollContainer);
@@ -1544,7 +1544,7 @@ describe("createWebStreamStrategy", () => {
     rowsShifted = true;
     act(() => root?.render(renderWithActivity(true)));
     act(() => notifyResize(scrollContainer, contentNode));
-    expect(onReadingPositionChange).toHaveBeenLastCalledWith("message-2");
+    expect(onReadingPositionChange).toHaveBeenLastCalledWith("message-2", true);
     expect(scrollTo).not.toHaveBeenCalled();
 
     act(() => root?.render(renderWithActivity(false)));

@@ -6,14 +6,16 @@ import { useSidebarNavItems } from "@/sidebar-nav/use-sidebar-nav-items";
  * Window rows pin to the summary only while it is on.
  */
 export function useUsageInSidebar(): {
+  /** False where the sidebar has no Usage item at all, as on the Mac rail. */
+  available: boolean;
   inSidebar: boolean;
   setInSidebar: (visible: boolean) => void;
 } {
   const { items, setVisible } = useSidebarNavItems("footer");
-  const inSidebar = items.some((item) => item.key === "usage" && item.visible);
+  const item = items.find((entry) => entry.key === "usage");
   const setInSidebar = useCallback(
     (visible: boolean) => setVisible("usage", visible),
     [setVisible],
   );
-  return { inSidebar, setInSidebar };
+  return { available: Boolean(item), inSidebar: item?.visible === true, setInSidebar };
 }

@@ -48,23 +48,65 @@ describe("computePosition", () => {
   });
 
   it("places side placements flush with the trigger top and ignores alignment", () => {
-    const left = position({ placement: "left", alignment: "end" });
-    expect(left).toEqual({ x: 8, y: 100, actualPlacement: "left" });
+    const left = position({
+      placement: "left",
+      alignment: "end",
+      triggerRect: { ...TRIGGER, x: 400 },
+    });
+    expect(left).toEqual({ x: 196, y: 100, actualPlacement: "left" });
 
     const right = position({ placement: "right", alignment: "end" });
     expect(right).toEqual({ x: 144, y: 100, actualPlacement: "right" });
   });
 
-  it("lets hover cards flip horizontally when the opposite side has room", () => {
-    const result = position({
-      triggerRect: { ...TRIGGER, x: 850 },
-      placement: "right",
-      flipHorizontal: true,
-    });
-    expect(result).toEqual({ x: 646, y: 100, actualPlacement: "left" });
+  it("flips a left-edge submenu right when the requested side cannot contain it", () => {
+    expect(position({ placement: "left" })).toEqual({ x: 144, y: 100, actualPlacement: "right" });
+  });
+
+  it("flips a right-edge submenu left, retaining the designed negative overlap", () => {
     expect(
-      position({ triggerRect: { ...TRIGGER, x: 850 }, placement: "right" }).actualPlacement,
-    ).toBe("right");
+      position({ placement: "right", triggerRect: { ...TRIGGER, x: 900 }, offset: -4 }),
+    ).toEqual({ x: 704, y: 100, actualPlacement: "left" });
+  });
+
+  it("uses display-area origin and padding when choosing the fitting side", () => {
+    expect(
+      position({
+        placement: "right",
+        displayArea: { x: 200, y: 50, width: 600, height: 600 },
+        triggerRect: { ...TRIGGER, x: 740 },
+        offset: -4,
+      }),
+    ).toEqual({ x: 544, y: 100, actualPlacement: "left" });
+    expect(
+      position({
+        placement: "left",
+        displayArea: { x: 500, y: 50, width: 500, height: 600 },
+        triggerRect: { ...TRIGGER, x: 520 },
+      }),
+    ).toEqual({ x: 564, y: 100, actualPlacement: "right" });
+  });
+
+  it("includes the gap and edge padding rather than flipping a side that still fits", () => {
+    const input = {
+      placement: "right" as const,
+      triggerRect: { ...TRIGGER, x: 870 },
+      contentSize: { width: 80, height: 100 },
+    };
+    expect(position({ ...input, offset: 4 })).toEqual({ x: 786, y: 100, actualPlacement: "left" });
+    expect(position({ ...input, offset: -4 })).toEqual({
+      x: 906,
+      y: 100,
+      actualPlacement: "right",
+    });
+  });
+
+  it("keeps the requested side and clamps when neither horizontal side fits", () => {
+    expect(position({ placement: "right", displayArea: { ...DISPLAY, width: 250 } })).toEqual({
+      x: 42,
+      y: 100,
+      actualPlacement: "right",
+    });
   });
 
   it("keeps the surface inside a display area that does not start at the origin", () => {

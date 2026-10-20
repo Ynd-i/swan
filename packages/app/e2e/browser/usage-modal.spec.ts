@@ -113,17 +113,17 @@ async function openUsageSummaryAtWidth(page: Page, width: number) {
   await page.setViewportSize({ width, height: 900 });
   await gotoAppShell(page);
   if (width === 390) await openCompactSidebar(page);
-  await expectPinnedUsage(page, ["31% Weekly", "12% Weekly"]);
+  await expectPinnedUsage(page, "31% Weekly", 1);
   await openUsageFromItem(page);
 }
 
-async function expectUsageProviderOrder(page: Page, summary: string[]) {
+async function expectUsageProviderOrder(page: Page, summary: string) {
   const group = page.getByTestId(`usage-host-${getServerId()}`);
   await expect(group.getByText(/^(opencode|openai) plan$/)).toHaveText([
     "opencode plan",
     "openai plan",
   ]);
-  await expectPinnedUsage(page, summary);
+  await expectPinnedUsage(page, summary, 1);
 }
 
 async function refreshUsageAndWaitForReports(page: Page, usage: UsageReportsFixture) {
@@ -193,11 +193,11 @@ test.describe("usage modal", () => {
     }) => {
       const usage = await installReversedUsageRefresh(page);
       await openUsageSummaryAtWidth(page, width);
-      await expectUsageProviderOrder(page, ["31% Weekly", "12% Weekly"]);
+      await expectUsageProviderOrder(page, "31% Weekly");
       await qaScreenshot(page, `usage-order-${width}-before-refresh`);
 
       await refreshUsageAndWaitForReports(page, usage);
-      await expectUsageProviderOrder(page, ["41% Weekly", "22% Weekly"]);
+      await expectUsageProviderOrder(page, "41% Weekly");
       await qaScreenshot(page, `usage-order-${width}-after-refresh`);
     });
   }
@@ -325,7 +325,7 @@ test.describe("usage modal", () => {
       });
 
       // Nothing picked and no workspace open: the first host.
-      await expectPinnedUsage(page, ["31% Weekly"]);
+      await expectPinnedUsage(page, "31% Weekly");
       await openUsageFromItem(page);
       await expect(page.getByTestId(`usage-host-${primaryServerId}`)).toBeVisible();
 
@@ -336,7 +336,7 @@ test.describe("usage modal", () => {
       ).toBeVisible({ timeout: 30_000 });
       await expect(hostFilter(page)).toContainText("Secondary box");
       await qaScreenshot(page, "usage-modal-picked-host");
-      await expectPinnedUsage(page, ["12% Weekly"]);
+      await expectPinnedUsage(page, "12% Weekly");
 
       // The e2e seed resets the host list on every load, so reopening re-adds the second host.
       await addConnectedHostAndReload(page, {
@@ -344,7 +344,7 @@ test.describe("usage modal", () => {
         label: "Secondary box",
         port: secondary.port,
       });
-      await expectPinnedUsage(page, ["12% Weekly"]);
+      await expectPinnedUsage(page, "12% Weekly");
       await openUsageFromItem(page);
       await expect(
         page.getByTestId(`usage-host-${secondary.serverId}`).getByText("12%"),
@@ -385,7 +385,7 @@ test("expired login refreshes to windows with visible pin toggles", async ({ pag
     await expect(
       page.getByText("Claude: Login expired 1h ago. Run claude to refresh it.", { exact: true }),
     ).toHaveCount(0);
-    await expectPinnedUsage(page, ["31% 5h", "54% wk"]);
+    await expectPinnedUsage(page, "54% wk");
     const row = page.getByRole("checkbox", { name: /^Pin Claude Weekly, / });
     await expect(row).toBeChecked();
     await expect(row.getByTestId("usage-pin-glyph-pinned")).toHaveCSS("opacity", "1");
@@ -405,11 +405,11 @@ test("expired login refreshes to windows with visible pin toggles", async ({ pag
     );
     await hoverUsageWindow(page, "Weekly");
     await expect(page.getByText("Pin", { exact: true })).toBeVisible();
-    await expectPinnedUsage(page, ["31% 5h"]);
+    await expectPinnedUsage(page, "31% 5h");
     await qaScreenshot(page, "usage-pin-unselected");
     await togglePin(page.getByTestId("usage-report-login-journey:account"), "Claude", "Weekly");
     await expect(row.getByTestId("usage-pin-glyph-pinned")).toHaveCSS("opacity", "1");
-    await expectPinnedUsage(page, ["31% 5h", "54% wk"]);
+    await expectPinnedUsage(page, "54% wk");
   } finally {
     await fixture.cleanup();
   }

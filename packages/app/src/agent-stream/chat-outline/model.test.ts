@@ -50,6 +50,11 @@ describe("resolveActivePromptSeq", () => {
     expect(resolveActivePromptSeq(prompts, null)).toBeNull();
     expect(resolveActivePromptSeq([], 42)).toBeNull();
   });
+
+  it("marks the last prompt at the bottom even when its turn is below the reading line", () => {
+    expect(resolveActivePromptSeq(prompts, 14, true)).toBe(20);
+    expect(resolveActivePromptSeq([], 14, true)).toBeNull();
+  });
 });
 
 describe("createActivePromptPublisher", () => {

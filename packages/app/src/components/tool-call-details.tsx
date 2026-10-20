@@ -1,10 +1,13 @@
-import React, { useMemo, type ReactNode } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, type ReactNode } from "react";
 import {
   View,
   Text,
   ScrollView as RNScrollView,
   type StyleProp,
   type ViewStyle,
+  type LayoutChangeEvent,
+  type NativeSyntheticEvent,
+  type NativeScrollEvent,
 } from "react-native";
 import { ScrollView as GHScrollView } from "react-native-gesture-handler";
 import { StyleSheet } from "react-native-unistyles";
@@ -31,6 +34,7 @@ const ScrollView = isWeb ? RNScrollView : GHScrollView;
 // ---- Content Component ----
 
 interface ToolCallDetailsContentProps {
+  onShellOverflowChange?: (hasMore: boolean) => void;
   toolName?: string;
   detail?: ToolCallDetail;
   errorText?: string;
@@ -40,6 +44,7 @@ interface ToolCallDetailsContentProps {
 }
 
 interface DetailStyles {
+  onShellOverflowChange?: (hasMore: boolean) => void;
   sectionFillStyle: StyleProp<ViewStyle>;
   codeBlockFillStyle: StyleProp<ViewStyle>;
   codeVerticalScrollStyle: StyleProp<ViewStyle>;
@@ -71,6 +76,7 @@ function useDetailStyles(
   detail: ToolCallDetail | undefined,
   resolvedMaxHeight: number | undefined,
   fillAvailableHeight: boolean,
+  onShellOverflowChange?: (hasMore: boolean) => void,
 ): DetailStyles {
   const isFullBleed = resolveIsFullBleed(detail);
   const shouldFill = resolveShouldFill(detail, fillAvailableHeight);
@@ -122,6 +128,7 @@ function useDetailStyles(
   );
 
   return {
+    onShellOverflowChange,
     sectionFillStyle,
     codeBlockFillStyle,
     codeVerticalScrollStyle,
@@ -154,6 +161,39 @@ interface ShellDetailProps {
 }
 
 function ShellDetailSection({ command, output, ds }: ShellDetailProps) {
+  const metrics = useRef({ height: 0, content: 0, offset: 0 });
+  const reportOverflow = ds.onShellOverflowChange;
+  const updateOverflow = useCallback(() => {
+    const { height, content, offset } = metrics.current;
+    reportOverflow?.(height > 0 && offset + height < content - 1);
+  }, [reportOverflow]);
+  const onLayout = useCallback(
+    (event: LayoutChangeEvent) => {
+      metrics.current.height = event.nativeEvent.layout.height;
+      updateOverflow();
+    },
+    [updateOverflow],
+  );
+  const onContentSizeChange = useCallback(
+    (_width: number, height: number) => {
+      metrics.current.content = height;
+      updateOverflow();
+    },
+    [updateOverflow],
+  );
+  const onScroll = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      const { contentOffset, layoutMeasurement, contentSize } = event.nativeEvent;
+      metrics.current = {
+        offset: contentOffset.y,
+        height: layoutMeasurement.height,
+        content: contentSize.height,
+      };
+      updateOverflow();
+    },
+    [updateOverflow],
+  );
+  useEffect(() => () => reportOverflow?.(false), [reportOverflow]);
   const normalizedCommand = command.replace(/\n+$/, "");
   const commandOutput = (output ?? "").replace(/^\n+/, "");
   const hasOutput = commandOutput.length > 0;
@@ -162,11 +202,17 @@ function ShellDetailSection({ command, output, ds }: ShellDetailProps) {
       <View style={ds.codeBlockFillStyle}>
         <ScrollView
           style={ds.codeVerticalScrollStyle}
+          testID="shell-output-scroll"
+          onLayout={reportOverflow ? onLayout : undefined}
+          onContentSizeChange={reportOverflow ? onContentSizeChange : undefined}
+          onScroll={reportOverflow ? onScroll : undefined}
+          scrollEventThrottle={reportOverflow ? 16 : undefined}
           contentContainerStyle={styles.codeVerticalContent}
           nestedScrollEnabled
           showsVerticalScrollIndicator
         >
           <ScrollView
+            testID="shell-output-horizontal-scroll"
             horizontal
             nestedScrollEnabled
             showsHorizontalScrollIndicator
@@ -781,6 +827,7 @@ function LoadingSkeleton({ containerStyle }: { containerStyle: StyleProp<ViewSty
 }
 
 export function ToolCallDetailsContent({
+  onShellOverflowChange,
   toolName,
   detail,
   errorText,
@@ -790,7 +837,7 @@ export function ToolCallDetailsContent({
 }: ToolCallDetailsContentProps) {
   const { t } = useTranslation();
   const resolvedMaxHeight = fillAvailableHeight ? undefined : (maxHeight ?? 300);
-  const ds = useDetailStyles(detail, resolvedMaxHeight, fillAvailableHeight);
+  const ds = useDetailStyles(detail, resolvedMaxHeight, fillAvailableHeight, onShellOverflowChange);
   const diffLines = useDiffLines(detail);
 
   const sections: ReactNode[] = buildDetailSections(toolName, detail, diffLines, ds, t);
@@ -813,6 +860,7 @@ export function ToolCallDetailsContent({
 
 const styles = StyleSheet.create((theme) => {
   const insets = getCodeInsets(theme);
+  const codeLineHeight = Math.round(theme.fontSize.code * 1.5);
 
   return {
     paddedContainer: {
@@ -938,10 +986,11 @@ const styles = StyleSheet.create((theme) => {
       padding: insets.padding,
     },
     scrollText: {
+      ...(theme.codeFontWeight ? { fontWeight: theme.codeFontWeight } : {}),
       fontFamily: theme.fontFamily.mono,
       fontSize: theme.fontSize.code,
       color: theme.colors.foreground,
-      lineHeight: 18,
+      lineHeight: codeLineHeight,
       ...(isWeb
         ? {
             whiteSpace: "pre",
@@ -956,7 +1005,7 @@ const styles = StyleSheet.create((theme) => {
       fontFamily: theme.fontFamily.mono,
       fontSize: theme.fontSize.code,
       color: theme.colors.foregroundMuted,
-      lineHeight: 18,
+      lineHeight: codeLineHeight,
       marginBottom: theme.spacing[2],
     },
     subAgentActions: {
@@ -972,13 +1021,14 @@ const styles = StyleSheet.create((theme) => {
       fontFamily: theme.fontFamily.mono,
       fontSize: theme.fontSize.code,
       color: theme.colors.foregroundMuted,
-      lineHeight: 18,
+      lineHeight: codeLineHeight,
     },
     subAgentActionSummary: {
+      ...(theme.codeFontWeight ? { fontWeight: theme.codeFontWeight } : {}),
       fontFamily: theme.fontFamily.mono,
       fontSize: theme.fontSize.code,
       color: theme.colors.foreground,
-      lineHeight: 18,
+      lineHeight: codeLineHeight,
     },
     jsonScroll: {
       borderWidth: theme.borderWidth[1],

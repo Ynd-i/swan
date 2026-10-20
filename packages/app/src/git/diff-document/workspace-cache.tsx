@@ -132,7 +132,12 @@ function exactModelKey(input: Omit<BuildDiffDocumentModelInput, "reuseFrom">): s
 }
 
 function typographyKey(typography: DiffTypography): string {
-  return JSON.stringify([typography.family, typography.size, typography.lineHeight]);
+  return JSON.stringify([
+    typography.family,
+    typography.size,
+    typography.lineHeight,
+    typography.weight ?? "400",
+  ]);
 }
 
 function paletteKey(palette: DiffPalette): string {
@@ -150,6 +155,11 @@ function paletteKey(palette: DiffPalette): string {
     palette.additionBackground,
     palette.deletionBackground,
     palette.emptyBackground,
+    palette.additionGutterBackground,
+    palette.deletionGutterBackground,
+    palette.emptyStripe,
+    palette.additionInlineBackground,
+    palette.deletionInlineBackground,
     palette.selection,
     palette.headerActiveSurface,
     palette.headerBorder,

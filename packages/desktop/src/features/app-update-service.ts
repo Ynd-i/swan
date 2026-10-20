@@ -77,6 +77,7 @@ export interface AppUpdateService {
 export interface AppUpdateServiceDeps {
   runtime: AppUpdateRuntime;
   isPackaged(): boolean;
+  unavailableReason?(): string | null;
   now(): number;
   bucket(): Promise<number>;
   reportCheckError?(error: unknown): void;
@@ -251,6 +252,16 @@ export function createAppUpdateService(deps: AppUpdateServiceDeps): AppUpdateSer
         currentVersion,
         hasUpdate: false,
         readyToInstall: false,
+      });
+    }
+
+    const unavailableReason = deps.unavailableReason?.();
+    if (unavailableReason) {
+      return buildCheckResult({
+        currentVersion,
+        hasUpdate: false,
+        readyToInstall: false,
+        errorMessage: unavailableReason,
       });
     }
 

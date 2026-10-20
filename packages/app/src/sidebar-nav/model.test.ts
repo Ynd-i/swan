@@ -124,6 +124,90 @@ describe("resolveSidebarNavItems for the Usage item", () => {
   });
 });
 
+describe("defaults after saving preferences", () => {
+  const resolve = (preferences: SidebarNavPreference[]) =>
+    resolveSidebarNavItems({ section: "footer", pluginGroups: [kanban], preferences });
+  const roundTrip = (preferences: SidebarNavPreference[]): SidebarNavPreference[] =>
+    JSON.parse(JSON.stringify(preferences));
+
+  it("keeps Usage on its default after moving a footer plugin", () => {
+    const next = roundTrip(
+      moveSidebarNavItem({ items: resolve([]), key: kanbanKey, direction: "up", previous: [] }),
+    );
+    expect(next).toEqual([{ key: kanbanKey }, { key: "usage" }]);
+    expect(summarize(resolve(next))).toEqual([
+      { key: kanbanKey, visible: true },
+      { key: "usage", visible: false },
+    ]);
+  });
+
+  it("does not freeze the Usage default when hiding another item", () => {
+    const next = roundTrip(
+      setSidebarNavItemVisible({
+        items: resolve([]),
+        key: kanbanKey,
+        visible: false,
+        previous: [],
+      }),
+    );
+    expect(next).toEqual([{ key: "usage" }, { key: kanbanKey, visible: false }]);
+    expect(summarize(resolve(next))).toEqual([
+      { key: "usage", visible: false },
+      { key: kanbanKey, visible: false },
+    ]);
+  });
+
+  it("preserves an explicit Usage choice through unrelated changes", () => {
+    for (const visible of [true, false]) {
+      let previous = roundTrip(
+        setSidebarNavItemVisible({ items: resolve([]), key: "usage", visible, previous: [] }),
+      );
+      previous = roundTrip(
+        moveSidebarNavItem({
+          items: resolve(previous),
+          key: "usage",
+          direction: "down",
+          previous,
+        }),
+      );
+      previous = roundTrip(
+        setSidebarNavItemVisible({
+          items: resolve(previous),
+          key: kanbanKey,
+          visible: false,
+          previous,
+        }),
+      );
+      expect(resolve(previous).find((item) => item.key === "usage")?.visible).toBe(visible);
+    }
+  });
+
+  it("retains absent plugins and first explicit overrides while defaults stay unset", () => {
+    const previous: SidebarNavPreference[] = [
+      { key: notesKey },
+      { key: "usage", visible: false },
+      { key: "usage", visible: true },
+    ];
+    const next = roundTrip(
+      moveSidebarNavItem({ items: resolve(previous), key: kanbanKey, direction: "up", previous }),
+    );
+    expect(next).toEqual([{ key: notesKey }, { key: kanbanKey }, { key: "usage", visible: false }]);
+    expect(
+      summarize(
+        resolveSidebarNavItems({
+          section: "footer",
+          pluginGroups: [notes, kanban],
+          preferences: next,
+        }),
+      ),
+    ).toEqual([
+      { key: notesKey, visible: true },
+      { key: kanbanKey, visible: true },
+      { key: "usage", visible: false },
+    ]);
+  });
+});
+
 describe("setSidebarNavItemVisible", () => {
   it("toggles one item and writes the full resolved order", () => {
     const items = resolveSidebarNavItems({
@@ -135,11 +219,11 @@ describe("setSidebarNavItemVisible", () => {
     const next = setSidebarNavItemVisible({ items, key: "search", visible: false, previous: [] });
 
     expect(next).toEqual([
-      { key: "new-workspace", visible: true },
-      { key: "history", visible: true },
+      { key: "new-workspace" },
+      { key: "history" },
       { key: "search", visible: false },
-      { key: "schedules", visible: true },
-      { key: kanbanKey, visible: true },
+      { key: "schedules" },
+      { key: kanbanKey },
     ]);
   });
 
@@ -159,9 +243,9 @@ describe("setSidebarNavItemVisible", () => {
     expect(next).toEqual([
       { key: notesKey, visible: false },
       { key: "history", visible: false },
-      { key: "new-workspace", visible: true },
-      { key: "search", visible: true },
-      { key: "schedules", visible: true },
+      { key: "new-workspace" },
+      { key: "search" },
+      { key: "schedules" },
     ]);
   });
 
@@ -208,7 +292,7 @@ describe("setSidebarNavItemVisible", () => {
 
     const next = setSidebarNavItemVisible({ items, key: "bogus", visible: false, previous: [] });
 
-    expect(next).toEqual(summarize(items));
+    expect(next).toEqual(items.map(({ key }) => ({ key })));
   });
 });
 
@@ -252,14 +336,14 @@ describe("moveSidebarNavItem", () => {
     });
     const last = moveSidebarNavItem({ items, key: kanbanKey, direction: "down", previous: [] });
 
-    expect(first).toEqual(summarize(items));
-    expect(last).toEqual(summarize(items));
+    expect(first).toEqual(items.map(({ key }) => ({ key })));
+    expect(last).toEqual(items.map(({ key }) => ({ key })));
   });
 
   it("returns the normalized list unchanged for an unknown key", () => {
     const next = moveSidebarNavItem({ items, key: "bogus", direction: "down", previous: [] });
 
-    expect(next).toEqual(summarize(items));
+    expect(next).toEqual(items.map(({ key }) => ({ key })));
   });
 
   it("drops duplicate carried-over keys", () => {
@@ -353,10 +437,6 @@ describe("footer section", () => {
       previous: moved,
     });
 
-    expect(shown).toEqual([
-      notesPreference,
-      { key: syncKey, visible: true },
-      { key: "usage", visible: true },
-    ]);
+    expect(shown).toEqual([notesPreference, { key: syncKey }, { key: "usage", visible: true }]);
   });
 });

@@ -2640,6 +2640,8 @@ export class Session {
     switch (msg.type) {
       case "agent.rewind.request":
         return this.handleAgentRewindRequest(msg, source);
+      case "agent.fork.request":
+        return this.handleAgentForkRequest(msg, source);
       default:
         return undefined;
     }
@@ -2667,6 +2669,8 @@ export class Session {
         return this.handleAgentTimelineSearchRequest(msg, source);
       case "agent.timeline.list_prompts.request":
         return this.handleAgentTimelineListPromptsRequest(msg, source);
+      case "agent.get_context_usage.request":
+        return this.handleAgentGetContextUsageRequest(msg, source);
       case "agent.provider_subagents.list.request":
         return this.handleProviderSubagentListRequest(msg);
       case "agent.provider_subagents.timeline.get.request":
@@ -2898,6 +2902,8 @@ export class Session {
       case "forge.search.request":
       case "github_search_request":
         return this.checkoutSession.handleForgeSearchRequest(msg);
+      case "forge.change_request.get.request":
+        return this.checkoutSession.handleForgeChangeRequestGetRequest(msg);
       case "stash_save_request":
         return this.checkoutSession.handleStashSaveRequest(msg);
       case "stash_pop_request":
@@ -4762,6 +4768,40 @@ export class Session {
       );
     } finally {
       this.rewindInitiators.delete(msg.agentId);
+    }
+  }
+
+  private async handleAgentForkRequest(
+    msg: Extract<SessionInboundMessage, { type: "agent.fork.request" }>,
+    source?: object,
+  ): Promise<void> {
+    const respond = (childAgentId: string | null, error: string | null) =>
+      this.emitForSource(
+        {
+          type: "agent.fork.response",
+          payload: {
+            requestId: msg.requestId,
+            agentId: msg.agentId,
+            childAgentId,
+            ok: error === null,
+            error,
+          },
+        },
+        source,
+      );
+    try {
+      await ensureUnarchivedAgentLoaded(msg.agentId, {
+        agentManager: this.agentManager,
+        agentStorage: this.agentStorage,
+        logger: this.sessionLogger,
+      });
+      const child = await this.agentManager.forkAgent({
+        sourceAgentId: msg.agentId,
+        boundaryCursor: msg.boundaryCursor,
+      });
+      respond(child.id, null);
+    } catch (error) {
+      respond(null, error instanceof Error ? error.message : "Failed to fork agent");
     }
   }
 
@@ -7001,7 +7041,11 @@ export class Session {
   ): Promise<void> {
     try {
       const result = await createProjectDirectory(
-        { parentPath: request.parentPath, name: request.name },
+        {
+          parentPath: request.parentPath,
+          name: request.name,
+          createParents: request.createParents,
+        },
         {
           registerProject: (directoryPath) =>
             this.workspaceProvisioning.findOrCreateProjectForDirectory(directoryPath),
@@ -7910,6 +7954,39 @@ export class Session {
             epoch: "",
             locations: [],
             nextCursor: null,
+            error: error instanceof Error ? error.message : String(error),
+          },
+        },
+        source,
+      );
+    }
+  }
+
+  // Asks only a live runtime: measuring costs the provider a request, so it never starts one.
+  private async handleAgentGetContextUsageRequest(
+    msg: Extract<SessionInboundMessage, { type: "agent.get_context_usage.request" }>,
+    source?: object,
+  ): Promise<void> {
+    const { agentId, requestId } = msg;
+    try {
+      const session = this.agentManager.getAgent(agentId)?.session;
+      const usage = session?.getContextUsage ? await session.getContextUsage() : null;
+      this.emitForSource(
+        {
+          type: "agent.get_context_usage.response",
+          payload: { requestId, agentId, usage, error: null },
+        },
+        source,
+      );
+    } catch (error) {
+      this.sessionLogger.warn({ err: error, agentId }, "Failed to read agent context usage");
+      this.emitForSource(
+        {
+          type: "agent.get_context_usage.response",
+          payload: {
+            requestId,
+            agentId,
+            usage: null,
             error: error instanceof Error ? error.message : String(error),
           },
         },

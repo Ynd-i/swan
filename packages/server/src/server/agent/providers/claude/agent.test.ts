@@ -823,6 +823,46 @@ describe("ClaudeAgentSession features", () => {
     await session.close();
   });
 
+  test("reports what fills the context window only from a live query", async () => {
+    const { queryFactory, queryMock } = createQueryMock();
+    // Shape captured from a real claude-haiku-4-5 session after one turn.
+    queryMock.getContextUsage.mockResolvedValue({
+      totalTokens: 36_260,
+      maxTokens: 200_000,
+      categories: [
+        { name: "System tools", tokens: 27_594, color: "inactive" },
+        { name: "MCP tools (deferred)", tokens: 1_426, color: "inactive", isDeferred: true },
+        { name: "Custom agents", tokens: 623, color: "permission" },
+        { name: "Skills", tokens: 0, color: "warning" },
+        { name: "Messages", tokens: 5_139, color: "purple_FOR_SUBAGENTS_ONLY" },
+        { name: "Autocompact buffer", tokens: 33_000, color: "inactive" },
+        { name: "Free space", tokens: 130_739, color: "promptBorder" },
+      ],
+    } as never);
+    const client = new ClaudeAgentClient({
+      logger,
+      queryFactory,
+      resolveBinary: async () => "/test/claude/bin",
+    });
+    const session = await client.createSession({ provider: "claude", cwd: process.cwd() });
+
+    await expect(session.getContextUsage?.()).resolves.toBeNull();
+    expect(queryMock.getContextUsage).not.toHaveBeenCalled();
+
+    await (session as unknown as { ensureQuery(): Promise<unknown> }).ensureQuery();
+    await expect(session.getContextUsage?.()).resolves.toEqual({
+      maxTokens: 200_000,
+      usedTokens: 36_260,
+      bufferTokens: 33_000,
+      categories: [
+        { name: "System tools", tokens: 27_594 },
+        { name: "Custom agents", tokens: 623 },
+        { name: "Messages", tokens: 5_139 },
+      ],
+    });
+    await session.close();
+  });
+
   test("preapproves only granted Hub MCP tools while preserving Claude denies", async () => {
     const { queryFactory } = createQueryMock();
     const client = new ClaudeAgentClient({
@@ -1962,6 +2002,7 @@ describe("ClaudeAgentSession context window usage", () => {
   interface QueryFactoryForTurnsOptions {
     getContextUsage?: ReturnType<typeof vi.fn>;
     model?: string;
+    featureValues?: Record<string, unknown>;
   }
 
   async function createSessionForTest(): Promise<TestClaudeSession> {
@@ -1986,6 +2027,7 @@ describe("ClaudeAgentSession context window usage", () => {
       provider: "claude",
       cwd: process.cwd(),
       model: options?.model,
+      featureValues: options?.featureValues,
     });
   }
 
@@ -2100,6 +2142,7 @@ describe("ClaudeAgentSession context window usage", () => {
         }),
         setPermissionMode: vi.fn(async () => undefined),
         setModel: vi.fn(async () => undefined),
+        applyFlagSettings: vi.fn(async () => undefined),
         getContextUsage,
         supportedModels: vi.fn(async () => []),
         supportedCommands: vi.fn(async () => []),
@@ -2562,7 +2605,8 @@ describe("ClaudeAgentSession context window usage", () => {
     try {
       const result = await session.run("turn");
 
-      expect(getContextUsage).not.toHaveBeenCalled();
+      // Only the one compaction-window request, after the result; its failure changes nothing.
+      expect(getContextUsage).toHaveBeenCalledTimes(1);
       expect(result.usage).toEqual({
         inputTokens: 9_000,
         cachedInputTokens: 700,
@@ -2718,7 +2762,8 @@ describe("ClaudeAgentSession context window usage", () => {
     try {
       const result = await session.run("turn");
 
-      expect(getContextUsage).not.toHaveBeenCalled();
+      // Only the one compaction-window request, after the result; its failure changes nothing.
+      expect(getContextUsage).toHaveBeenCalledTimes(1);
       expect(result.usage).toEqual({
         inputTokens: 4,
         cachedInputTokens: 16_999,
@@ -2817,6 +2862,75 @@ describe("ClaudeAgentSession context window usage", () => {
         totalCostUsd: 0.1,
         contextWindowMaxTokens: 200_000,
       });
+    } finally {
+      await session.close();
+    }
+  });
+
+  test("measures usage against Claude's compaction window, asked once per model", async () => {
+    const getContextUsage = vi.fn(async () => ({
+      maxTokens: 150_000,
+      totalTokens: 15,
+      categories: [],
+    }));
+    const session = await createSessionForTurns(
+      [
+        [createInitMessage(), createSuccessResult()],
+        [createSuccessResult({ uuid: "result-2" })],
+        [createSuccessResult({ uuid: "result-3" })],
+      ],
+      { getContextUsage },
+    );
+    const events: AgentStreamEvent[] = [];
+    session.subscribe((event) => events.push(event));
+
+    try {
+      await session.run("turn 1");
+      await vi.waitFor(() =>
+        expect(events).toContainEqual(
+          expect.objectContaining({
+            type: "usage_updated",
+            usage: {
+              inputTokens: 10,
+              cachedInputTokens: 5,
+              outputTokens: 7,
+              totalCostUsd: 0.25,
+              contextWindowMaxTokens: 150_000,
+              contextWindowUsedTokens: 22,
+            },
+          }),
+        ),
+      );
+      const secondTurn = await session.run("turn 2");
+      await session.run("turn 3");
+
+      expect(secondTurn.usage?.contextWindowMaxTokens).toBe(150_000);
+      expect(getContextUsage).toHaveBeenCalledTimes(1);
+    } finally {
+      await session.close();
+    }
+  });
+
+  test("keeps the model window and does not ask again when the compaction window request fails", async () => {
+    const getContextUsage = vi.fn(async () => {
+      throw new Error("context usage unavailable");
+    });
+    const session = await createSessionForTurns(
+      [
+        [createInitMessage(), createSuccessResult()],
+        [createSuccessResult({ uuid: "result-2" })],
+        [createSuccessResult({ uuid: "result-3" })],
+      ],
+      { getContextUsage },
+    );
+
+    try {
+      await session.run("turn 1");
+      await session.run("turn 2");
+      const thirdTurn = await session.run("turn 3");
+
+      expect(thirdTurn.usage?.contextWindowMaxTokens).toBe(200_000);
+      expect(getContextUsage).toHaveBeenCalledTimes(1);
     } finally {
       await session.close();
     }
@@ -3356,6 +3470,40 @@ describe("ClaudeAgentSession context window usage", () => {
 
       const nextTurn = await collectStreamEvents(session, "next compaction");
       expect(nextTurn.filter(isLoadingCompactionEvent)).toHaveLength(1);
+    } finally {
+      await session.close();
+    }
+  });
+
+  test("fails the turn instead of falling back when fast mode runs out of usage credits", async () => {
+    const session = await createSessionForTurns(
+      [
+        [
+          createInitMessage(),
+          {
+            type: "system",
+            subtype: "notification",
+            key: "fast-mode-overage-rejected",
+            text: "Fast mode disabled · usage credits exhausted",
+            priority: "immediate",
+            color: "error",
+          },
+          // Claude Code's standard-speed retry, which the interrupt discards.
+          createSuccessResult(),
+        ],
+      ],
+      { model: "claude-opus-4-8", featureValues: { fast_mode: true } },
+    );
+
+    try {
+      const events = await collectStreamEvents(session, "fast turn");
+      expect(events).toContainEqual(
+        expect.objectContaining({
+          type: "turn_failed",
+          error: "Fast mode disabled · usage credits exhausted",
+        }),
+      );
+      expect(events.some((event) => event.type === "turn_completed")).toBe(false);
     } finally {
       await session.close();
     }

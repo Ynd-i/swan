@@ -1,6 +1,8 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { darkHighlightColors, resolveSyntaxColors } from "@getpaseo/highlight";
-import { DEFAULT_UI_FONT_STACK, REGISTERED_THEMES } from "@/styles/theme";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import * as platform from "@/constants/platform";
+import { darkHighlightColors, resolveSyntaxColors, SYNTAX_THEME_IDS } from "@getpaseo/highlight";
+import { resolveSyntaxColors as resolveAppSyntaxColors } from "./syntax-theme";
+import { DEFAULT_UI_FONT_STACK, PLUGIN_THEME_NAMES, REGISTERED_THEMES } from "@/styles/theme";
 import { applyAppearance, type AppearanceInput } from "./apply";
 
 // Override the global react-native-unistyles mock (vitest.setup.ts) so that
@@ -24,7 +26,7 @@ type ThemeUpdater = (theme: FakeTheme) => FakeTheme;
 // fake of this shape through `unknown` to ThemeUpdater's param is test-only.
 interface FakeTheme {
   colorScheme: "light" | "dark";
-  fontFamily: { ui: string; mono: string };
+  fontFamily: { ui: string; content: string; mono: string };
   fontSize: {
     code: number;
     content: number;
@@ -38,13 +40,13 @@ interface FakeTheme {
   };
   lineHeight: { diff: number };
   contentMaxWidth: number;
-  colors: { foreground: string; syntax: Record<string, string> };
+  colors: { foreground: string; syntax: Record<string, string> } & Record<string, unknown>;
 }
 
 function makeFakeTheme(): FakeTheme {
   return {
     colorScheme: "dark",
-    fontFamily: { ui: "seed-ui-stack", mono: "seed-mono-stack" },
+    fontFamily: { ui: "seed-ui-stack", content: "seed-content-stack", mono: "seed-mono-stack" },
     fontSize: {
       code: 12,
       content: 15,
@@ -65,23 +67,36 @@ function makeFakeTheme(): FakeTheme {
 function makeInput(overrides: Partial<AppearanceInput> = {}): AppearanceInput {
   return {
     uiFontFamily: "",
+    contentFontFamily: "",
     monoFontFamily: "",
     uiBaseFontSize: 14,
     contentFontSize: 15,
     codeFontSize: 12,
+    codeFontWeight: null,
+    contentFontWeight: null,
+    uiFontWeight: null,
     contentMaxWidth: 820,
     syntaxTheme: "one",
+    themeColors: {},
     ...overrides,
   };
 }
 
 // Run a single captured updater (default the first) against a fresh fake theme.
-function runCapturedUpdater(call = 0): FakeTheme {
+function runCapturedUpdater(call = 0, theme = makeFakeTheme()): FakeTheme {
   const updater = updateTheme.mock.calls[call]?.[1] as unknown as ThemeUpdater;
-  return updater(makeFakeTheme());
+  return updater(theme);
+}
+
+function runUpdaterFor(key: string, theme = makeFakeTheme()): FakeTheme {
+  return runCapturedUpdater(
+    updateTheme.mock.calls.findIndex((call) => call[0] === key),
+    theme,
+  );
 }
 
 describe("applyAppearance", () => {
+  afterEach(() => vi.restoreAllMocks());
   beforeEach(() => {
     updateTheme.mockClear();
     runtime.themeName = undefined;
@@ -92,6 +107,71 @@ describe("applyAppearance", () => {
 
     expect(updateTheme).toHaveBeenCalledTimes(ALL_THEME_KEYS.length);
     expect(updateTheme.mock.calls.map((call) => call[0])).toEqual([...ALL_THEME_KEYS]);
+  });
+
+  it.each(["codeFontWeight", "contentFontWeight", "uiFontWeight"] as const)(
+    "applies %s only on Mac without changing other typography or plugin colors",
+    (field) => {
+      vi.spyOn(platform, "getIsElectronMac").mockReturnValue(true);
+      for (const codeFontWeight of ["400", "500", "600", null] as const) {
+        updateTheme.mockClear();
+        applyAppearance(makeInput({ [field]: codeFontWeight }));
+        for (let index = 0; index < ALL_THEME_KEYS.length; index++) {
+          const updated = runCapturedUpdater(index);
+          expect(updated).toMatchObject({ [field]: codeFontWeight });
+          expect(updated.fontSize.content).toBe(15);
+        }
+        for (const key of Object.values(PLUGIN_THEME_NAMES)) {
+          expect(runUpdaterFor(key).colors.foreground).toBe("#fff");
+        }
+      }
+      vi.spyOn(platform, "getIsElectronMac").mockReturnValue(false);
+      updateTheme.mockClear();
+      applyAppearance(makeInput({ [field]: "600" }));
+      expect(runCapturedUpdater()).toMatchObject({ [field]: null });
+    },
+  );
+
+  it("rebuilds a built-in theme from its palette and the user's colors", () => {
+    applyAppearance(
+      makeInput({
+        themeColors: { dark: { main: "#101010", sidebar: "#000000", accent: "#ffffff" } },
+      }),
+    );
+
+    const { colors } = runUpdaterFor("dark");
+    expect(colors).toMatchObject({
+      surface0: "#101010",
+      surfaceWorkspace: "#101010",
+      background: "#101010",
+      surfaceSidebar: "#000000",
+      accent: "#ffffff",
+      accentForeground: "#151515",
+      surface1: REGISTERED_THEMES.dark.colors.surface1,
+    });
+    expect(runUpdaterFor("darkZinc").colors).toMatchObject({
+      surface0: REGISTERED_THEMES.darkZinc.colors.surface0,
+    });
+  });
+
+  it.each([
+    ["#d97757", "#ffffff"],
+    ["#3b82f6", "#ffffff"],
+    ["#ffcc00", "#151515"],
+  ])("gives accent %s readable %s text", (accent, accentForeground) => {
+    applyAppearance(makeInput({ themeColors: { dark: { accent } } }));
+
+    expect(runUpdaterFor("dark").colors.accentForeground).toBe(accentForeground);
+  });
+
+  it("restores the authored color once the user's color is cleared", () => {
+    applyAppearance(makeInput({ themeColors: {} }));
+
+    const previouslyCustomized = makeFakeTheme();
+    previouslyCustomized.colors.surfaceSidebar = "#000000";
+    expect(runUpdaterFor("dark", previouslyCustomized).colors.surfaceSidebar).toBe(
+      REGISTERED_THEMES.dark.colors.surfaceSidebar,
+    );
   });
 
   it("patches the active theme before inactive registry entries", () => {
@@ -121,6 +201,35 @@ describe("applyAppearance", () => {
     applyAppearance(makeInput({ uiFontFamily: "  Menlo  " }));
 
     expect(runCapturedUpdater().fontFamily.ui).toBe("Menlo");
+  });
+
+  it("applies the content font independently and falls back to the selected UI font", () => {
+    applyAppearance(
+      makeInput({
+        uiFontFamily: "  Avenir  ",
+        contentFontFamily: "  Charter  ",
+        monoFontFamily: "  Menlo  ",
+      }),
+    );
+    expect(runCapturedUpdater().fontFamily).toEqual({
+      ui: "Avenir",
+      content: "Charter",
+      mono: "Menlo",
+    });
+
+    updateTheme.mockClear();
+    applyAppearance(
+      makeInput({
+        uiFontFamily: "Avenir",
+        contentFontFamily: "",
+        monoFontFamily: "Menlo",
+      }),
+    );
+    expect(runCapturedUpdater().fontFamily).toEqual({
+      ui: "Avenir",
+      content: "Avenir",
+      mono: "Menlo",
+    });
   });
 
   it("scales the whole UI ramp proportionally while preserving ratios", () => {
@@ -202,5 +311,53 @@ describe("applyAppearance", () => {
     // makeFakeTheme().colorScheme === "dark" -> github resolves to the dark palette.
     expect(runCapturedUpdater().colors.syntax).toEqual(darkHighlightColors);
     expect(runCapturedUpdater().colors.syntax).toEqual(resolveSyntaxColors("github", "dark"));
+  });
+
+  it.each(SYNTAX_THEME_IDS)("preserves the shared %s preset in both color schemes", (id) => {
+    for (const mode of ["light", "dark"] as const) {
+      expect(resolveAppSyntaxColors(id, mode)).toEqual(resolveSyntaxColors(id, mode));
+    }
+  });
+
+  it("applies Codex colors in both modes without replacing custom font choices", () => {
+    applyAppearance(
+      makeInput({ syntaxTheme: "codex", monoFontFamily: "Courier New", codeFontSize: 16 }),
+    );
+    for (const colorScheme of ["light", "dark"] as const) {
+      const result = runUpdaterFor(PLUGIN_THEME_NAMES[colorScheme], {
+        ...makeFakeTheme(),
+        colorScheme,
+      });
+      expect(result.colors.syntax).toEqual(resolveAppSyntaxColors("codex", colorScheme));
+      expect(result.colors.foreground).toBe("#fff");
+      expect(result.fontFamily.mono).toBe("Courier New");
+      expect(result.fontSize.code).toBe(16);
+    }
+    expect(resolveAppSyntaxColors("codex", "dark").keyword).not.toBe(
+      resolveAppSyntaxColors("codex", "light").keyword,
+    );
+  });
+
+  it("keeps unsampled Codex roles on the shared GitHub palette", () => {
+    for (const mode of ["light", "dark"] as const) {
+      const palette = resolveAppSyntaxColors("codex", mode);
+      const base = resolveSyntaxColors("github", mode);
+      for (const role of [
+        "attribute",
+        "class",
+        "type",
+        "heading",
+        "tag",
+        "regexp",
+        "link",
+        "comment",
+        "number",
+        "literal",
+        "escape",
+        "meta",
+      ] as const) {
+        expect(palette[role]).toBe(base[role]);
+      }
+    }
   });
 });

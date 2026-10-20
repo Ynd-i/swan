@@ -12,6 +12,8 @@ import { openDesktopTarget, useDesktopOpenTargets } from "@/workspace/desktop-op
 interface OpenInFileManagerMenuItemProps {
   path?: string | null;
   testID: string;
+  /** Replaces the default label, such as the macOS desktop's "Show in Finder". */
+  label?: string;
   surface?: "context" | "dropdown";
 }
 
@@ -26,6 +28,7 @@ const leadingIcon = <ThemedFolderOpen size={14} uniProps={foregroundMutedColorMa
 export function OpenInFileManagerMenuItem({
   path,
   testID,
+  label: labelOverride,
   surface = "dropdown",
 }: OpenInFileManagerMenuItemProps) {
   const { t } = useTranslation();
@@ -52,7 +55,7 @@ export function OpenInFileManagerMenuItem({
     return null;
   }
 
-  const label = t("sidebar.project.actions.openFolder");
+  const label = labelOverride ?? t("sidebar.project.actions.openFolder");
   if (surface === "context") {
     return (
       <ContextMenuItem testID={testID} leading={leadingIcon} onSelect={openInFileManager}>

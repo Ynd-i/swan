@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { StyleSheet } from "react-native-unistyles";
 import { ComboboxItem, type ComboboxOption } from "@/components/ui/combobox";
 import { Shortcut } from "@/components/ui/shortcut";
+import { getIsElectronMac } from "@/constants/platform";
 import { useShortcutKeys } from "@/hooks/use-shortcut-keys";
 import { getHostProjectSourceDirectory, type HostProjectListItem } from "@/projects/host-projects";
 import { pickerItemLabel, type PickerItem } from "../../new-workspace-picker-item";
@@ -20,6 +21,8 @@ function IconBox({ children }: { children: ReactElement }): ReactElement {
   return <View style={styles.iconBox}>{children}</View>;
 }
 
+const localLeading = <IconBox>{folderIcon}</IconBox>;
+
 export function ProjectOption({
   option,
   selected,
@@ -35,26 +38,30 @@ export function ProjectOption({
   selectedServerId: string;
   disabled: boolean;
 }): ReactElement {
-  const leadingSlot = useMemo(
-    () =>
-      project ? (
-        <IconBox>
-          <ProjectIcon
-            projectViewKey={project.viewKey}
-            projectName={project.projectName}
-            iconDataUri={iconDataUri}
-          />
-        </IconBox>
-      ) : undefined,
-    [iconDataUri, project],
-  );
+  // Like Codex, the Mac desktop shows a project's favicon or a folder, and only its name.
+  const desktopChat = getIsElectronMac();
+  const leadingSlot = useMemo(() => {
+    if (!project) return undefined;
+    if (desktopChat && !iconDataUri) return localLeading;
+    return (
+      <IconBox>
+        <ProjectIcon
+          projectViewKey={project.viewKey}
+          projectName={project.projectName}
+          iconDataUri={iconDataUri}
+        />
+      </IconBox>
+    );
+  }, [desktopChat, iconDataUri, project]);
   if (!project) return <View key={option.id} />;
   return (
     <ComboboxItem
       testID={`new-workspace-project-picker-option-${project.viewKey}`}
       label={project.projectName}
       description={
-        getHostProjectSourceDirectory(project, selectedServerId) ?? project.iconWorkingDir
+        desktopChat
+          ? undefined
+          : (getHostProjectSourceDirectory(project, selectedServerId) ?? project.iconWorkingDir)
       }
       selected={selected}
       active={active}
@@ -84,7 +91,6 @@ export function AddProjectOption({ onPress }: { onPress: () => void }): ReactEle
 }
 
 const worktreeLeading = <IconBox>{branchIcon}</IconBox>;
-const localLeading = <IconBox>{folderIcon}</IconBox>;
 
 export function IsolationOption({
   option,
@@ -108,6 +114,27 @@ export function IsolationOption({
 
 const branchLeading = <IconBox>{branchIcon}</IconBox>;
 const pullRequestLeading = <IconBox>{pullRequestIcon}</IconBox>;
+
+/** A branch of the project checkout itself, which Local isolation switches in place. */
+export function LocalBranchOption({
+  option,
+  selected,
+  active,
+  onPress,
+  disabled,
+}: OptionRowState & { disabled: boolean }): ReactElement {
+  return (
+    <ComboboxItem
+      testID={`new-workspace-local-branch-${option.id}`}
+      label={option.label}
+      selected={selected}
+      active={active}
+      disabled={disabled}
+      onPress={onPress}
+      leadingSlot={branchLeading}
+    />
+  );
+}
 
 export function RefOption({
   option,

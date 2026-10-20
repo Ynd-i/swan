@@ -26,6 +26,15 @@ when you have actually looked at it on a phone.
 `ContextMenu` is the exception: it defaults to `compactMode="sheet"` and enables native long press.
 Disable mobile triggering explicitly on draggable rows, where long press belongs to drag instead.
 
+## Popover anchors
+
+A popover may pass `anchorRef` to position against a larger control, such as the
+composer, and `matchAnchorWidth` to use its measured width. This opt-in tracks
+window and anchor-size changes; other menus keep their existing geometry rules.
+Focus still restores to the original trigger. Compact sheets keep their normal
+presentation. `surfaceStyle` and a `MenuItem` style callback allow local color and
+corner adjustments without replacing the selection or keyboard engine.
+
 ## When the items differ per form factor
 
 A menu whose contents depend on what else is on screen gets one component per surface, not one
@@ -81,6 +90,15 @@ last. Nothing else differs between the two.
 Opening a submenu truncates the path to the depth of the trigger that opened it. Without that,
 sliding the pointer across a row of triggers would stack up every flyout it passed instead of
 swapping between them.
+
+## Keyboard navigation
+
+Popover pages support ArrowRight, Enter and Space to enter a submenu and focus its
+first enabled item. ArrowLeft closes that page and returns focus to its parent
+trigger. Hover opens without moving keyboard focus. Keyboard navigation cancels
+pending hover timers so a previous pointer position cannot reopen a closed page.
+Text fields keep their editing keys. Focus waits for an entering surface to become
+visible; a placed Reanimated surface can still be hidden during its first frame.
 
 ## A page that takes input
 

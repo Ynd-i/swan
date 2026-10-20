@@ -11,6 +11,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { getIsElectronMac } from "@/constants/platform";
 import { type RewindMode, useRewindCapabilities } from "./use-rewind-capabilities";
 import type { AgentCapabilityFlags } from "@getpaseo/protocol/agent-types";
 
@@ -82,7 +83,11 @@ export const RewindMenu = memo(function RewindMenu({
   );
 
   const triggerStyle = useCallback(
-    () => [styles.trigger, isLocked ? styles.triggerDisabled : null],
+    ({ hovered, open }: { hovered: boolean; open: boolean }) => [
+      styles.trigger,
+      hovered || open ? styles.triggerActive : null,
+      isLocked ? styles.triggerDisabled : null,
+    ],
     [isLocked],
   );
 
@@ -151,7 +156,12 @@ const styles = StyleSheet.create((theme) => ({
     paddingTop: theme.spacing[1],
     alignItems: "center",
     justifyContent: "center",
+    borderRadius: theme.borderRadius.md,
     backgroundColor: "transparent",
+  },
+  // The Mac desktop UI boxes hovered icon buttons; other platforms only recolor the icon.
+  triggerActive: {
+    backgroundColor: getIsElectronMac() ? theme.colors.interactionHighlight : "transparent",
   },
   triggerDisabled: {
     opacity: theme.opacity[50],

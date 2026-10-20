@@ -67,6 +67,8 @@ interface KeyboardShortcutPlatformContext {
 }
 
 interface ShortcutWhen {
+  /** Voice controls are excluded from the custom macOS desktop. */
+  voice?: true;
   /** true = mac only, false = non-mac only */
   mac?: boolean;
   /** true = desktop only, false = web only */
@@ -1091,7 +1093,7 @@ const SHORTCUT_BINDINGS: readonly ShortcutBinding[] = [
     action: "message-input.action",
     combo: "Cmd+Shift+D",
     repeat: false,
-    when: { mac: true, commandCenter: false, terminal: false },
+    when: { voice: true, mac: true, commandCenter: false, terminal: false },
     payload: { type: "message-input", kind: "voice-toggle" },
     help: {
       id: "voice-toggle",
@@ -1104,7 +1106,7 @@ const SHORTCUT_BINDINGS: readonly ShortcutBinding[] = [
     action: "message-input.action",
     combo: "Ctrl+Shift+D",
     repeat: false,
-    when: { mac: false, commandCenter: false, terminal: false },
+    when: { voice: true, mac: false, commandCenter: false, terminal: false },
     payload: { type: "message-input", kind: "voice-toggle" },
     help: {
       id: "voice-toggle",
@@ -1116,7 +1118,7 @@ const SHORTCUT_BINDINGS: readonly ShortcutBinding[] = [
     id: "message-input-dictation-toggle-cmd-d-mac",
     action: "message-input.action",
     combo: "Cmd+D",
-    when: { mac: true, commandCenter: false, terminal: false },
+    when: { voice: true, mac: true, commandCenter: false, terminal: false },
     payload: { type: "message-input", kind: "dictation-toggle" },
     help: {
       id: "dictation-toggle",
@@ -1128,7 +1130,7 @@ const SHORTCUT_BINDINGS: readonly ShortcutBinding[] = [
     id: "message-input-dictation-toggle-ctrl-d-non-mac",
     action: "message-input.action",
     combo: "Ctrl+D",
-    when: { mac: false, commandCenter: false, terminal: false },
+    when: { voice: true, mac: false, commandCenter: false, terminal: false },
     payload: { type: "message-input", kind: "dictation-toggle" },
     help: {
       id: "dictation-toggle",
@@ -1153,7 +1155,7 @@ const SHORTCUT_BINDINGS: readonly ShortcutBinding[] = [
     id: "message-input-dictation-confirm-enter",
     action: "message-input.action",
     combo: "Enter",
-    when: { commandCenter: false, terminal: false },
+    when: { voice: true, commandCenter: false, terminal: false },
     payload: { type: "message-input", kind: "dictation-confirm" },
   },
 
@@ -1162,7 +1164,7 @@ const SHORTCUT_BINDINGS: readonly ShortcutBinding[] = [
     action: "message-input.action",
     combo: "Space",
     repeat: false,
-    when: { commandCenter: false, focusScope: "other" },
+    when: { voice: true, commandCenter: false, focusScope: "other" },
     payload: { type: "message-input", kind: "voice-mute-toggle" },
     help: {
       id: "voice-mute-toggle",
@@ -1335,8 +1337,7 @@ export function matchesKeyboardShortcutContext(
   context: KeyboardShortcutContext,
 ): boolean {
   if (!when) return true;
-  if (when.mac !== undefined && when.mac !== context.isMac) return false;
-  if (when.desktop !== undefined && when.desktop !== context.isDesktop) return false;
+  if (!helpMatchesPlatform(when, context)) return false;
   if (
     when.editable === false &&
     (context.focusScope === "message-input" || context.focusScope === "editable")
@@ -1400,6 +1401,7 @@ function helpMatchesPlatform(
   when: ShortcutWhen | undefined,
   context: KeyboardShortcutPlatformContext,
 ): boolean {
+  if (when?.voice && context.isMac && context.isDesktop) return false;
   if (when?.mac !== undefined && when.mac !== context.isMac) return false;
   if (when?.desktop !== undefined && when.desktop !== context.isDesktop) return false;
   return true;

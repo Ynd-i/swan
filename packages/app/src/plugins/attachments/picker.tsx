@@ -149,6 +149,7 @@ export function usePluginAttachmentPicker(
         const Icon = resolvePluginIcon(source.icon);
         return {
           id: `plugin:${key}`,
+          section: "plugins" as const,
           label: `Attach ${source.title}`,
           icon: <ThemedSourceIcon Icon={Icon} uniProps={iconColorMapping} />,
           onSelect: () => setActiveKey(key),

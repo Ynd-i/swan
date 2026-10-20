@@ -22,10 +22,13 @@ import {
   useImperativeHandle,
   useMemo,
   forwardRef,
+  Fragment,
 } from "react";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { useTranslation } from "react-i18next";
-import { ICON_SIZE, type Theme } from "@/styles/theme";
+import { ICON_SIZE, getContentLineHeight, type Theme } from "@/styles/theme";
+import { CONTENT_SURFACE_DATASET } from "@/styles/content-surface";
+import { CODE_SURFACE_DATASET } from "@/styles/code-surface";
 import { ArrowUp, Mic, MicOff, CornerDownLeft, Plus, Square } from "lucide-react-native";
 import { useDictation } from "@/hooks/use-dictation";
 import { hasFinePointer } from "@/hooks/use-fine-pointer";
@@ -49,6 +52,8 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useShortcutKeys } from "@/hooks/use-shortcut-keys";
@@ -57,7 +62,7 @@ import { formatShortcut, type ShortcutKey } from "@/utils/format-shortcut";
 import { getShortcutOs } from "@/utils/shortcut-platform";
 import type { MessageInputKeyboardActionKind } from "@/keyboard/actions";
 import { isImeComposingKeyboardEvent } from "@/utils/keyboard-ime";
-import { isWeb } from "@/constants/platform";
+import { getIsElectronMac, isWeb } from "@/constants/platform";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { useComposerKeyboardScope } from "@/composer/keyboard-scope";
 import { RenderProfile } from "@/utils/render-profiler";
@@ -71,8 +76,11 @@ import {
   type EditingTextInputProps,
 } from "@/components/ui/text-input";
 
-const ComposerTextInput = withUnistyles(EditingTextInput, (theme) => ({
-  placeholderTextColor: theme.colors.surface4,
+const ComposerTextInput = withUnistyles(EditingTextInput, (theme, rt) => ({
+  placeholderTextColor:
+    getIsElectronMac() && rt.themeName === "dark"
+      ? theme.colors.foregroundExtraMuted
+      : theme.colors.surface4,
 }));
 import {
   resolveSendTooltipLabel,
@@ -93,7 +101,8 @@ import {
 } from "./state";
 
 const DEFAULT_SEND_KEYS: ShortcutKey[][] = [["Enter"]];
-const COMPOSER_INPUT_DATASET = { composerInput: "" } as const;
+const COMPOSER_INPUT_DATASET = { composerInput: "", ...CONTENT_SURFACE_DATASET } as const;
+const TERMINAL_INPUT_DATASET = { composerInput: "", ...CODE_SURFACE_DATASET } as const;
 
 export interface AttachmentMenuItem {
   id: string;
@@ -101,6 +110,9 @@ export interface AttachmentMenuItem {
   onSelect: () => void;
   disabled?: boolean;
   icon?: React.ReactElement | null;
+  /** "modes" rows (plan, goal) toggle composer modes and follow a separator. */
+  section?: "plugins" | "modes";
+  selected?: boolean;
 }
 
 export interface ComposerInputSnapshot {
@@ -202,9 +214,13 @@ export interface MessageInputRef {
 
 const MIN_INPUT_HEIGHT_MOBILE = 30;
 const MIN_INPUT_HEIGHT_DESKTOP = 46;
+// The Mac composer moves 4pt from the input to the top padding, as in Codex, keeping its height.
+const MAC_INPUT_TOP_INSET = 4;
 const DEFAULT_MAX_INPUT_HEIGHT = 160;
 const MAX_INPUT_VIEWPORT_RATIO = 0.5;
-const MIN_INPUT_HEIGHT = isWeb ? MIN_INPUT_HEIGHT_DESKTOP : MIN_INPUT_HEIGHT_MOBILE;
+const MIN_INPUT_HEIGHT = isWeb
+  ? MIN_INPUT_HEIGHT_DESKTOP - (getIsElectronMac() ? MAC_INPUT_TOP_INSET : 0)
+  : MIN_INPUT_HEIGHT_MOBILE;
 type WebTextInputKeyPressEvent = NativeSyntheticEvent<
   TextInputKeyPressEventData & {
     metaKey?: boolean;
@@ -247,19 +263,48 @@ function AttachButtonIcon({
   );
 }
 
-function AttachmentMenuList({ items }: { items: AttachmentMenuItem[] }) {
+const desktopAttachmentItemStyle: React.ComponentProps<typeof DropdownMenuItem>["style"] = ({
+  hovered,
+  focused,
+  pressed,
+  disabled,
+}) => [
+  styles.attachmentMenuItem,
+  !disabled && (hovered || focused || pressed) ? styles.attachmentMenuItemActive : null,
+];
+
+function AttachmentMenuList({
+  items,
+  desktop,
+  title,
+}: {
+  items: AttachmentMenuItem[];
+  desktop: boolean;
+  title: string;
+}) {
+  const { t } = useTranslation();
   return (
     <>
-      {items.map((item) => (
-        <DropdownMenuItem
-          key={item.id}
-          testID={`message-input-attachment-menu-item-${item.id}`}
-          disabled={item.disabled}
-          onSelect={item.onSelect}
-          leading={item.icon ?? null}
-        >
-          {item.label}
-        </DropdownMenuItem>
+      {desktop ? <DropdownMenuLabel>{title}</DropdownMenuLabel> : null}
+      {items.map((item, index) => (
+        <Fragment key={item.id}>
+          {desktop && item.section === "plugins" && items[index - 1]?.section !== "plugins" ? (
+            <DropdownMenuLabel>{t("settings.plugins.title")}</DropdownMenuLabel>
+          ) : null}
+          {item.section === "modes" && items[index - 1]?.section !== "modes" ? (
+            <DropdownMenuSeparator />
+          ) : null}
+          <DropdownMenuItem
+            testID={`message-input-attachment-menu-item-${item.id}`}
+            disabled={item.disabled}
+            selected={item.selected}
+            onSelect={item.onSelect}
+            leading={item.icon ?? null}
+            style={desktop ? desktopAttachmentItemStyle : undefined}
+          >
+            {item.label}
+          </DropdownMenuItem>
+        </Fragment>
       ))}
     </>
   );
@@ -273,6 +318,8 @@ function AttachmentDropdown({
   renderAttachButtonIcon,
   attachmentMenuItems,
   addAttachmentLabel,
+  composerRef,
+  compact,
 }: {
   visible: boolean;
   isConnected: boolean;
@@ -281,12 +328,15 @@ function AttachmentDropdown({
   renderAttachButtonIcon: (input: { hovered?: boolean }) => React.ReactElement;
   attachmentMenuItems: AttachmentMenuItem[];
   addAttachmentLabel: string;
+  composerRef: React.RefObject<View | null>;
+  compact: boolean;
 }) {
+  const desktopMenu = getIsElectronMac() && !compact;
   const isButtonDisabled = !isConnected || disabled;
   if (!visible) return null;
   return (
     <DropdownMenu compactMode="sheet">
-      <Tooltip delayDuration={0} enabledOnDesktop enabledOnMobile={false}>
+      <Tooltip delayDuration={0} enabledOnDesktop={!desktopMenu} enabledOnMobile={false}>
         <TooltipTrigger asChild>
           <DropdownMenuTrigger
             disabled={isButtonDisabled}
@@ -306,11 +356,20 @@ function AttachmentDropdown({
         side="top"
         align="start"
         offset={8}
-        minWidth={220}
+        minWidth={desktopMenu ? 0 : 220}
+        anchorRef={desktopMenu ? composerRef : undefined}
+        matchAnchorWidth={desktopMenu}
+        surfaceStyle={desktopMenu ? styles.attachmentMenuSurface : undefined}
+        maxHeight={desktopMenu ? 360 : undefined}
+        scrollable={desktopMenu}
         testID="message-input-attachment-menu"
         sheetTitle={addAttachmentLabel}
       >
-        <AttachmentMenuList items={attachmentMenuItems} />
+        <AttachmentMenuList
+          items={attachmentMenuItems}
+          desktop={desktopMenu}
+          title={addAttachmentLabel}
+        />
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -610,7 +669,9 @@ function FocusHint({
   label: string;
 }) {
   const { isActiveComposer } = useComposerKeyboardScope();
-  if (!isActiveComposer || !visible || !focusInputKeys || !label.trim()) return null;
+  if (getIsElectronMac() || !isActiveComposer || !visible || !focusInputKeys || !label.trim()) {
+    return null;
+  }
   return (
     <Text style={styles.focusHintText} pointerEvents="none">
       {label}
@@ -620,6 +681,7 @@ function FocusHint({
 
 interface ComposerTextSurfaceProps {
   readOnly: boolean;
+  monospace: boolean;
   value: string;
   textReplacementKey: string;
   textInputRef: React.Ref<ComposerTextInputHandle>;
@@ -671,7 +733,11 @@ function ComposerTextSurface(props: ComposerTextSurfaceProps): React.ReactElemen
   if (props.readOnly) {
     return (
       <View style={styles.textInputScrollWrapper}>
-        <Text style={props.readOnlyTextStyle} testID="composer-readonly-content">
+        <Text
+          dataSet={props.monospace ? CODE_SURFACE_DATASET : CONTENT_SURFACE_DATASET}
+          style={props.readOnlyTextStyle}
+          testID="composer-readonly-content"
+        >
           {props.value}
         </Text>
       </View>
@@ -691,7 +757,7 @@ function ComposerTextSurface(props: ComposerTextSurfaceProps): React.ReactElemen
       ) : null}
       <ComposerTextInput
         ref={props.textInputRef}
-        dataSet={COMPOSER_INPUT_DATASET}
+        dataSet={props.monospace ? TERMINAL_INPUT_DATASET : COMPOSER_INPUT_DATASET}
         initialValue={props.value}
         onChangeText={handleTextChange}
         placeholder={props.placeholder}
@@ -1983,6 +2049,7 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
         <RenderProfile id="ComposerTextSurface">
           <ComposerTextSurface
             readOnly={readOnly}
+            monospace={mode.isMonospace}
             value={
               readOnly
                 ? value
@@ -2021,6 +2088,7 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
       ),
       [
         readOnly,
+        mode.isMonospace,
         textReplacement,
         assignTextInput,
         textInputStyle,
@@ -2053,6 +2121,8 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
           {/* Toolbar left: attachment button + agent controls */}
           <View style={styles.leftButtonGroup}>
             <AttachmentDropdown
+              composerRef={rootRef}
+              compact={isCompact}
               visible={mode.showAttachments}
               isConnected={isConnected}
               disabled={disabled}
@@ -2085,6 +2155,7 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
         </View>
       ),
       [
+        isCompact,
         mode.showAttachments,
         isConnected,
         disabled,
@@ -2192,6 +2263,9 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
 );
 
 const styles = StyleSheet.create((theme: Theme) => ({
+  attachmentMenuSurface: { backgroundColor: theme.colors.surface2, borderRadius: 24 },
+  attachmentMenuItem: { borderRadius: theme.borderRadius.full },
+  attachmentMenuItemActive: { backgroundColor: theme.colors.surface3 },
   container: {
     flexShrink: 1,
     position: "relative",
@@ -2203,24 +2277,21 @@ const styles = StyleSheet.create((theme: Theme) => ({
   inputWrapper: {
     flexShrink: 1,
     flexDirection: "column",
-    gap: theme.spacing[3],
-    backgroundColor: theme.colors.surface1,
-    borderWidth: theme.borderWidth[1],
+    gap: getIsElectronMac() ? theme.spacing[2] : theme.spacing[3],
+    backgroundColor: getIsElectronMac() ? theme.colors.surface3 : theme.colors.surface1,
+    borderWidth: getIsElectronMac() ? 0 : theme.borderWidth[1],
     borderColor: theme.colors.borderAccent,
-    borderRadius: theme.borderRadius["2xl"],
-    paddingTop: {
-      xs: theme.spacing[2],
-      md: theme.spacing[4],
-    },
+    borderRadius: getIsElectronMac() ? 24 : theme.borderRadius["2xl"],
+    paddingTop: getIsElectronMac()
+      ? theme.spacing[2] + MAC_INPUT_TOP_INSET
+      : { xs: theme.spacing[2], md: theme.spacing[4] },
     // The button row bleeds 6px horizontally, so match its corner inset at the bottom.
-    paddingBottom: {
-      xs: theme.spacing[2],
-      md: theme.spacing[3],
-    },
-    paddingHorizontal: {
-      xs: theme.spacing[3],
-      md: theme.spacing[4],
-    },
+    paddingBottom: getIsElectronMac()
+      ? theme.spacing[2]
+      : { xs: theme.spacing[2], md: theme.spacing[3] },
+    paddingHorizontal: getIsElectronMac()
+      ? theme.spacing[3]
+      : { xs: theme.spacing[3], md: theme.spacing[4] },
     ...(isWeb
       ? {
           transitionProperty: "border-color",
@@ -2237,6 +2308,7 @@ const styles = StyleSheet.create((theme: Theme) => ({
   // into it" without swapping the border colour, which reads as an error state.
   inputWrapperReadOnly: {
     borderStyle: "dotted",
+    borderWidth: theme.borderWidth[1],
   },
   // The band the fullscreen glyph sits in is the input's own padding, so a tap
   // anywhere in it (under the glyph, or where the glyph would be) is a tap on the
@@ -2272,15 +2344,16 @@ const styles = StyleSheet.create((theme: Theme) => ({
     flexShrink: 1,
     width: "100%",
     color: theme.colors.foreground,
+    fontFamily: theme.fontFamily.content,
     fontSize: theme.fontSize.content,
-    fontWeight: theme.fontWeight.normal,
+    fontWeight: theme.contentFontWeight ?? "normal",
     // No lineHeight on native. React Native applies it as a span over the text, and an
     // empty trailing line is laid out from the font's own metrics on some devices, so
     // the input jumps when the first character lands on a new line. The font's natural
     // line box is the same for every line. Web keeps the CSS value.
     ...(isWeb
       ? ({
-          lineHeight: theme.fontSize.content * 1.4,
+          lineHeight: getContentLineHeight(theme.fontSize.content),
           outlineStyle: "none",
           outlineWidth: 0,
           outlineColor: "transparent",
@@ -2299,7 +2372,7 @@ const styles = StyleSheet.create((theme: Theme) => ({
     flexDirection: "row",
     alignItems: "flex-end",
     justifyContent: "space-between",
-    marginHorizontal: -6,
+    marginHorizontal: getIsElectronMac() ? -4 : -6,
   },
   leftButtonGroup: {
     minWidth: 0,

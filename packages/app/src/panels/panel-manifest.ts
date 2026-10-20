@@ -1,4 +1,5 @@
 import type { WorkspaceTabTarget } from "@/workspace-tabs/model";
+import { getIsElectronMac } from "@/constants/platform";
 
 /** Where a tab renders: a split pane, the Explorer dock, or the compact workspace sheet. */
 export type PaneHost = "main" | "explorer" | "sheet";
@@ -161,7 +162,10 @@ const manifests = {
 } satisfies PanelManifestByKind;
 
 export function getPanelManifest<K extends WorkspaceTabTarget["kind"]>(kind: K): PanelManifest<K> {
-  return manifests[kind] as unknown as PanelManifest<K>;
+  const manifest = manifests[kind] as unknown as PanelManifest<K>;
+  return getIsElectronMac() && (kind === "browser" || kind === "setup")
+    ? { ...manifest, supportedHosts: ["main", "explorer"] }
+    : manifest;
 }
 
 export function panelSupportsHost(kind: WorkspaceTabTarget["kind"], host: PaneHost): boolean {

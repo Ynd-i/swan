@@ -22,7 +22,7 @@ import type { WorkspaceFileLocation } from "@/workspace/file-open";
 import { useRetainedPanelActive } from "@/components/retained-panel";
 import { useAppActivelyVisible } from "@/hooks/use-app-visible";
 import { isFileQueryEnabled } from "@/components/file-pane-enabled";
-import { isWeb } from "@/constants/platform";
+import { getIsElectronMac, isWeb } from "@/constants/platform";
 import { useAppSettings } from "@/hooks/use-settings";
 import { useLiveFile } from "./live-file/hook";
 import { useFilePreview } from "./preview-lifecycle/hook";
@@ -103,6 +103,7 @@ function ReadonlySource({
       selection: theme.colors.terminal.selectionBackground,
       monoFont: theme.fontFamily.mono,
       codeFontSize: theme.fontSize.code,
+      codeFontWeight: theme.codeFontWeight,
       syntax: theme.colors.syntax,
     }),
     [theme],
@@ -449,7 +450,10 @@ function FilePanePresentation({
   }
 
   return (
-    <View style={styles.container} testID="workspace-file-pane">
+    <View
+      style={[styles.container, getIsElectronMac() && styles.macFilePane]}
+      testID="workspace-file-pane"
+    >
       {preview ? (
         <FilePanelBar
           size={preview.size}
@@ -558,6 +562,7 @@ function EditableFilePane({
       selection: theme.colors.terminal.selectionBackground,
       monoFont: theme.fontFamily.mono,
       codeFontSize: theme.fontSize.code,
+      codeFontWeight: theme.codeFontWeight,
       syntax: theme.colors.syntax,
     }),
     [
@@ -571,6 +576,7 @@ function EditableFilePane({
       theme.colorScheme,
       theme.fontFamily.mono,
       theme.fontSize.code,
+      theme.codeFontWeight,
     ],
   );
 
@@ -613,7 +619,10 @@ function EditableFilePane({
   const showSource = mode !== "preview";
 
   return (
-    <View style={styles.container} testID="workspace-file-pane">
+    <View
+      style={[styles.container, getIsElectronMac() && styles.macFilePane]}
+      testID="workspace-file-pane"
+    >
       <FilePanelBar
         size={
           snapshot.observedVersion.status === "ready" ? snapshot.observedVersion.size : preview.size
@@ -676,6 +685,7 @@ function fileConflictAlertState(input: {
 }
 
 const styles = StyleSheet.create((theme) => ({
+  macFilePane: { flexDirection: "column-reverse" },
   container: {
     flex: 1,
     minHeight: 0,

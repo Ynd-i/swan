@@ -1,6 +1,8 @@
 import path from "node:path";
+import { once } from "node:events";
 import { existsSync } from "node:fs";
 import { app, BrowserWindow, Notification, ipcMain, nativeImage } from "electron";
+import log from "electron-log/main";
 import { getDesktopSettingsStore } from "../settings/desktop-settings-electron.js";
 
 interface NotificationInput {
@@ -14,6 +16,8 @@ interface NotificationClickPayload {
 }
 
 const activeNotifications = new Set<Notification>();
+// Each window receives the same agent attention event; show it once.
+const recentNotificationKeys = new Set<string>();
 
 function toTrimmedString(value: unknown): string | null {
   if (typeof value !== "string") {
@@ -74,6 +78,9 @@ export function ensureNotificationCenterRegistration(): void {
 
   const probe = new Notification({ title: app.name, silent: true });
   probe.on("show", () => probe.close());
+  probe.on("failed", (_event, error) =>
+    log.warn("[notifications] registration probe failed", error),
+  );
   setTimeout(() => probe.close(), 2_000);
   probe.show();
 }
@@ -95,6 +102,14 @@ export function registerNotificationHandlers(): void {
 
     const body = toTrimmedString(rawInput?.body) ?? undefined;
     const data = toRecord(rawInput?.data);
+    if (data) {
+      const key = JSON.stringify([title, body, data]);
+      if (recentNotificationKeys.has(key)) {
+        return true;
+      }
+      recentNotificationKeys.add(key);
+      setTimeout(() => recentNotificationKeys.delete(key), 5_000);
+    }
     const icon = getNotificationIcon();
     const settings = await getDesktopSettingsStore().get();
     const notification = new Notification({
@@ -119,7 +134,19 @@ export function registerNotificationHandlers(): void {
       activeNotifications.delete(notification);
     });
 
+    // macOS reports a refused notification (for example when the app is not allowed to
+    // notify) through "failed"; wait for it so the renderer does not report false success.
+    const delivered = Promise.race([
+      once(notification, "show").then(() => true),
+      once(notification, "failed").then(([, error]) => {
+        activeNotifications.delete(notification);
+        log.warn("[notifications] show failed", error);
+        return false;
+      }),
+      // ponytail: some platforms never emit "show"; assume delivered after 2s
+      new Promise<boolean>((resolve) => setTimeout(resolve, 2_000, true)),
+    ]);
     notification.show();
-    return true;
+    return await delivered;
   });
 }

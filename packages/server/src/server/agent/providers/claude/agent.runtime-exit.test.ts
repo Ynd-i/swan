@@ -202,6 +202,56 @@ describe("Claude runtime exit", () => {
     }
   });
 
+  test("reports background shells between turns and clears them when the runtime exits", async () => {
+    let capturedOptions: Options | undefined;
+    let deliverLevel: ((event: unknown) => void) | undefined;
+    const queryFactory = vi.fn(({ options }: ClaudeQueryInput) => {
+      capturedOptions = options;
+      return createQueryMock([COMPLETED_TURN_EVENTS[0], COMPLETED_TURN_EVENTS[2]], {
+        tail: new Promise((resolve) => {
+          deliverLevel = resolve;
+        }),
+      });
+    });
+    const child = createChildProcessStub();
+    vi.spyOn(spawnUtils, "spawnProcess").mockReturnValue(child);
+    const client = new ClaudeAgentClient({
+      logger: createTestLogger(),
+      queryFactory,
+      resolveBinary: async () => "/test/claude/bin",
+    });
+    const session = await client.createSession({ provider: "claude", cwd: process.cwd() });
+    const events: AgentStreamEvent[] = [];
+    session.subscribe((event) => events.push(event));
+
+    try {
+      await session.run("start a background shell");
+      capturedOptions?.spawnClaudeCodeProcess?.(SPAWN_OPTIONS);
+      const taskSets = () =>
+        events.flatMap((event) => (event.type === "background_tasks_changed" ? [event.tasks] : []));
+
+      // The level usually lands after the turn's result, while the session is idle.
+      deliverLevel?.({
+        type: "system",
+        subtype: "background_tasks_changed",
+        tasks: [
+          { task_id: "b-shell", task_type: "local_bash", description: "Sleep for 15 seconds" },
+          { task_id: "a-child", task_type: "local_agent", description: "Explore the repo" },
+          { task_id: "w-spec", task_type: "local_workflow", description: "Run the spec workflow" },
+        ],
+      });
+      // Subagents and workflows stay in the subagents track.
+      await vi.waitFor(() => {
+        expect(taskSets()).toEqual([[{ id: "b-shell", description: "Sleep for 15 seconds" }]]);
+      });
+
+      child.emit("exit", 1, null);
+      expect(taskSets().at(-1)).toEqual([]);
+    } finally {
+      await session.close();
+    }
+  });
+
   test("stays quiet when the process exits during an intentional teardown", async () => {
     let capturedOptions: Options | undefined;
     const queryFactory = vi.fn(({ options }: ClaudeQueryInput) => {

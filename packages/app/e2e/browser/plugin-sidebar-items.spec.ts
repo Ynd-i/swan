@@ -19,6 +19,7 @@ import {
 } from "../support/helpers/plugin-sidebar-items";
 import {
   leaveSettings,
+  sidebarShortcutLabel,
   openSidebarNavSettings,
   seedSidebarFooterPreferences,
   setFooterItemVisible,
@@ -242,12 +243,15 @@ test.describe("Plugin sidebar items", () => {
   });
 
   test("a header row's shortcut hint presses the row", async ({ page }) => {
+    await installUsageReportsFixture(page, { lists: [[]] });
     await page.setViewportSize(WIDE);
     await gotoWorkspace(page, workspaceId);
     const newWorkspace = visibleTestId(page, "sidebar-global-new-workspace");
     await expect(newWorkspace).toBeVisible({ timeout: 30_000 });
     await newWorkspace.hover();
-    const hint = page.getByText("Ctrl+N", { exact: true }).locator("visible=true");
+    const hint = page
+      .getByText(await sidebarShortcutLabel(page, ["mod", "n"]), { exact: true })
+      .locator("visible=true");
     await expect(hint).toBeVisible();
     await qaScreenshot(page, "phase7-header-row-hint", newWorkspace.locator("xpath=../.."));
     await hint.click();

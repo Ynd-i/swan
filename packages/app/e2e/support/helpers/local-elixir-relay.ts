@@ -1,6 +1,7 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { existsSync } from "node:fs";
-import net from "node:net";
+import { once } from "node:events";
+import { getAvailableHostDaemonPort } from "./isolated-host-daemon";
 import path from "node:path";
 import { killProcessTree } from "./spawn-node";
 
@@ -10,21 +11,6 @@ export interface LocalElixirRelay {
   start(): Promise<void>;
   stop(): Promise<void>;
   close(): Promise<void>;
-}
-
-async function availablePort(): Promise<number> {
-  return await new Promise((resolve, reject) => {
-    const server = net.createServer();
-    server.once("error", reject);
-    server.listen(0, "127.0.0.1", () => {
-      const address = server.address();
-      if (!address || typeof address === "string") {
-        server.close(() => reject(new Error("Could not allocate a relay port")));
-        return;
-      }
-      server.close(() => resolve(address.port));
-    });
-  });
 }
 
 async function waitUntilReady(
@@ -58,9 +44,7 @@ async function waitUntilReady(
 
 export async function startLocalElixirRelay(): Promise<LocalElixirRelay> {
   if (process.platform === "win32") {
-    throw new Error(
-      "The local Elixir relay requires asdf, which is not available on Windows; the relay-deployment Playwright project is POSIX-only.",
-    );
+    throw new Error("The local Elixir relay-deployment Playwright project is POSIX-only.");
   }
 
   const relayRoot =
@@ -71,7 +55,7 @@ export async function startLocalElixirRelay(): Promise<LocalElixirRelay> {
     );
   }
 
-  const port = await availablePort();
+  const port = await getAvailableHostDaemonPort();
   let child: ChildProcess | null = null;
   let output: string[] = [];
 
@@ -80,7 +64,7 @@ export async function startLocalElixirRelay(): Promise<LocalElixirRelay> {
       throw new Error("Elixir relay is already running");
     }
     output = [];
-    child = spawn("asdf", ["exec", "mix", "run", "--no-halt"], {
+    child = spawn("mix", ["run", "--no-halt"], {
       cwd: relayRoot,
       env: {
         ...process.env,
@@ -98,9 +82,10 @@ export async function startLocalElixirRelay(): Promise<LocalElixirRelay> {
     child.stdout?.on("data", capture);
     child.stderr?.on("data", capture);
     try {
+      await once(child, "spawn");
       await waitUntilReady(port, child, () => output.join("\n"));
     } catch (error) {
-      await killProcessTree(child);
+      if (child.pid !== undefined) await killProcessTree(child);
       throw error;
     }
   };

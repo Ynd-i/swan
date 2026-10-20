@@ -20,7 +20,15 @@ export interface CheckoutStatusClient {
 
 // Checkout status enters the app through exactly two doors: daemon pushes
 // (applyCheckoutStatusUpdateFromEvent) and query fetches (fetchCheckoutStatus). Both run
-// the dirty-state reactions, so they hold regardless of which screens are mounted.
+// the comparison-state reactions, so they hold regardless of which screens are mounted.
+
+function comparisonSnapshot(payload: CheckoutStatusPayload) {
+  return {
+    isDirty: payload.isGit && payload.isDirty,
+    currentBranch: payload.isGit ? (payload.currentBranch ?? null) : null,
+    defaultBaseRef: payload.isGit ? (payload.baseRef ?? null) : null,
+  };
+}
 
 export async function fetchCheckoutStatus({
   client,
@@ -32,7 +40,7 @@ export async function fetchCheckoutStatus({
   cwd: string;
 }): Promise<CheckoutStatusPayload> {
   const payload = await client.getCheckoutStatus(cwd);
-  expireWorkingDiffComparisons({ serverId, cwd, isDirty: payload.isGit && payload.isDirty });
+  expireWorkingDiffComparisons({ serverId, cwd, ...comparisonSnapshot(payload) });
   return payload;
 }
 
@@ -81,7 +89,7 @@ export function applyCheckoutStatusUpdateFromEvent({
   expireWorkingDiffComparisons({
     serverId,
     cwd: payload.cwd,
-    isDirty: payload.isGit && payload.isDirty,
+    ...comparisonSnapshot(payload),
   });
 
   if (!prStatus) {

@@ -4,8 +4,9 @@ import {
   resolveExactHostProjectCandidate,
   type HostProjectListItem,
 } from "@/projects/host-projects";
+import { isChatFolderPath } from "@/projects/chat-folder";
 
-export type ProjectSelectionSource = "initial" | "manual";
+export type ProjectSelectionSource = "initial" | "manual" | "none";
 export type InitialProjectSelectionSource = "route" | "lastActive" | "fallback" | null;
 
 interface InitialProjectSelection {
@@ -21,7 +22,17 @@ interface ManualProjectSelection {
   source: "manual";
 }
 
-export type ProjectSelection = InitialProjectSelection | ManualProjectSelection;
+// No project: the chat gets its own folder. Kept like a manual choice until the route changes.
+interface NoProjectSelection {
+  contextKey: string;
+  project: null;
+  source: "none";
+}
+
+export type ProjectSelection =
+  | InitialProjectSelection
+  | ManualProjectSelection
+  | NoProjectSelection;
 
 export interface ProjectSelectionContext {
   contextKey: string;
@@ -50,10 +61,19 @@ export function createManualProjectSelectionContextKey(input: {
   return input.routeProjectViewKey ?? "";
 }
 
+export function createNoProjectSelection(manualContextKey: string): ProjectSelection {
+  return { contextKey: manualContextKey, project: null, source: "none" };
+}
+
 export function createProjectSelection({
   contextKey,
+  manualContextKey,
   initialProject,
 }: ProjectSelectionContext): ProjectSelection {
+  // A new chat started from a chat without a project stays without one.
+  if (initialProject && isChatFolderPath(initialProject.iconWorkingDir)) {
+    return createNoProjectSelection(manualContextKey);
+  }
   return {
     contextKey,
     project: initialProject,
@@ -104,7 +124,7 @@ function resolveSelectedProjectFromInitialInputs(
 }
 
 function refreshSelectionProject(
-  selection: ProjectSelection,
+  selection: InitialProjectSelection | ManualProjectSelection,
   project: HostProjectListItem,
 ): ProjectSelection {
   if (selection.project === project) {
@@ -206,9 +226,13 @@ export function reconcileProjectSelection(
 ): ProjectSelection {
   const initialSelection = createProjectSelection(context);
   const currentContextKey =
-    current.source === "manual" ? context.manualContextKey : context.contextKey;
+    current.source === "initial" ? context.contextKey : context.manualContextKey;
   if (current.contextKey !== currentContextKey) {
     return initialSelection;
+  }
+
+  if (current.source === "none") {
+    return current;
   }
 
   if (shouldResetHydratedInitialSelection(current, context)) {

@@ -7,6 +7,9 @@ import {
 } from "@/utils/agent-attention";
 import { getIsAppActivelyVisible } from "@/utils/app-visibility";
 import { isWeb } from "@/constants/platform";
+import { useToast } from "@/contexts/toast-context";
+import { updateDesktopChat } from "@/components/desktop/desktop-chat-actions";
+import { DESKTOP_CHAT_UNREAD } from "@/components/desktop/desktop-chat-model";
 
 type AttentionReason = "finished" | "error" | "permission" | null | undefined;
 
@@ -15,6 +18,7 @@ interface UseAgentAttentionClearParams {
   client: DaemonClient | null;
   isConnected: boolean;
   requiresAttention: boolean | null | undefined;
+  manualUnread?: boolean;
   attentionReason: AttentionReason;
   isScreenFocused: boolean;
 }
@@ -29,10 +33,13 @@ export function useAgentAttentionClear({
   agentId,
   client,
   isConnected,
-  requiresAttention,
+  requiresAttention: serverRequiresAttention,
+  manualUnread = false,
   attentionReason,
   isScreenFocused,
 }: UseAgentAttentionClearParams): AgentAttentionClearController {
+  const toast = useToast();
+  const requiresAttention = Boolean(serverRequiresAttention || manualUnread);
   const [isAppVisible, setIsAppVisible] = useState<boolean>(() => getIsAppActivelyVisible());
   const deferredFocusEntryClearRef = useRef(false);
   const prevRequiresAttentionRef = useRef(Boolean(requiresAttention));
@@ -53,15 +60,38 @@ export function useAgentAttentionClear({
           requiresAttention,
           attentionReason,
           trigger,
+          manualUnread,
           hasDeferredFocusEntryClear: deferredFocusEntryClearRef.current,
         })
       ) {
         return;
       }
       deferredFocusEntryClearRef.current = false;
-      client.clearAgentAttention(resolvedAgentId).catch(() => {});
+      if (manualUnread) {
+        void updateDesktopChat(
+          client,
+          {
+            id: resolvedAgentId,
+            requiresAttention: Boolean(serverRequiresAttention),
+            attentionReason,
+            labels: { [DESKTOP_CHAT_UNREAD]: "true" },
+          },
+          { kind: "read" },
+        ).catch((error) => toast.error(String(error instanceof Error ? error.message : error)));
+      } else {
+        client.clearAgentAttention(resolvedAgentId).catch(() => {});
+      }
     },
-    [agentId, attentionReason, client, isConnected, requiresAttention],
+    [
+      agentId,
+      attentionReason,
+      client,
+      isConnected,
+      manualUnread,
+      requiresAttention,
+      serverRequiresAttention,
+      toast,
+    ],
   );
 
   useEffect(() => {

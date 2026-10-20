@@ -35,6 +35,7 @@ interface WorkspaceOpenInEditorButtonProps {
   cwd: string;
   activeFile?: WorkspaceFileLocation | null;
   hideLabels?: boolean;
+  fileToolbar?: boolean;
 }
 
 interface OpenTarget {
@@ -85,7 +86,9 @@ export function WorkspaceOpenInEditorButton({
   cwd,
   activeFile,
   hideLabels,
+  fileToolbar = false,
 }: WorkspaceOpenInEditorButtonProps) {
+  const testIdPrefix = fileToolbar ? "file-open-in-editor" : "workspace-open-in-editor";
   const { t } = useTranslation();
   const toast = useToast();
   const isConnected = useHostRuntimeIsConnected(serverId);
@@ -202,9 +205,10 @@ export function WorkspaceOpenInEditorButton({
   const caretTriggerStyle = useCallback(
     ({ hovered, pressed, open }: { hovered: boolean; pressed: boolean; open: boolean }) => [
       styles.splitButtonCaret,
+      fileToolbar && styles.fileToolbarCaret,
       (hovered || pressed || open) && styles.splitButtonCaretHovered,
     ],
-    [],
+    [fileToolbar],
   );
 
   const handlePrimaryPress = useCallback(() => {
@@ -219,9 +223,9 @@ export function WorkspaceOpenInEditorButton({
 
   return (
     <View style={styles.row}>
-      <View style={styles.splitButton}>
+      <View style={[styles.splitButton, fileToolbar && styles.fileToolbarButton]}>
         <Pressable
-          testID="workspace-open-in-editor-primary"
+          testID={`${testIdPrefix}-primary`}
           style={primaryPressableStyle}
           onPress={handlePrimaryPress}
           disabled={openMutation.isPending}
@@ -247,7 +251,9 @@ export function WorkspaceOpenInEditorButton({
             <View style={styles.splitButtonContent}>
               {primaryOption.icon}
               {!hideLabels && (
-                <Text style={styles.splitButtonText}>{t("workspace.git.openInEditor.open")}</Text>
+                <Text style={[styles.splitButtonText, fileToolbar && styles.fileToolbarText]}>
+                  {t("workspace.git.openInEditor.open")}
+                </Text>
               )}
             </View>
           )}
@@ -255,7 +261,7 @@ export function WorkspaceOpenInEditorButton({
         {targets.length > 1 ? (
           <DropdownMenu>
             <DropdownMenuTrigger
-              testID="workspace-open-in-editor-caret"
+              testID={`${testIdPrefix}-caret`}
               style={caretTriggerStyle}
               accessibilityRole="button"
               accessibilityLabel={t("workspace.git.openInEditor.chooseEditor")}
@@ -285,6 +291,14 @@ export function WorkspaceOpenInEditorButton({
 }
 
 const styles = StyleSheet.create((theme) => ({
+  fileToolbarButton: {
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: theme.colors.surface2,
+    borderWidth: 0,
+  },
+  fileToolbarCaret: { width: 20, borderLeftWidth: 0 },
+  fileToolbarText: { fontSize: theme.fontSize.sm },
   row: {
     flexDirection: "row",
     alignItems: "center",

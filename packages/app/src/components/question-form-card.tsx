@@ -1,17 +1,26 @@
 import { Alert } from "@/components/ui/alert";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { useState, useCallback, useMemo, useRef, type RefObject } from "react";
-import { View, Text, Pressable, type PressableStateCallbackType } from "react-native";
+import {
+  View,
+  Text,
+  Pressable,
+  type NativeSyntheticEvent,
+  type PressableStateCallbackType,
+  type TextInputKeyPressEventData,
+} from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { useIsCompactFormFactor } from "@/constants/layout";
-import { Check, X } from "lucide-react-native";
+import { Check, ChevronRight, CircleHelp, Pencil, X } from "lucide-react-native";
 import { useTranslation } from "react-i18next";
 import type { PendingPermission } from "@/types/shared";
 import type { AgentPermissionResponse } from "@getpaseo/protocol/agent-types";
-import { isWeb } from "@/constants/platform";
+import { getIsElectronMac, isWeb } from "@/constants/platform";
+import type { Theme } from "@/styles/theme";
 import { EditingTextInput as TextInput } from "@/components/ui/text-input";
 import type { EditingTextInputHandle } from "@/components/ui/text-input/types";
 import { ScrollableCodeSurface } from "@/components/ui/scrollable-code-surface";
+import { isImeComposingKeyboardEvent } from "@/utils/keyboard-ime";
 import {
   areQuestionsAnswered,
   buildQuestionFormAnswers,
@@ -35,6 +44,13 @@ const IS_WEB = isWeb;
 // Native previews are uncapped: inside the option's Pressable, Android never hands a
 // drag to the preview's nested scroll, so lines past a cap would be unreachable.
 const OPTION_PREVIEW_MAX_HEIGHT = IS_WEB ? 240 : undefined;
+// The Mac card only renders in Electron: the textarea grows with the answer up to its
+// maxHeight, then scrolls.
+const MAC_GROWING_INPUT_STYLE = { fieldSizing: "content" };
+
+type QuestionInputKeyPressEvent = NativeSyntheticEvent<
+  TextInputKeyPressEventData & { shiftKey?: boolean; isComposing?: boolean; keyCode?: number }
+>;
 
 function getQuestionInputPlaceholder({
   question,
@@ -50,12 +66,21 @@ function getQuestionInputPlaceholder({
   );
 }
 
+function getOptionsGroupAccessibility(question: QuestionFormQuestion | undefined) {
+  if (!question || question.multiSelect) return {};
+  return {
+    accessibilityRole: "radiogroup" as const,
+    accessibilityLabel: question.question,
+  };
+}
+
 interface QuestionOptionRowProps {
   qIndex: number;
   optIndex: number;
   option: QuestionOption;
   isSelected: boolean;
   multiSelect: boolean;
+  isMacPresentation: boolean;
   isResponding: boolean;
   onToggle: (qIndex: number, optIndex: number, multiSelect: boolean) => void;
 }
@@ -66,6 +91,7 @@ function QuestionOptionRow({
   option,
   isSelected,
   multiSelect,
+  isMacPresentation,
   isResponding,
   onToggle,
 }: QuestionOptionRowProps) {
@@ -76,14 +102,20 @@ function QuestionOptionRow({
   }, [onToggle, qIndex, optIndex, multiSelect]);
 
   const pressableStyle = useCallback(
-    ({ pressed, hovered }: PressableStateCallbackType & { hovered?: boolean }) => [
-      styles.optionItem,
-      (Boolean(hovered) || isSelected) && {
-        backgroundColor: theme.colors.surface2,
+    ({
+      pressed,
+      hovered,
+      focused = false,
+    }: PressableStateCallbackType & { hovered?: boolean; focused?: boolean }) => [
+      isMacPresentation ? styles.macOptionItem : styles.optionItem,
+      (Boolean(hovered) || focused || isSelected) && {
+        backgroundColor: isMacPresentation
+          ? styles.macOptionHighlight.backgroundColor
+          : theme.colors.surface2,
       },
       pressed && styles.optionItemPressed,
     ],
-    [isSelected, theme.colors.surface2],
+    [isMacPresentation, isSelected, theme],
   );
 
   const optionLabelStyle = useMemo(
@@ -128,12 +160,18 @@ function QuestionOptionRow({
       aria-checked={isSelected}
     >
       <View style={styles.optionItemContent}>
-        <View style={controlStyle}>
-          {isSelected && multiSelect ? (
-            <Check size={12} color={theme.colors.accentForeground} />
-          ) : null}
-          {isSelected && !multiSelect ? <View style={radioDotStyle} /> : null}
-        </View>
+        {isMacPresentation && !multiSelect ? (
+          <View style={styles.macOptionNumber}>
+            <Text style={styles.macOptionNumberText}>{optIndex + 1}</Text>
+          </View>
+        ) : (
+          <View style={controlStyle}>
+            {isSelected && multiSelect ? (
+              <Check size={12} color={theme.colors.accentForeground} />
+            ) : null}
+            {isSelected && !multiSelect ? <View style={radioDotStyle} /> : null}
+          </View>
+        )}
         <View style={styles.optionTextBlock}>
           <Text style={optionLabelStyle}>{option.label}</Text>
           {option.description ? (
@@ -154,6 +192,9 @@ function QuestionOptionRow({
             </ScrollableCodeSurface>
           ) : null}
         </View>
+        {isMacPresentation && isSelected && !multiSelect ? (
+          <ChevronRight size={18} color={theme.colors.foregroundMuted} />
+        ) : null}
       </View>
     </Pressable>
   );
@@ -284,6 +325,7 @@ interface QuestionOtherInputProps {
   value: string;
   placeholder: string;
   isResponding: boolean;
+  isMacPresentation: boolean;
   onChange: (qIndex: number, text: string) => void;
   onSubmit: () => void;
 }
@@ -295,15 +337,29 @@ function QuestionOtherInput({
   value,
   placeholder,
   isResponding,
+  isMacPresentation,
   onChange,
   onSubmit,
 }: QuestionOtherInputProps) {
   const { theme } = useUnistyles();
+  const [isFocused, setIsFocused] = useState(false);
   const handleChange = useCallback(
     (text: string) => {
       onChange(qIndex, text);
     },
     [onChange, qIndex],
+  );
+  const handleFocus = useCallback(() => setIsFocused(true), []);
+  const handleBlur = useCallback(() => setIsFocused(false), []);
+  // The Mac field is a growing textarea: Enter submits, Shift+Enter adds a line.
+  const handleMacKeyPress = useCallback(
+    (event: QuestionInputKeyPressEvent) => {
+      const { key, shiftKey } = event.nativeEvent;
+      if (key !== "Enter" || shiftKey || isImeComposingKeyboardEvent(event.nativeEvent)) return;
+      event.preventDefault();
+      onSubmit();
+    },
+    [onSubmit],
   );
   const otherInputStyle = useMemo(
     () =>
@@ -324,23 +380,188 @@ function QuestionOtherInput({
       theme.colors.surface2,
     ],
   );
-  return (
+  const input = (
     <TextInput
       ref={inputRef}
       // @ts-expect-error - outlineStyle is web-only
-      style={otherInputStyle}
+      style={
+        isMacPresentation
+          ? [otherInputStyle, styles.macOtherInput, MAC_GROWING_INPUT_STYLE]
+          : otherInputStyle
+      }
       accessibilityLabel={accessibilityLabel}
       placeholder={placeholder}
       placeholderTextColor={theme.colors.foregroundMuted}
       initialValue={value}
       onChangeText={handleChange}
       onSubmitEditing={onSubmit}
+      onKeyPress={isMacPresentation ? handleMacKeyPress : undefined}
+      onFocus={handleFocus}
+      onBlur={handleBlur}
+      multiline={isMacPresentation}
+      rows={1}
       editable={!isResponding}
       blurOnSubmit={false}
     />
   );
+  if (!isMacPresentation) return input;
+  return (
+    <View
+      style={[styles.macOtherInputRow, isFocused && styles.macOtherInputRowFocused]}
+      testID="question-form-other-input"
+    >
+      <Pencil size={18} color={theme.colors.foregroundMuted} />
+      {input}
+    </View>
+  );
 }
 
+function QuestionFormHeader({
+  theme,
+  isMacPresentation,
+  isResponding,
+  dismissLabel,
+  onDismiss,
+}: {
+  theme: Theme;
+  isMacPresentation: boolean;
+  isResponding: boolean;
+  dismissLabel: string;
+  onDismiss: () => void;
+}) {
+  const { t } = useTranslation();
+  if (!isMacPresentation) return null;
+  return (
+    <View style={styles.macTitleRow}>
+      <View style={styles.macTitleContent}>
+        <CircleHelp size={18} color={theme.colors.foregroundMuted} />
+        <Text style={styles.macTitleText}>{t("message.question.title")}</Text>
+      </View>
+      <Pressable
+        onPress={onDismiss}
+        disabled={isResponding}
+        accessibilityRole="button"
+        accessibilityLabel={dismissLabel}
+        style={styles.macCloseButton}
+      >
+        <X size={18} color={theme.colors.foregroundMuted} />
+      </Pressable>
+    </View>
+  );
+}
+
+function QuestionFormActions({
+  theme,
+  isMacPresentation,
+  isMobile,
+  isResponding,
+  respondingAction,
+  dismissLabel,
+  primaryDisabled,
+  primaryActionLabel,
+  isLastQuestion,
+  onDismiss,
+  onPrimaryAction,
+}: {
+  theme: Theme;
+  isMacPresentation: boolean;
+  isMobile: boolean;
+  isResponding: boolean;
+  respondingAction: "submit" | "dismiss" | null;
+  dismissLabel: string;
+  primaryDisabled: boolean;
+  primaryActionLabel: string;
+  isLastQuestion: boolean;
+  onDismiss: () => void;
+  onPrimaryAction: () => void;
+}) {
+  const { t } = useTranslation();
+  const dismissButtonStyle = useCallback(
+    ({ pressed, hovered }: PressableStateCallbackType & { hovered?: boolean }) => [
+      styles.actionButton,
+      {
+        backgroundColor: hovered ? theme.colors.surface2 : theme.colors.surface1,
+        borderColor: theme.colors.borderAccent,
+      },
+      pressed && styles.optionItemPressed,
+    ],
+    [theme.colors.surface2, theme.colors.surface1, theme.colors.borderAccent],
+  );
+  const submitButtonStyle = useCallback(
+    ({ pressed }: PressableStateCallbackType & { hovered?: boolean }) => [
+      styles.actionButton,
+      {
+        backgroundColor: theme.colors.accent,
+        borderColor: theme.colors.accent,
+        opacity: primaryDisabled ? 0.5 : 1,
+      },
+      pressed && !primaryDisabled ? styles.optionItemPressed : null,
+    ],
+    [primaryDisabled, theme.colors.accent],
+  );
+  const actionsContainerStyle = useMemo(
+    () => [styles.actionsContainer, !isMobile && styles.actionsContainerDesktop],
+    [isMobile],
+  );
+  const dismissActionTextStyle = useMemo(
+    () => [styles.actionText, { color: theme.colors.foregroundMuted }],
+    [theme.colors.foregroundMuted],
+  );
+  const submitActionTextColor = isMacPresentation
+    ? styles.macSubmitText.color
+    : theme.colors.accentForeground;
+  const submitActionTextStyle = useMemo(
+    () => [styles.actionText, { color: submitActionTextColor }],
+    [submitActionTextColor],
+  );
+  const macSubmitButtonStyle = useMemo(
+    () => [styles.macSubmitButton, primaryDisabled && styles.macActionButtonDisabled],
+    [primaryDisabled],
+  );
+  const submitLabel =
+    isMacPresentation && isLastQuestion ? t("message.question.send") : primaryActionLabel;
+
+  return (
+    <View style={[actionsContainerStyle, isMacPresentation && styles.macActionsContainer]}>
+      <Pressable
+        style={isMacPresentation ? styles.macDismissButton : dismissButtonStyle}
+        onPress={onDismiss}
+        disabled={isResponding}
+        accessibilityRole="button"
+        accessibilityLabel={dismissLabel}
+        testID="question-form-dismiss"
+      >
+        {respondingAction === "dismiss" ? (
+          <LoadingSpinner size="small" color={theme.colors.foregroundMuted} />
+        ) : (
+          <View style={styles.actionContent}>
+            {isMacPresentation ? null : <X size={14} color={theme.colors.foregroundMuted} />}
+            <Text style={dismissActionTextStyle}>{dismissLabel}</Text>
+          </View>
+        )}
+      </Pressable>
+      <Pressable
+        style={isMacPresentation ? macSubmitButtonStyle : submitButtonStyle}
+        onPress={onPrimaryAction}
+        disabled={primaryDisabled}
+        accessibilityRole="button"
+        accessibilityLabel={submitLabel}
+        testID="question-form-primary-action"
+      >
+        {respondingAction === "submit" ? (
+          <LoadingSpinner size="small" color={theme.colors.accentForeground} />
+        ) : (
+          <View style={styles.actionContent}>
+            {isMacPresentation ? null : <Check size={14} color={submitActionTextColor} />}
+            <Text style={submitActionTextStyle}>{submitLabel}</Text>
+          </View>
+        )}
+      </Pressable>
+    </View>
+  );
+}
+
+// oxlint-disable-next-line complexity -- upstream card plus the Mac presentation branches
 export function QuestionFormCard({
   permission,
   onRespond,
@@ -350,6 +571,7 @@ export function QuestionFormCard({
   const { theme } = useUnistyles();
   const { t } = useTranslation();
   const isMobile = useIsCompactFormFactor();
+  const isMacPresentation = getIsElectronMac();
   const questions = useMemo(
     () => parseQuestionFormQuestions(permission.request.input),
     [permission.request.input],
@@ -482,35 +704,11 @@ export function QuestionFormCard({
     handleSubmit();
   }, [activeQuestionAnswered, handleSubmit, isLastQuestion, isResponding, questions?.length]);
 
-  const dismissButtonStyle = useCallback(
-    ({ pressed, hovered }: PressableStateCallbackType & { hovered?: boolean }) => [
-      styles.actionButton,
-      {
-        backgroundColor: hovered ? theme.colors.surface2 : theme.colors.surface1,
-        borderColor: theme.colors.borderAccent,
-      },
-      pressed && styles.optionItemPressed,
-    ],
-    [theme.colors.surface2, theme.colors.surface1, theme.colors.borderAccent],
-  );
-
   const pendingAction = isResponding ? respondingAction : null;
   const primaryDisabled = isResponding || (isLastQuestion ? !allAnswered : !activeQuestionAnswered);
   const primaryActionLabel = isLastQuestion
     ? t("message.question.submit")
     : t("message.question.next");
-  const submitButtonStyle = useCallback(
-    ({ pressed }: PressableStateCallbackType & { hovered?: boolean }) => [
-      styles.actionButton,
-      {
-        backgroundColor: theme.colors.accent,
-        borderColor: theme.colors.accent,
-        opacity: primaryDisabled ? 0.5 : 1,
-      },
-      pressed && !primaryDisabled ? styles.optionItemPressed : null,
-    ],
-    [primaryDisabled, theme.colors.accent],
-  );
 
   const containerStyle = useMemo(
     () => [
@@ -519,49 +717,38 @@ export function QuestionFormCard({
         backgroundColor: theme.colors.surface1,
         borderColor: theme.colors.border,
       },
+      isMacPresentation && styles.macContainer,
     ],
-    [theme.colors.surface1, theme.colors.border],
+    [isMacPresentation, theme.colors.surface1, theme.colors.border],
   );
   const questionTextStyle = useMemo(
     () => [styles.questionText, { color: theme.colors.foreground }],
     [theme.colors.foreground],
   );
   // Single-select radios need a group; checkboxes are valid standalone.
-  const optionsGroupAccessibility = useMemo(
-    () =>
-      activeQuestion && !activeQuestion.multiSelect
-        ? ({
-            accessibilityRole: "radiogroup",
-            accessibilityLabel: activeQuestion.question,
-          } as const)
-        : {},
-    [activeQuestion],
-  );
-  const actionsContainerStyle = useMemo(
-    () => [styles.actionsContainer, !isMobile && styles.actionsContainerDesktop],
-    [isMobile],
-  );
-  const dismissActionTextStyle = useMemo(
-    () => [styles.actionText, { color: theme.colors.foregroundMuted }],
-    [theme.colors.foregroundMuted],
-  );
-  const submitActionTextColor = theme.colors.accentForeground;
-  const submitActionTextStyle = useMemo(
-    () => [styles.actionText, { color: submitActionTextColor }],
-    [submitActionTextColor],
-  );
-
+  const optionsGroupAccessibility = getOptionsGroupAccessibility(activeQuestion);
   if (!questions) {
     return null;
   }
 
-  const dismissLabel = resolveDismissLabel(questions, t("common.actions.dismiss"));
+  const canSkip = shouldSubmitEmptyOnDismiss(questions);
+  const dismissLabel = resolveDismissLabel(
+    questions,
+    isMacPresentation && canSkip ? t("message.question.skip") : t("common.actions.dismiss"),
+  );
   const selected = selections[resolvedActiveQuestionIndex] ?? new Set<number>();
   const otherText = otherTexts[resolvedActiveQuestionIndex] ?? "";
   const showTextInput = questionShowsTextInput(questions[resolvedActiveQuestionIndex]);
 
   return (
     <View style={containerStyle} testID="question-form-card">
+      <QuestionFormHeader
+        theme={theme}
+        isMacPresentation={isMacPresentation}
+        isResponding={isResponding}
+        dismissLabel={dismissLabel}
+        onDismiss={handleDeny}
+      />
       <QuestionNav
         questions={questions}
         activeIndex={resolvedActiveQuestionIndex}
@@ -569,7 +756,7 @@ export function QuestionFormCard({
         isResponding={isResponding}
         onSelect={handleSelectQuestion}
       />
-      <View style={styles.questionHeader}>
+      <View style={[styles.questionHeader, isMacPresentation && styles.macQuestionHeader]}>
         <Text testID="question-form-current-question" style={questionTextStyle}>
           {activeQuestion?.question}
         </Text>
@@ -587,6 +774,7 @@ export function QuestionFormCard({
                   option={opt}
                   isSelected={selected.has(optIndex)}
                   multiSelect={activeQuestion.multiSelect}
+                  isMacPresentation={isMacPresentation}
                   isResponding={isResponding}
                   onToggle={toggleOption}
                 />
@@ -605,6 +793,7 @@ export function QuestionFormCard({
                 otherPlaceholder: t("message.question.otherPlaceholder"),
               })}
               isResponding={isResponding}
+              isMacPresentation={isMacPresentation}
               onChange={setOtherText}
               onSubmit={handlePrimaryAction}
             />
@@ -614,48 +803,24 @@ export function QuestionFormCard({
 
       {responseError ? <Alert variant="error" description={responseError} size="sm" /> : null}
 
-      <View style={actionsContainerStyle}>
-        <Pressable
-          style={dismissButtonStyle}
-          onPress={handleDeny}
-          disabled={isResponding}
-          accessibilityRole="button"
-          accessibilityLabel={dismissLabel}
-          testID="question-form-dismiss"
-        >
-          {pendingAction === "dismiss" ? (
-            <LoadingSpinner size="small" color={theme.colors.foregroundMuted} />
-          ) : (
-            <View style={styles.actionContent}>
-              <X size={14} color={theme.colors.foregroundMuted} />
-              <Text style={dismissActionTextStyle}>{dismissLabel}</Text>
-            </View>
-          )}
-        </Pressable>
-
-        <Pressable
-          style={submitButtonStyle}
-          onPress={handlePrimaryAction}
-          disabled={primaryDisabled}
-          accessibilityRole="button"
-          accessibilityLabel={primaryActionLabel}
-          testID="question-form-primary-action"
-        >
-          {pendingAction === "submit" ? (
-            <LoadingSpinner size="small" color={theme.colors.accentForeground} />
-          ) : (
-            <View style={styles.actionContent}>
-              <Check size={14} color={submitActionTextColor} />
-              <Text style={submitActionTextStyle}>{primaryActionLabel}</Text>
-            </View>
-          )}
-        </Pressable>
-      </View>
+      <QuestionFormActions
+        theme={theme}
+        isMacPresentation={isMacPresentation}
+        isMobile={isMobile}
+        isResponding={isResponding}
+        respondingAction={pendingAction}
+        dismissLabel={dismissLabel}
+        primaryDisabled={primaryDisabled}
+        primaryActionLabel={primaryActionLabel}
+        isLastQuestion={isLastQuestion}
+        onDismiss={handleDeny}
+        onPrimaryAction={handlePrimaryAction}
+      />
     </View>
   );
 }
 
-const styles = StyleSheet.create((theme) => ({
+const styles = StyleSheet.create((theme, rt) => ({
   container: {
     padding: theme.spacing[3],
     borderRadius: theme.spacing[2],
@@ -665,6 +830,35 @@ const styles = StyleSheet.create((theme) => ({
   questionBlock: {
     gap: theme.spacing[2],
   },
+  macOptionHighlight: {
+    backgroundColor: rt.themeName === "dark" ? theme.colors.surface3 : theme.colors.surface2,
+  },
+  macSubmitText: { color: theme.colors.surface0 },
+  macContainer: {
+    padding: 16,
+    borderRadius: 20,
+    gap: 12,
+    backgroundColor: rt.themeName === "dark" ? theme.colors.surface2 : theme.colors.surface1,
+    borderColor: rt.themeName === "dark" ? theme.colors.borderAccent : theme.colors.border,
+  },
+  macTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  macTitleContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  macTitleText: {
+    fontSize: theme.fontSize.base,
+    color: theme.colors.foregroundMuted,
+  },
+  macCloseButton: {
+    padding: 4,
+    borderRadius: theme.borderRadius.base,
+  },
   questionHeader: {
     flexDirection: "row",
     alignItems: "center",
@@ -672,6 +866,10 @@ const styles = StyleSheet.create((theme) => ({
     paddingHorizontal: theme.spacing[3],
     paddingBottom: theme.spacing[1],
     flex: 1,
+  },
+  macQuestionHeader: {
+    paddingHorizontal: 0,
+    paddingBottom: 0,
   },
   questionText: {
     flex: 1,
@@ -710,6 +908,14 @@ const styles = StyleSheet.create((theme) => ({
     paddingVertical: theme.spacing[2],
     borderRadius: theme.borderRadius.md,
   },
+  macOptionItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    minHeight: 32,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
   optionItemPressed: {
     opacity: 0.9,
   },
@@ -722,6 +928,19 @@ const styles = StyleSheet.create((theme) => ({
   optionTextBlock: {
     flex: 1,
     gap: theme.spacing[1],
+  },
+  macOptionNumber: {
+    width: 20,
+    height: 20,
+    borderRadius: 5,
+    borderWidth: 1,
+    borderColor: theme.colors.foregroundExtraMuted,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  macOptionNumberText: {
+    fontSize: theme.fontSize.base,
+    color: theme.colors.foregroundMuted,
   },
   optionLabel: {
     fontSize: theme.fontSize.base,
@@ -762,6 +981,30 @@ const styles = StyleSheet.create((theme) => ({
     paddingVertical: theme.spacing[3],
     fontSize: theme.fontSize.base,
   },
+  macOtherInputRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    minHeight: 40,
+    paddingHorizontal: 8,
+    paddingVertical: 9,
+    borderWidth: 1,
+    borderRadius: 16,
+    borderColor: "transparent",
+  },
+  macOtherInputRowFocused: {
+    borderColor: rt.themeName === "dark" ? "#d7b9ad" : theme.colors.borderAccent,
+  },
+  macOtherInput: {
+    flex: 1,
+    borderWidth: 0,
+    borderRadius: 0,
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+    lineHeight: 20,
+    maxHeight: 240,
+    backgroundColor: "transparent",
+  },
   actionsContainer: {
     gap: theme.spacing[2],
   },
@@ -770,12 +1013,38 @@ const styles = StyleSheet.create((theme) => ({
     justifyContent: "flex-start",
     alignItems: "center",
   },
+  macActionsContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    gap: 8,
+  },
   actionButton: {
     paddingVertical: theme.spacing[2],
     paddingHorizontal: theme.spacing[3],
     borderRadius: theme.borderRadius.md,
     alignItems: "center",
     borderWidth: theme.borderWidth[1],
+  },
+  macDismissButton: {
+    minHeight: 28,
+    paddingHorizontal: 12,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: rt.themeName === "dark" ? theme.colors.surface3 : theme.colors.surface2,
+  },
+  macSubmitButton: {
+    minHeight: 28,
+    paddingHorizontal: 12,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: theme.colors.foreground,
+  },
+  macActionButtonDisabled: {
+    opacity: theme.opacity[50],
   },
   actionContent: {
     flexDirection: "row",

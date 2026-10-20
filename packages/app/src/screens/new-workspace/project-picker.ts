@@ -7,8 +7,10 @@ import {
   resolveInitialWorkspaceProject,
   type HostProjectListItem,
 } from "@/projects/host-projects";
+import { isChatFolderPath } from "@/projects/chat-folder";
 import {
   createManualProjectSelectionContextKey,
+  createNoProjectSelection,
   createProjectSelectionContextKey,
   createProjectSelection,
   reconcileProjectSelection,
@@ -37,6 +39,9 @@ interface NewWorkspaceProjectPickerState {
   selectedProjectOptionId: string;
   projectTriggerLabel: string;
   handleSelectProjectOption: (id: string) => void;
+  /** The user chose no project, so the chat gets its own folder. */
+  projectCleared: boolean;
+  clearProject: () => void;
 }
 
 function projectOptionId(projectId: string): string {
@@ -91,7 +96,11 @@ export function useNewWorkspaceProjectPicker({
 }: NewWorkspaceProjectPickerInput): NewWorkspaceProjectPickerState {
   const selectableProjects = useMemo(
     () =>
-      filterWorkspaceProjectsForHost({ projects, serverId: selectedServerId, allowAllProjects }),
+      filterWorkspaceProjectsForHost({
+        projects,
+        serverId: selectedServerId,
+        allowAllProjects,
+      }).filter((project) => !isChatFolderPath(project.iconWorkingDir)),
     [allowAllProjects, projects, selectedServerId],
   );
   const initialProject = useMemo(
@@ -181,6 +190,10 @@ export function useNewWorkspaceProjectPicker({
     },
     [allowAllProjects, manualSelectionContextKey, projectByOptionId],
   );
+  const clearProject = useCallback(
+    () => setProjectSelection(createNoProjectSelection(manualSelectionContextKey)),
+    [manualSelectionContextKey],
+  );
 
   return {
     selectedProject,
@@ -192,5 +205,7 @@ export function useNewWorkspaceProjectPicker({
     selectedProjectOptionId: selectedProject ? projectOptionId(selectedProject.viewKey) : "",
     projectTriggerLabel: selectedProject?.projectName ?? "Choose project",
     handleSelectProjectOption,
+    projectCleared: activeSelection.source === "none",
+    clearProject,
   };
 }

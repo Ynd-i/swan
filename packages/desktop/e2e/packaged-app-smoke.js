@@ -67,7 +67,13 @@ function assertExecutable(filePath, label) {
 
 function getExecutablePath(appPath) {
   if (process.platform === "darwin") {
-    return path.join(appPath, "Contents", "MacOS", EXECUTABLE_NAME);
+    const executable = spawnSync(
+      "/usr/libexec/PlistBuddy",
+      ["-c", "Print :CFBundleExecutable", path.join(appPath, "Contents", "Info.plist")],
+      { encoding: "utf8" },
+    );
+    if (executable.status !== 0) throw new Error(executable.stderr);
+    return path.join(appPath, "Contents", "MacOS", executable.stdout.trim());
   }
 
   if (process.platform === "win32") {
@@ -90,7 +96,7 @@ function getCliShimPath(appPath) {
 }
 
 function getMacMainExecutablePath(appPath) {
-  return path.join(appPath, "Contents", "MacOS", EXECUTABLE_NAME);
+  return getExecutablePath(appPath);
 }
 
 function getLaunchCommand(executablePath, args) {
@@ -515,7 +521,10 @@ async function waitForRendererStartedDaemon({
         typeof lastStatus.pid === "number" &&
         typeof lastStatus.serverId === "string" &&
         lastStatus.serverId.length > 0 &&
-        lastStatus.listen === listen &&
+        (listen === null
+          ? /^127\.0\.0\.1:[1-9]\d*$/.test(lastStatus.listen ?? "") &&
+            lastStatus.listen !== "127.0.0.1:6767"
+          : lastStatus.listen === listen) &&
         path.resolve(lastStatus.home) === path.resolve(daemonHome)
       ) {
         return lastStatus;
@@ -864,6 +873,89 @@ function assertLinuxDesktopIdentity(appPath) {
   }
 }
 
+function assertCustomMacIdentity(appPath) {
+  if (process.platform !== "darwin") return false;
+  const resourcesPath = path.join(appPath, "Contents", "Resources");
+  const metadata = JSON.parse(
+    extractFile(path.join(resourcesPath, "app.asar"), "package.json").toString(),
+  );
+  if (metadata.productName !== "Swan") {
+    if (process.env.PASEO_DESKTOP_EXPECT_CUSTOM === "1") {
+      throw new Error("Expected the custom macOS bundle");
+    }
+    return false;
+  }
+  const identifier = spawnSync(
+    "/usr/libexec/PlistBuddy",
+    ["-c", "Print :CFBundleIdentifier", path.join(appPath, "Contents", "Info.plist")],
+    { encoding: "utf8" },
+  );
+  if (identifier.status !== 0 || identifier.stdout.trim() !== "local.paseo.custom.desktop") {
+    throw new Error("Custom macOS bundle must have its own application identifier");
+  }
+  const protocols = spawnSync(
+    "/usr/bin/plutil",
+    [
+      "-extract",
+      "CFBundleURLTypes",
+      "json",
+      "-o",
+      "-",
+      path.join(appPath, "Contents", "Info.plist"),
+    ],
+    { encoding: "utf8" },
+  );
+  if (protocols.status !== 0) {
+    throw new Error("Custom macOS bundle must declare its operating-system agent link scheme");
+  }
+  const schemes = JSON.parse(protocols.stdout).flatMap((entry) => entry.CFBundleURLSchemes ?? []);
+  if (schemes.length !== 1 || schemes[0] !== "paseo-custom") {
+    throw new Error(
+      `Custom macOS bundle must register only paseo-custom, never the upstream paseo scheme; received ${JSON.stringify(schemes)}`,
+    );
+  }
+  const updateFeedPath = path.join(resourcesPath, "app-update.yml");
+  if (metadata.paseoCustomUpdateVersion) {
+    // The custom-release workflow stamps the builds it publishes and gives them the fork's feed.
+    const updateFeed = fs.readFileSync(updateFeedPath, "utf8");
+    if (!updateFeed.includes("provider: generic") || updateFeed.includes("getpaseo")) {
+      throw new Error(
+        `Published custom macOS bundle must use the fork's update feed:\n${updateFeed}`,
+      );
+    }
+  } else if (fs.existsSync(updateFeedPath)) {
+    throw new Error("Custom macOS bundle must not contain an upstream update feed");
+  }
+  return metadata;
+}
+
+async function assertCustomAppUpdates(page, enabled) {
+  if (enabled) {
+    // Any outcome of a real check against the fork's feed but "disabled" proves the stamp is read.
+    const check = await page.evaluate(() =>
+      window.paseoDesktop.invoke("check_app_update", { intent: "manual" }),
+    );
+    if (check.errorMessage?.includes("disabled for custom builds")) {
+      throw new Error("Published custom application update checks must be enabled");
+    }
+    console.log(
+      "Packaged custom smoke: independent identity, fork update feed, update IPC enabled",
+    );
+    return;
+  }
+  const result = await page.evaluate(async () => {
+    const check = await window.paseoDesktop.invoke("check_app_update", { intent: "manual" });
+    if (check.hasUpdate || !check.errorMessage?.includes("disabled for custom builds")) {
+      throw new Error("Custom application update checks must report disabled");
+    }
+    return window.paseoDesktop.invoke("install_app_update");
+  });
+  if (result.installed || !result.message?.includes("disabled for custom builds")) {
+    throw new Error("Custom application update installation must be disabled");
+  }
+  console.log("Packaged custom smoke: independent identity, no update feed, update IPC disabled");
+}
+
 async function smokePackagedDesktopApp({
   appPath,
   executablePath = getExecutablePath(appPath),
@@ -872,10 +964,15 @@ async function smokePackagedDesktopApp({
 }) {
   assertExecutable(executablePath, "Packaged app executable");
   assertLinuxDesktopIdentity(appPath);
+  const customMetadata = assertCustomMacIdentity(appPath);
+  const customMac = Boolean(customMetadata);
   await smokeColdCliDaemonStart({ appPath });
 
   const userData = createTempDir("paseo-smoke-user-data-");
-  const daemonHome = createTempDir("paseo-smoke-daemon-home-");
+  const daemonHome = customMac
+    ? path.join(userData, "daemon")
+    : createTempDir("paseo-smoke-daemon-home-");
+  fs.mkdirSync(daemonHome, { recursive: true });
   const daemonPort = await reserveLocalTcpPort();
   let cdpPort = await reserveLocalTcpPort();
   for (let attempt = 0; cdpPort === daemonPort && attempt < 10; attempt += 1) {
@@ -892,6 +989,12 @@ async function smokePackagedDesktopApp({
     userData,
     cdpPort,
   });
+  const guiEnv = { ...env };
+  if (customMac) {
+    // Exercise real custom GUI defaults, while CLI checks target its explicit home.
+    delete guiEnv.PASEO_HOME;
+    delete guiEnv.PASEO_LISTEN;
+  }
 
   const stdout = [];
   const stderr = [];
@@ -899,7 +1002,7 @@ async function smokePackagedDesktopApp({
   console.log(`Packaged desktop smoke: launching ${launch.command} ${launch.args.join(" ")}`);
   const child = spawn(launch.command, launch.args, {
     detached: process.platform !== "win32",
-    env,
+    env: guiEnv,
     stdio: ["pipe", "pipe", "pipe"],
   });
   child.stdout.on("data", (chunk) => stdout.push(chunk.toString()));
@@ -934,16 +1037,20 @@ async function smokePackagedDesktopApp({
     });
     page = await waitForPackagedAppPage(browser, deadline);
     await assertPackagedRendererLoaded(page, deadline);
+    if (customMac) {
+      await assertCustomAppUpdates(page, Boolean(customMetadata.paseoCustomUpdateVersion));
+    }
     console.log("Packaged desktop smoke: real app renderer and preload bridge loaded");
     const status = await waitForRendererStartedDaemon({
       page,
       daemonHome,
-      listen,
+      listen: customMac ? null : listen,
       stdout,
       stderr,
       userData,
       deadline,
     });
+    env.PASEO_LISTEN = status.listen;
     console.log("Packaged desktop smoke: renderer-started desktop daemon reported running");
     await assertBuiltinPluginsStarted(listen);
     console.log("Packaged desktop smoke: every built-in plugin started");

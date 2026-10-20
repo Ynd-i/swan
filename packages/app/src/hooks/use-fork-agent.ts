@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import { useRouter } from "expo-router";
 import { useTranslation } from "react-i18next";
 import type {
@@ -20,6 +21,7 @@ import {
 import { useWorkspaceDraftSubmissionStore } from "@/stores/workspace-draft-submission-store";
 import { toErrorMessage } from "@/utils/error-messages";
 import { buildNewWorkspaceRoute } from "@/utils/host-routes";
+import { navigateToAgent } from "@/utils/navigate-to-agent";
 import type { WorkspaceDraftTabSetup, WorkspaceTabTarget } from "@/workspace-tabs/model";
 
 /**
@@ -31,6 +33,8 @@ import type { WorkspaceDraftTabSetup, WorkspaceTabTarget } from "@/workspace-tab
 export type ForkAgentSource = Pick<
   AgentScreenAgent,
   | "provider"
+  | "status"
+  | "capabilities"
   | "cwd"
   | "currentModeId"
   | "model"
@@ -118,6 +122,26 @@ function buildForkDraftTabTarget(
 }
 
 /**
+ * A native fork copies the provider conversation itself, so it needs a completed turn: the
+ * pinned boundary, or the latest turn of an idle chat. The in-flight footer and new
+ * workspaces keep the history attachment, which also captures a still-streaming reply.
+ */
+export function canForkNatively(input: {
+  hostSupportsNativeFork: boolean;
+  agent: ForkAgentSource;
+  target: AssistantForkTarget;
+  boundary?: ForkAgentBoundary;
+}): boolean {
+  if (input.target !== "tab" || !input.hostSupportsNativeFork) {
+    return false;
+  }
+  if (!input.agent.capabilities?.supportsNativeFork) {
+    return false;
+  }
+  return input.boundary ? Boolean(input.boundary.boundaryCursor) : input.agent.status === "idle";
+}
+
+/**
  * Shared fork driver behind both turn-footer fork affordances: the completed
  * turn's footer (which supplies a boundary pinned to that turn) and the
  * in-flight turn's footer next to the progress loader (which omits the boundary
@@ -131,8 +155,35 @@ export function useForkAgent(
   const router = useRouter();
   const client = useSessionStore((state) => state.sessions[serverId]?.client ?? null);
   const supportsAgentForkContext = useHostFeature(serverId, "agentForkContext") && !readOnly;
+  const hostSupportsNativeFork = useHostFeature(serverId, "agentNativeFork") && !readOnly;
+  const nativeForkInFlight = useRef(false);
 
-  return useStableEvent(async ({ agentId, agent, workspaceId, target, boundary }) => {
+  const forkNatively = useStableEvent(
+    async ({ agentId, workspaceId, boundary }: ForkAgentRequest) => {
+      if (nativeForkInFlight.current) {
+        return;
+      }
+      nativeForkInFlight.current = true;
+      try {
+        if (!client) {
+          throw new Error(t("workspace.terminal.hostDisconnected"));
+        }
+        const childAgentId = await client.forkAgent(agentId, boundary?.boundaryCursor);
+        navigateToAgent({ serverId, agentId: childAgentId, workspaceId });
+      } catch (error) {
+        toast?.error(toErrorMessage(error) || t("message.actions.forkFailed"));
+      } finally {
+        nativeForkInFlight.current = false;
+      }
+    },
+  );
+
+  return useStableEvent(async (request) => {
+    const { agentId, agent, workspaceId, target, boundary } = request;
+    if (canForkNatively({ hostSupportsNativeFork, agent, target, boundary })) {
+      await forkNatively(request);
+      return;
+    }
     try {
       if (!supportsAgentForkContext) {
         toast?.error(t("message.actions.forkUnavailable"));

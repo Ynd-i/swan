@@ -58,6 +58,7 @@ vi.mock("react-native-unistyles", () => ({
 vi.mock("@/constants/platform", () => ({
   isWeb: true,
   isNative: false,
+  getIsElectronMac: () => false,
 }));
 
 vi.mock("react-i18next", () => ({

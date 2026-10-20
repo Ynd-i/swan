@@ -79,7 +79,13 @@ const testTheme = {
   },
 };
 
-type StyleFactory<T> = (theme: typeof testTheme) => T;
+const testRuntime = {
+  themeName: "light",
+  screen: { width: 1200, height: 800 },
+  insets: { top: 0, right: 0, bottom: 0, left: 0 },
+};
+
+type StyleFactory<T> = (theme: typeof testTheme, runtime: typeof testRuntime) => T;
 
 function isStyleFactory<T>(styles: T | StyleFactory<T>): styles is StyleFactory<T> {
   return typeof styles === "function";
@@ -87,18 +93,18 @@ function isStyleFactory<T>(styles: T | StyleFactory<T>): styles is StyleFactory<
 
 export const StyleSheet = {
   create: <T>(styles: T | StyleFactory<T>): T =>
-    isStyleFactory(styles) ? styles(testTheme) : styles,
+    isStyleFactory(styles) ? styles(testTheme, testRuntime) : styles,
 };
 
 export const withUnistyles = <T>(Component: T): T => Component;
 
 export const useUnistyles = () => ({
   theme: testTheme,
-  rt: {},
+  rt: testRuntime,
   breakpoint: undefined,
 });
 
 export const UnistylesRuntime = {
+  ...testRuntime,
   setTheme: () => undefined,
-  themeName: "light",
 };

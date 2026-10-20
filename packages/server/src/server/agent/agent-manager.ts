@@ -14,6 +14,8 @@ import {
   hasOpenAgentTab,
   isDelegatedAgent,
   isOpenAgentTabLabel,
+  FORKED_AT_LABEL,
+  FORKED_FROM_AGENT_ID_LABEL,
   PARENT_AGENT_ID_LABEL,
 } from "@getpaseo/protocol/agent-labels";
 import type { Logger } from "pino";
@@ -49,6 +51,7 @@ import {
   type AgentStreamEvent,
   type AgentTimelineItem,
   type AgentUsage,
+  type AgentBackgroundTask,
   type AgentRuntimeInfo,
   type ImportedTimelineEntry,
   type ImportableProviderSession,
@@ -63,6 +66,7 @@ import {
   type SeedAgentTimelineOptions,
 } from "./agent-timeline-store.js";
 import type {
+  AgentTimelineCursor,
   AgentTimelineFetchOptions,
   AgentTimelineFetchResult,
   AgentTimelineRow,
@@ -83,6 +87,7 @@ import { parseAgentMessage, projectAgentMessage } from "./agent-messages/index.j
 import { isStaleProviderSessionError } from "./stale-provider-session-error.js";
 import { stripInternalPaseoMcpServer, withRuntimePaseoMcpServer } from "./runtime-mcp-config.js";
 import { resolveCreateAgentTitles } from "./create-agent-title.js";
+import { forkTitle } from "./fork-title.js";
 import type { PaseoToolCatalogFactory } from "./tools/types.js";
 import { isPaseoToolPolicyEnabled } from "./paseo-tool-policy.js";
 import {
@@ -430,6 +435,8 @@ interface ManagedAgentBase {
   activeTurnId: string | null;
   activeTurnStartedAt: Date | null;
   lastUsage?: AgentUsage;
+  /** Live provider process state: never persisted, and gone when the process is. */
+  backgroundTasks?: AgentBackgroundTask[];
   lastError?: string;
   attention: AttentionState;
   foregroundTurnWaiters: Set<ForegroundTurnWaiter>;
@@ -1461,6 +1468,7 @@ export class AgentManager {
     cwd: string;
     workspaceId: string;
     labels?: Record<string, string>;
+    config?: Partial<AgentSessionConfig>;
   }): Promise<ManagedAgent> {
     this.assertAcceptingAgentRegistrations();
     const resolvedAgentId = validateAgentId(this.idFactory(), "importProviderSession");
@@ -1473,6 +1481,7 @@ export class AgentManager {
 
     const { storedConfig, launchConfig, paseoToolPolicy } = await this.prepareSessionConfig(
       {
+        ...input.config,
         provider: input.provider,
         cwd: input.cwd,
       },
@@ -3310,6 +3319,93 @@ export class AgentManager {
     }
   }
 
+  /**
+   * Native fork: copy the source's provider conversation through a completed turn into a new
+   * agent in the same workspace. The source keeps its handle, timeline and run.
+   */
+  forkAgent(input: {
+    sourceAgentId: string;
+    boundaryCursor?: AgentTimelineCursor;
+  }): Promise<ManagedAgent> {
+    return this.trackAgentRegistrationOperation(this.forkAgentInternal(input));
+  }
+
+  private async forkAgentInternal(input: {
+    sourceAgentId: string;
+    boundaryCursor?: AgentTimelineCursor;
+  }): Promise<ManagedAgent> {
+    const source = this.requireSessionAgent(input.sourceAgentId);
+    if (!source.session.capabilities.supportsNativeFork || !source.session.forkConversation) {
+      throw new Error(`Provider '${source.provider}' does not support native fork`);
+    }
+    if (!source.workspaceId) {
+      throw new Error("Cannot fork an agent that has no workspace");
+    }
+    const messageId = this.resolveForkUserMessageId(input.sourceAgentId, input.boundaryCursor);
+    const handle = await source.session.forkConversation({ messageId });
+    // ponytail: a daemon exit between this clone and registration leaves an orphan native
+    // session; the source is untouched. Persist the handle in a creation receipt to recover it.
+    const config = source.config;
+    // The sidebar shows the stored title, which renames and generated titles update.
+    const records = (await this.registry?.list()) ?? [];
+    const sourceTitle = records.find((record) => record.id === source.id)?.title ?? config.title;
+    const child = await this.importProviderSessionInternal({
+      provider: source.provider,
+      providerHandleId: handle.sessionId,
+      cwd: config.cwd,
+      workspaceId: source.workspaceId,
+      labels: { [FORKED_FROM_AGENT_ID_LABEL]: source.id },
+      config: {
+        title: sourceTitle
+          ? forkTitle({
+              sourceTitle,
+              sourceIsFork: FORKED_FROM_AGENT_ID_LABEL in source.labels,
+              existingTitles: records.flatMap((record) => (record.title ? [record.title] : [])),
+            })
+          : undefined,
+        modeId: config.modeId,
+        model: config.model,
+        thinkingOptionId: config.thinkingOptionId,
+        featureValues: config.featureValues,
+        providerOptions: config.providerOptions,
+        systemPrompt: config.systemPrompt,
+      },
+    });
+    // Stamped after the import, so every inherited row, even one primed without a provider
+    // timestamp, is older; clients mark the end of the inherited history with it.
+    await this.writeLabels(child.id, { [FORKED_AT_LABEL]: new Date().toISOString() });
+    return this.getAgent(child.id) ?? child;
+  }
+
+  /** The provider id of the user message that opens the completed turn to fork through. */
+  private resolveForkUserMessageId(agentId: string, cursor?: AgentTimelineCursor): string {
+    if (cursor && cursor.epoch !== this.timelineStore.getEpoch(agentId)) {
+      throw new Error("The chat changed since this turn was shown; reload it and fork again");
+    }
+    const rows = this.timelineStore.getRows(agentId);
+    const boundarySeq = cursor?.seq ?? Number.POSITIVE_INFINITY;
+    const userRow = rows.findLast(
+      (row) => row.seq <= boundarySeq && row.item.type === "user_message",
+    );
+    if (!userRow || userRow.item.type !== "user_message") {
+      throw new Error("There is no completed turn to fork");
+    }
+    const turnIsLatest = !rows.some(
+      (row) => row.seq > boundarySeq && row.item.type === "user_message",
+    );
+    if (turnIsLatest && this.hasInFlightRun(agentId)) {
+      throw new Error("Wait for the current turn to finish before forking it");
+    }
+    if (userRow.item.clientMessageId === userRow.item.messageId && !userRow.providerMessageId) {
+      throw new Error("Cannot fork before the provider acknowledges the prompt");
+    }
+    const messageId = userRow.providerMessageId ?? userRow.item.messageId;
+    if (!messageId) {
+      throw new Error("The selected turn has no provider message id");
+    }
+    return messageId;
+  }
+
   async deleteAgentState(agentId: string): Promise<void> {
     this.discardRetainedAgentState(agentId);
     await this.deleteCommittedTimeline(agentId);
@@ -3841,6 +3937,7 @@ export class AgentManager {
       foregroundTurnWaiters: new Set(),
       finalizedForegroundTurnIds: new Set(),
       unsubscribeSession: null,
+      backgroundTasks: [],
     };
   }
 
@@ -3957,6 +4054,12 @@ export class AgentManager {
     if (event.type === "provider_subagent") {
       const update = this.providerSubagents.apply(agent.id, event.provider, event.event);
       this.dispatch({ type: "provider_subagent", event: update });
+      return;
+    }
+    if (event.type === "background_tasks_changed") {
+      if (event.tasks.length === 0 && !agent.backgroundTasks?.length) return;
+      agent.backgroundTasks = event.tasks;
+      this.emitState(agent, { persist: false });
       return;
     }
     const turnId = getAgentStreamEventTurnId(event);

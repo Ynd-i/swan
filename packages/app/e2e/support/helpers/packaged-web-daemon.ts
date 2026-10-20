@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import net from "node:net";
+import { getAvailableHostDaemonPort } from "./isolated-host-daemon";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
@@ -14,21 +14,6 @@ export interface PackagedWebDaemon {
   serverId: string;
   pairingOfferUrl(): Promise<string>;
   close(): Promise<void>;
-}
-
-async function availablePort(): Promise<number> {
-  return await new Promise((resolve, reject) => {
-    const server = net.createServer();
-    server.once("error", reject);
-    server.listen(0, "127.0.0.1", () => {
-      const address = server.address();
-      if (!address || typeof address === "string") {
-        server.close(() => reject(new Error("Could not allocate a daemon port")));
-        return;
-      }
-      server.close(() => resolve(address.port));
-    });
-  });
 }
 
 async function waitForWebUi(origin: string, home: string): Promise<void> {
@@ -54,7 +39,8 @@ async function waitForWebUi(origin: string, home: string): Promise<void> {
 export async function startPackagedWebDaemon(input: {
   relayEndpoint: string;
 }): Promise<PackagedWebDaemon> {
-  const port = await availablePort();
+  const relayPort = Number(new URL(`http://${input.relayEndpoint}`).port);
+  const port = await getAvailableHostDaemonPort([relayPort]);
   const home = await mkdtemp(path.join(tmpdir(), "paseo-relay-deployment-e2e-"));
   const serverId = `relay-deployment-${Date.now().toString(36)}`;
   const paseo = path.resolve(__dirname, "../../../../../node_modules/.bin/paseo");

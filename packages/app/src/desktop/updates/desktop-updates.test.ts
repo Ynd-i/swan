@@ -99,14 +99,17 @@ describe("desktop-updates helpers", () => {
     expect(
       parseDesktopRuntimeInfo({
         appVersion: " 0.1.64 ",
+        releaseTag: "v0.11.0-beta.3-v1-beta7",
         runningUnderARM64Translation: true,
       }),
     ).toEqual({
       appVersion: "0.1.64",
+      releaseTag: "v0.11.0-beta.3-v1-beta7",
       runningUnderARM64Translation: true,
     });
     expect(parseDesktopRuntimeInfo(null)).toEqual({
       appVersion: null,
+      releaseTag: null,
       runningUnderARM64Translation: false,
     });
   });

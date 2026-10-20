@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { View, type StyleProp, type ViewStyle } from "react-native";
+import { View, type StyleProp, type ViewStyle, type AccessibilityValue } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { clampPct } from "./format";
 import type { UsageTone } from "./types";
@@ -26,11 +26,15 @@ export function UsageMeter({
   tone,
   quiet = false,
   style,
+  accessibilityLabel,
+  accessibilityValue,
 }: {
   percent: number;
   tone: UsageTone;
   quiet?: boolean;
   style?: StyleProp<ViewStyle>;
+  accessibilityLabel?: string;
+  accessibilityValue?: AccessibilityValue;
 }) {
   const fillWidth = clampPct(percent);
   const fillStyle = useMemo<StyleProp<ViewStyle>>(
@@ -38,7 +42,16 @@ export function UsageMeter({
     [fillWidth, quiet, tone],
   );
   return (
-    <View style={[styles.track, style]}>
+    <View
+      style={[styles.track, style]}
+      accessibilityRole={accessibilityLabel ? "progressbar" : undefined}
+      accessibilityLabel={accessibilityLabel}
+      accessibilityValue={accessibilityValue}
+      aria-valuemin={accessibilityValue?.min}
+      aria-valuemax={accessibilityValue?.max}
+      aria-valuenow={accessibilityValue?.now}
+      aria-valuetext={accessibilityValue?.text}
+    >
       <View style={fillStyle} />
     </View>
   );

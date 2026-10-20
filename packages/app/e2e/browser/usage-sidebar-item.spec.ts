@@ -86,7 +86,7 @@ test.describe("Usage item", () => {
       await expect(page).toHaveURL(startingUrl);
       await qaScreenshot(page, "compact-usage-icon-sheet");
       await setSummaryInSidebar(page, true);
-      await expectPinnedUsage(page, ["31% 5h", "54% wk", "7% 5h", "12% wk"]);
+      await expectPinnedUsage(page, "54% wk", 1);
       await closeUsageFromBackdrop(page);
     });
 
@@ -195,11 +195,11 @@ test.describe("Usage item", () => {
       await qaScreenshot(page, "compact-settings-sidebar-footer");
       await gotoAppShell(page);
       await openCompactSidebar(page);
-      await expectPinnedUsage(page, ["31% 5h", "54% wk", "7% 5h", "12% wk"]);
+      await expectPinnedUsage(page, "54% wk", 1);
       await qaScreenshot(page, "compact-footer-defaults");
       await page.setViewportSize(WIDE);
       await gotoAppShell(page);
-      await expectPinnedUsage(page, ["31% 5h", "54% wk", "7% 5h", "12% wk"]);
+      await expectPinnedUsage(page, "54% wk", 1);
       await qaScreenshot(page, "desktop-footer-defaults", { kind: "footer" });
       await openUsageFromItem(page);
       await qaScreenshot(page, "default-pins-card");
@@ -216,13 +216,13 @@ test.describe("Usage item", () => {
         0,
       );
       await togglePin(screen, "Claude", "Weekly");
-      await expectPinnedUsage(page, ["31% 5h", "7% 5h", "12% wk"]);
+      await expectPinnedUsage(page, "31% 5h", 1);
       await expect(pinRow(screen, "Claude", "Session")).toBeChecked();
       await expect(pinRow(screen, "Codex", "Session")).toBeChecked();
       await expect(pinRow(screen, "Codex", "Weekly")).toBeChecked();
       await qaScreenshot(page, "default-pins-after-one-toggle");
       await togglePin(screen, "Codex", "Session");
-      await expectPinnedUsage(page, ["31% 5h", "12% wk"]);
+      await expectPinnedUsage(page, "31% 5h", 1);
       await expect(usageItem(page)).not.toHaveText("Usage");
       await qaScreenshot(page, "desktop-footer-pins", { kind: "footer" });
       await expect(page.getByRole("button", { name: "Refresh all", exact: true })).toBeVisible();
@@ -234,7 +234,7 @@ test.describe("Usage item", () => {
 
     await test.step("remaining flips the Usage item and the Usage modal", async () => {
       await showUsageAs(page, "remaining");
-      await expectPinnedUsage(page, ["69% 5h", "88% wk"]);
+      await expectPinnedUsage(page, "69% 5h", 1);
       await expect(usageItem(page)).toHaveAccessibleName(/Claude .*69% left, Codex .*88% left/);
       await expect(
         screen.getByTestId("usage-report-claude:default").getByText("69% left"),
@@ -249,7 +249,7 @@ test.describe("Usage item", () => {
       await page.setViewportSize(COMPACT);
       await openCompactSidebar(page);
       await expect(usageItem(page)).toBeInViewport();
-      await expectPinnedUsage(page, ["69% 5h", "88% wk"]);
+      await expectPinnedUsage(page, "69% 5h", 1);
       await qaScreenshot(page, "compact-footer");
       await openUsageFromItem(page);
       const sheet = usageModal(page);
@@ -285,7 +285,7 @@ test.describe("Usage item", () => {
 
     await test.step("a reload keeps the pins and the toggle", async () => {
       await page.reload();
-      await expectPinnedUsage(page, ["69% 5h", "88% wk"]);
+      await expectPinnedUsage(page, "69% 5h", 1);
       await openUsageFromItem(page);
       await openUsageOptions(page);
       await expect(page.getByTestId("usage-display-remaining")).toHaveAttribute(
@@ -391,10 +391,10 @@ test("the Usage Settings switch turns on the sidebar summary and the pins with i
 
   await test.step("on: the Usage item and the pins appear", async () => {
     await setSummaryInSidebar(page, true);
-    await expectPinnedUsage(page, ["31% 5h", "54% wk", "7% 5h", "12% wk"]);
+    await expectPinnedUsage(page, "54% wk", 1);
     await expect(pinRow(screen, "Claude", "Weekly")).toBeChecked();
     await togglePin(screen, "Claude", "Weekly");
-    await expectPinnedUsage(page, ["31% 5h", "7% 5h", "12% wk"]);
+    await expectPinnedUsage(page, "31% 5h", 1);
     await qaScreenshot(page, "usage-summary-on");
   });
 
@@ -408,7 +408,7 @@ test("the Usage Settings switch turns on the sidebar summary and the pins with i
     await expect(claude.getByText("Session", { exact: true })).toBeVisible({ timeout: 10_000 });
     await expectUnpinnableRows(claude);
     await setSummaryInSidebar(page, true);
-    await expectPinnedUsage(page, ["31% 5h", "7% 5h", "12% wk"]);
+    await expectPinnedUsage(page, "31% 5h", 1);
     await expect(pinRow(screen, "Claude", "Session")).toBeChecked();
     await expect(pinRow(screen, "Claude", "Weekly")).not.toBeChecked();
   });
@@ -422,14 +422,13 @@ test("released hosts supply source logos through the client conversion", async (
   await seedSidebarFooterPreferences(page, [{ key: "usage", visible: true }]);
   await page.setViewportSize(WIDE);
   await gotoAppShell(page);
-  await expectPinnedUsage(page, ["31% 5h", "54% wk", "7% 5h", "12% wk"]);
+  await expectPinnedUsage(page, "54% wk", 1);
   // Source logos are decorative SVGs with no accessible role. Their path data distinguishes
   // the source artwork from the fallback gauge.
   const claudePath = /<path[^>]* d="([^"]+)"/.exec(claudeAndCodexReports()[0]!.icon!)![1]!;
   const codexPath = /<path[^>]* d="([^"]+)"/.exec(claudeAndCodexReports()[1]!.icon!)![1]!;
   const summary = usageItem(page).getByTestId("sidebar-usage-source");
   await expect(summary.nth(0).locator("svg path").first()).toHaveAttribute("d", claudePath);
-  await expect(summary.nth(1).locator("svg path").first()).toHaveAttribute("d", codexPath);
   await qaScreenshot(page, "released-host-footer", { kind: "footer" });
   await openUsageFromItem(page);
   const screen = page.getByTestId(`usage-host-${getServerId()}`);

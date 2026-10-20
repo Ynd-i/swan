@@ -94,7 +94,11 @@ function pluginData(items: StreamItem[]): unknown[] {
   return items.flatMap((item) => (item.kind === "plugin" ? [item.data] : []));
 }
 
-const presentationOptions = { level: "overview" as const, isTurnActive: true };
+const presentationOptions = {
+  level: "overview" as const,
+  isTurnActive: true,
+  absorbThoughts: false,
+};
 
 function streamHarness(transform?: TimelineItemTransform) {
   let state: { tail: StreamItem[]; head: StreamItem[] } = { tail: [], head: [] };
@@ -578,5 +582,130 @@ describe("timeline presentation", () => {
       { ...source, text: "Please fix the voice chat." },
     ]);
     expect(projectTimelineItems([source], () => [])).toEqual([]);
+  });
+});
+
+describe("chat proposals in the stream presentation", () => {
+  const proposal =
+    "<paseo_chat_proposal>\n<title>Fix the gate</title>\n<task>\nGate tools/list.\n\nAdd a test.\n</task>\n</paseo_chat_proposal>";
+
+  it("streams a proposal as cards on its message, never as raw tags", () => {
+    const harness = streamHarness();
+    harness.send(assistant("Root cause found.\n\n"));
+    const partial = harness.send(assistant(proposal.slice(0, 40)));
+    expect(
+      rows(partial).map((item) => (item.kind === "assistant_message" ? item.text : "")),
+    ).toEqual(["Root cause found."]);
+    expect(rows(partial)[0]).not.toHaveProperty("proposals");
+    const closed = harness.send(assistant(`${proposal.slice(40)}\n\nKept the docs here.`));
+    const card = { title: "Fix the gate", task: "Gate tools/list.\n\nAdd a test.", context: null };
+    const message = { text: "Root cause found.\n\n\nKept the docs here.", proposals: [card] };
+    expect(rows(closed).filter((item) => item.kind === "assistant_message")).toMatchObject([
+      message,
+    ]);
+    const completed = harness.send({ type: "turn_completed", provider: "claude" });
+    expect(completed.tail.at(-1)).toMatchObject(message);
+    expect(rows(harness.source())[0]).toMatchObject({ text: expect.stringContaining(proposal) });
+  });
+
+  it("keeps the row of a reply that is only a proposal, so its card renders", () => {
+    const harness = streamHarness();
+    harness.send(assistant(proposal));
+    const completed = harness.send({ type: "turn_completed", provider: "claude" });
+    const card = {
+      title: "Fix the gate",
+      task: "Gate tools/list.\n\nAdd a test.",
+      context: null,
+      model: null,
+      thinking: null,
+    };
+    expect(completed.tail).toMatchObject([
+      { kind: "assistant_message", text: "", proposals: [card] },
+    ]);
+    for (const platform of ["web", "native"] as const) {
+      const model = buildAgentStreamRenderModel({
+        tail: completed.tail,
+        head: completed.head,
+        isTurnActive: false,
+        activeTurnStartedAt: null,
+        platform,
+        isMobileBreakpoint: platform === "native",
+      });
+      expect([...model.history, ...model.segments.liveHead]).toContainEqual(
+        expect.objectContaining({ proposals: [card] }),
+      );
+    }
+  });
+
+  it("shows a started chat's first prompt as its brief", () => {
+    const harness = streamHarness();
+    const text =
+      "<paseo_started_chat>\n<task>\nFix it.\n</task>\n<context>\nWhy.\n</context>\n</paseo_started_chat>";
+    const result = harness.send({
+      type: "timeline",
+      provider: "claude",
+      item: { type: "user_message", messageId: "user-1", text },
+    });
+    expect(rows(result)).toMatchObject([
+      { kind: "user_message", text: "Fix it.", startedChat: { task: "Fix it.", context: "Why." } },
+    ]);
+  });
+
+  describe("report notes from started chats", () => {
+    const report = (chat: string, title: string, outcome: string, reply: string) =>
+      `<paseo_started_chat_report>\n<chat>${chat}</chat>\n<title>${title}</title>\n<outcome>${outcome}</outcome>\n<reply>\n${reply}\n</reply>\n</paseo_started_chat_report>`;
+    const sendNote = (text: string) =>
+      streamHarness().send({
+        type: "timeline",
+        provider: "claude",
+        item: { type: "user_message", messageId: "user-1", text },
+      });
+
+    it("shows every report of one note as its own row", () => {
+      const text = [
+        "Chats started from your proposals ended a turn.",
+        report("chat-1", "Fix login", "completed", "Login fixed.\n\nTests pass."),
+        report("chat-2", "Docs", "failed", ""),
+      ].join("\n");
+      expect(rows(sendNote(text))).toMatchObject([
+        {
+          kind: "user_message",
+          startedChatReports: [
+            {
+              chatId: "chat-1",
+              title: "Fix login",
+              outcome: "completed",
+              reply: "Login fixed.\n\nTests pass.",
+            },
+            { chatId: "chat-2", title: "Docs", outcome: "failed", reply: "" },
+          ],
+        },
+      ]);
+    });
+
+    it("keeps the row of a report whose chat ended its turn without a reply", () => {
+      const text = `Lead.\n${report("chat-1", "Fix login", "completed", "")}`;
+      const presented = sendNote(text);
+      for (const platform of ["web", "native"] as const) {
+        const model = buildAgentStreamRenderModel({
+          tail: presented.tail,
+          head: presented.head,
+          isTurnActive: false,
+          activeTurnStartedAt: null,
+          platform,
+          isMobileBreakpoint: platform === "native",
+        });
+        expect([...model.history, ...model.segments.liveHead]).toContainEqual(
+          expect.objectContaining({ startedChatReports: [expect.objectContaining({ reply: "" })] }),
+        );
+      }
+    });
+
+    it("keeps a message that only quotes a report a user bubble", () => {
+      const text = `What does this mean?\n\nI got it twice:\n${report("chat-1", "Fix login", "completed", "Done.")}`;
+      const [row] = rows(sendNote(text));
+      expect(row).toMatchObject({ kind: "user_message", text });
+      expect(row).not.toHaveProperty("startedChatReports");
+    });
   });
 });

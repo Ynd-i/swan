@@ -41,6 +41,7 @@ import {
   resolveExplorerSidebarWidth,
 } from "@/components/explorer-sidebar-layout";
 import { RetainedPanel } from "@/components/retained-panel";
+import { useAnimatedDock } from "@/components/use-animated-dock";
 import {
   hasMultipleVisiblePanes,
   resolveSplitContainerRoot,
@@ -91,7 +92,7 @@ import {
 import type { WorkspaceTab } from "@/workspace-tabs/model";
 import { recordRenderProfileReasons, RenderProfile } from "@/utils/render-profiler";
 import { inlineUnistylesStyle } from "@/styles/unistyles-inline-style";
-import { isNative } from "@/constants/platform";
+import { getIsElectronMac, isNative } from "@/constants/platform";
 import { panelTargetSupportsHost } from "@/plugins/workspace-panels/locations";
 
 interface SplitContainerProps {
@@ -399,6 +400,18 @@ export function SplitContainer({
     },
     [workspaceKey],
   );
+  const handleCreateExplorerTab = useCallback(
+    () => onCreateNewTab({ paneId: explorerSidebarPaneId ?? undefined }),
+    [explorerSidebarPaneId, onCreateNewTab],
+  );
+  const handleMoveExplorerTabToMain = useCallback(
+    (tabId: string) => {
+      if (layout.focusedPaneId) {
+        onMoveTabToPane(tabId, layout.focusedPaneId);
+      }
+    },
+    [layout.focusedPaneId, onMoveTabToPane],
+  );
   const splitRoot = useMemo(
     () =>
       resolveSplitContainerRoot({
@@ -436,8 +449,17 @@ export function SplitContainer({
     ? removeWindowChromeCorner(inheritedWindowChromeCorners, "top-right")
     : inheritedWindowChromeCorners;
   const mainColumnStyle = styles.mainColumn;
+  const explorerSidebarDock = useAnimatedDock(renderExplorerSidebarDock, explorerSidebarWidth);
   const explorerSidebarDockStyle = useMemo(
-    () => [styles.explorerSidebarDock, inlineUnistylesStyle({ width: explorerSidebarWidth })],
+    () => [styles.explorerSidebarDock, explorerSidebarDock.style],
+    [explorerSidebarDock.style],
+  );
+  // Fixed width so the content clips instead of reflowing while the dock slides.
+  const explorerSidebarDockContentStyle = useMemo(
+    () => [
+      styles.explorerSidebarDockContent,
+      inlineUnistylesStyle({ width: explorerSidebarWidth }),
+    ],
     [explorerSidebarWidth],
   );
   const handleWorkspaceShellLayout = useCallback((event: LayoutChangeEvent) => {
@@ -692,49 +714,45 @@ export function SplitContainer({
               ) : null}
             </View>
           </WindowChromeRegion>
-          {renderExplorerSidebarDock && explorerSidebarPane ? (
+          {explorerSidebarDock.rendered && explorerSidebarPane ? (
             <>
-              <ResizeHandle
-                testID="workspace-explorer-sidebar-resize-handle"
-                direction="horizontal"
-                hitAreaAlignment="end"
-                groupId={EXPLORER_SIDEBAR_RESIZE_GROUP_ID}
-                index={0}
-                sizes={explorerSidebarDockSizes}
-                containerSize={workspaceShellWidth}
-                onPreviewResizeSplit={previewExplorerSidebarResize}
-                onResizeSplit={commitExplorerSidebarResize}
-              />
-              <View style={explorerSidebarDockStyle}>
-                <ExplorerSidebarDock
-                  pane={explorerSidebarPane}
-                  uiTabs={uiTabs}
-                  normalizedServerId={normalizedServerId}
-                  normalizedWorkspaceId={normalizedWorkspaceId}
-                  isWorkspaceFocused={isWorkspaceFocused}
-                  closingTabIds={closingTabIds}
-                  onSelectTab={onSelectTabInPane}
-                  onCloseTab={onCloseTab}
-                  onCreateNewTab={onCreateNewTab}
-                  hoveredCloseTabKey={hoveredCloseTabKey}
-                  setHoveredCloseTabKey={setHoveredCloseTabKey}
-                  onCopyResumeCommand={onCopyResumeCommand}
-                  onCopyAgentId={onCopyAgentId}
-                  onCopyTerminalId={onCopyTerminalId}
-                  onCopyFilePath={onCopyFilePath}
-                  onReloadAgent={onReloadAgent}
-                  onRenameTab={onRenameTab}
-                  onCloseTabsToLeft={onCloseTabsToLeft}
-                  onCloseTabsToRight={onCloseTabsToRight}
-                  onCloseOtherTabs={onCloseOtherTabs}
-                  onExitFocusMode={onExitFocusMode}
-                  buildPaneContentModel={buildPaneContentModel}
-                  onReorderTabsInPane={onReorderTabsInPane}
-                  activeDragTabId={activeDragTabId}
-                  tabDropPreview={tabDropPreview}
-                  headerAction={renderExplorerSidebarHeaderAction?.()}
+              {renderExplorerSidebarDock ? (
+                <ResizeHandle
+                  testID="workspace-explorer-sidebar-resize-handle"
+                  direction="horizontal"
+                  hitAreaAlignment="end"
+                  groupId={EXPLORER_SIDEBAR_RESIZE_GROUP_ID}
+                  index={0}
+                  sizes={explorerSidebarDockSizes}
+                  containerSize={workspaceShellWidth}
+                  onPreviewResizeSplit={previewExplorerSidebarResize}
+                  onResizeSplit={commitExplorerSidebarResize}
                 />
-              </View>
+              ) : null}
+              <Animated.View
+                style={explorerSidebarDockStyle}
+                pointerEvents={renderExplorerSidebarDock ? "auto" : "none"}
+              >
+                <View style={explorerSidebarDockContentStyle}>
+                  <ExplorerSidebarDock
+                    pane={explorerSidebarPane}
+                    uiTabs={uiTabs}
+                    normalizedServerId={normalizedServerId}
+                    normalizedWorkspaceId={normalizedWorkspaceId}
+                    isWorkspaceFocused={isWorkspaceFocused}
+                    closingTabIds={closingTabIds}
+                    onSelectTab={onSelectTabInPane}
+                    onCloseTab={onCloseTab}
+                    onCreateNewTab={handleCreateExplorerTab}
+                    onMoveTabToMain={handleMoveExplorerTabToMain}
+                    buildPaneContentModel={buildPaneContentModel}
+                    onReorderTabsInPane={onReorderTabsInPane}
+                    activeDragTabId={activeDragTabId}
+                    tabDropPreview={tabDropPreview}
+                    headerAction={renderExplorerSidebarHeaderAction?.()}
+                  />
+                </View>
+              </Animated.View>
             </>
           ) : null}
         </View>
@@ -1260,43 +1278,45 @@ const SplitPaneView = memo(function SplitPaneView({
         style={styles.pane}
         testID={`workspace-pane-${pane.id}`}
       >
-        <WindowChromeSafeArea placement="inline" style={styles.paneTabs}>
-          <TitlebarDragRegion />
-          <WorkspaceDesktopTabsRow
-            paneId={pane.id}
-            isFocused={isFocused && isWorkspaceFocused}
-            tabs={desktopTabRowItems}
-            normalizedServerId={normalizedServerId}
-            normalizedWorkspaceId={normalizedWorkspaceId}
-            setHoveredCloseTabKey={setHoveredCloseTabKey}
-            onNavigateTab={onNavigateTab}
-            onCloseTab={onCloseTab}
-            onCopyResumeCommand={onCopyResumeCommand}
-            onCopyAgentId={onCopyAgentId}
-            onCopyTerminalId={onCopyTerminalId}
-            onCopyFilePath={onCopyFilePath}
-            onReloadAgent={onReloadAgent}
-            onRenameTab={onRenameTab}
-            onCloseTabsToLeft={handleCloseTabsToLeft}
-            onCloseTabsToRight={handleCloseTabsToRight}
-            onCloseOtherTabs={handleCloseOtherTabs}
-            onCreateNewTab={onCreateNewTab}
-            onReorderTabs={handleReorderTabs}
-            externalDndContext
-            activeDragTabId={activeDragTabId}
-            tabDropPreviewIndex={
-              tabDropPreview?.paneId === pane.id ? tabDropPreview.indicatorIndex : null
-            }
-            showPaneSplitActions={!focusModeEnabled}
-            showPaneMaximizeAction={workspaceHasMultiplePanes && !focusModeEnabled}
-            paneMaximized={paneId === maximizedPaneId}
-            onTogglePaneMaximized={handleTogglePaneMaximized}
-            onSplitRight={handleSplitRight}
-            onSplitDown={handleSplitDown}
-            focusModeEnabled={Boolean(focusModeEnabled)}
-            onExitFocusMode={onExitFocusMode}
-          />
-        </WindowChromeSafeArea>
+        {!getIsElectronMac() ? (
+          <WindowChromeSafeArea placement="inline" style={styles.paneTabs}>
+            <TitlebarDragRegion />
+            <WorkspaceDesktopTabsRow
+              paneId={pane.id}
+              isFocused={isFocused && isWorkspaceFocused}
+              tabs={desktopTabRowItems}
+              normalizedServerId={normalizedServerId}
+              normalizedWorkspaceId={normalizedWorkspaceId}
+              setHoveredCloseTabKey={setHoveredCloseTabKey}
+              onNavigateTab={onNavigateTab}
+              onCloseTab={onCloseTab}
+              onCopyResumeCommand={onCopyResumeCommand}
+              onCopyAgentId={onCopyAgentId}
+              onCopyTerminalId={onCopyTerminalId}
+              onCopyFilePath={onCopyFilePath}
+              onReloadAgent={onReloadAgent}
+              onRenameTab={onRenameTab}
+              onCloseTabsToLeft={handleCloseTabsToLeft}
+              onCloseTabsToRight={handleCloseTabsToRight}
+              onCloseOtherTabs={handleCloseOtherTabs}
+              onCreateNewTab={onCreateNewTab}
+              onReorderTabs={handleReorderTabs}
+              externalDndContext
+              activeDragTabId={activeDragTabId}
+              tabDropPreviewIndex={
+                tabDropPreview?.paneId === pane.id ? tabDropPreview.indicatorIndex : null
+              }
+              showPaneSplitActions={!focusModeEnabled}
+              showPaneMaximizeAction={workspaceHasMultiplePanes && !focusModeEnabled}
+              paneMaximized={paneId === maximizedPaneId}
+              onTogglePaneMaximized={handleTogglePaneMaximized}
+              onSplitRight={handleSplitRight}
+              onSplitDown={handleSplitDown}
+              focusModeEnabled={Boolean(focusModeEnabled)}
+              onExitFocusMode={onExitFocusMode}
+            />
+          </WindowChromeSafeArea>
+        ) : null}
 
         <View style={styles.paneContent}>
           <WorkspacePanelHost
@@ -1398,9 +1418,14 @@ const styles = StyleSheet.create((theme) => ({
   },
   explorerSidebarDock: {
     flexShrink: 0,
+    minHeight: 0,
+    overflow: "hidden",
+    backgroundColor: theme.colors.surfaceSidebar,
+  },
+  explorerSidebarDockContent: {
+    flex: 1,
     minWidth: 240,
     minHeight: 0,
-    backgroundColor: theme.colors.surfaceSidebar,
   },
   group: {
     flex: 1,

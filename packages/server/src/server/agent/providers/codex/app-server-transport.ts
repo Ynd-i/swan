@@ -51,6 +51,8 @@ type UnexpectedTerminationHandler = (error: Error) => void;
 export interface CodexThreadForkParams {
   threadId: string;
   beforeTurnId?: string | null;
+  /** Inclusive cutoff; the turn must be complete. */
+  lastTurnId?: string | null;
   path?: string | null;
   model?: string | null;
   modelProvider?: string | null;

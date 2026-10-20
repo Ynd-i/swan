@@ -1,3 +1,4 @@
+import { getIsElectronMac } from "@/constants/platform";
 import { StyleSheet } from "react-native-unistyles";
 
 export const settingsStyles = StyleSheet.create((theme) => ({
@@ -27,7 +28,7 @@ export const settingsStyles = StyleSheet.create((theme) => ({
   },
   card: {
     backgroundColor: theme.colors.surface1,
-    borderRadius: theme.borderRadius.lg,
+    borderRadius: getIsElectronMac() ? theme.borderRadius["2xl"] : theme.borderRadius.lg,
     borderWidth: 1,
     borderColor: theme.colors.border,
     overflow: "hidden",

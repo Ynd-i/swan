@@ -2,6 +2,8 @@
 
 Tokens — every color, font size, weight, spacing step, radius, icon size — live in `packages/app/src/styles/theme.ts`.
 
+The custom macOS presentation follows the supplied Codex reference through desktop-only overrides. Its scope, implementation steps, and verification live in [the desktop UI plan](refactors/codex-desktop-ui-plan.md); shared and native surfaces retain this design system.
+
 ---
 
 ## 1. Character

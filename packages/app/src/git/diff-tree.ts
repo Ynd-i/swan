@@ -198,6 +198,17 @@ export function flattenDiffTree(
   return rows;
 }
 
+/** Search results retain original diff identities and leave saved folder collapse state alone. */
+export function searchDiffTree(root: DiffTreeDirNode, query: string): DiffTreeFileRow[] {
+  const needle = query.trim().toLowerCase();
+  return flattenDiffTree(root, new Set())
+    .filter(
+      (row): row is DiffTreeFileRow =>
+        row.kind === "file" && row.file.path.toLowerCase().includes(needle),
+    )
+    .map(({ file, fileIndex }) => ({ kind: "file", file, fileIndex, depth: 0 }));
+}
+
 /** Every directory path in the (compressed) tree — used for "collapse all folders". */
 export function collectDirPaths(root: DiffTreeDirNode): string[] {
   const paths: string[] = [];

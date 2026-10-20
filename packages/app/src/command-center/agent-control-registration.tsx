@@ -54,7 +54,7 @@ function ignoreAgentFeatureChange(): void {
   return;
 }
 
-function resolveDefaultModeId(
+export function resolveDefaultModeId(
   provider: string | null | undefined,
   providerDefinitions: AgentProviderDefinition[],
 ): string | null {

@@ -12,6 +12,8 @@ interface PageLayoutProps {
   onBack?: () => void;
   testID?: string;
   titleTestID?: string;
+  /** Maximum outer column width, including its horizontal padding. */
+  contentMaxWidth?: number;
   /** Controls for the whole page: right of the title on desktop, in the back header on compact. */
   actions?: ReactNode;
   children: ReactNode;
@@ -27,6 +29,7 @@ export function PageLayout({
   onBack,
   testID,
   titleTestID,
+  contentMaxWidth = 720,
   actions,
   children,
 }: PageLayoutProps) {
@@ -34,6 +37,7 @@ export function PageLayout({
   const insets = useSafeAreaInsets();
   const scrollContentStyle = useMemo(() => ({ paddingBottom: insets.bottom }), [insets.bottom]);
   const showTitle = !isCompact && title !== undefined;
+  const contentWidthStyle = useMemo(() => ({ maxWidth: contentMaxWidth }), [contentMaxWidth]);
 
   return (
     <View style={styles.container}>
@@ -43,7 +47,7 @@ export function PageLayout({
         <MenuHeader borderless />
       )}
       <ScrollView style={styles.scroll} contentContainerStyle={scrollContentStyle} testID={testID}>
-        <View style={styles.content}>
+        <View style={[styles.content, contentWidthStyle]}>
           {showTitle ? (
             <View style={styles.titleRow} testID={titleTestID}>
               <Text style={styles.title} testID="page-title">
@@ -71,7 +75,6 @@ const styles = StyleSheet.create((theme) => ({
     padding: theme.spacing[4],
     paddingTop: theme.spacing[6],
     width: "100%",
-    maxWidth: 720,
     alignSelf: "center",
   },
   titleRow: {

@@ -1,5 +1,6 @@
 import { supportsUsageReports } from "@getpaseo/client/internal/daemon-client";
 import { useCallback, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import {
   skipToken,
   useMutation,
@@ -16,7 +17,7 @@ import {
   useHosts,
 } from "@/runtime/host-runtime";
 import { useSessionStore, type SessionState } from "@/stores/session-store";
-import { usageCopy } from "./copy";
+import { i18n } from "@/i18n/i18next";
 import {
   replaceReport,
   resolveAgentUsageView,
@@ -50,7 +51,7 @@ function agentUsageQueryKey(serverId: string, agentId: string) {
 
 function requireClient(serverId: string) {
   const client = getHostRuntimeStore().getClient(serverId);
-  if (!client) throw new Error(usageCopy.clientUnavailable);
+  if (!client) throw new Error(i18n.t("usage.clientUnavailable"));
   return client;
 }
 
@@ -131,6 +132,8 @@ function toQueryState(query: {
 
 /** Usage reports for one host, as shown on its settings page. */
 export function useHostUsage(serverId: string): { view: UsageView; refresh: () => void } {
+  // Availability messages are built here, so a language change must rerender the query consumer.
+  useTranslation();
   const queryClient = useQueryClient();
   const isConnected = useHostRuntimeIsConnected(serverId);
   const isSupported = useSessionStore((state) => supportsUsage(state.sessions[serverId]));

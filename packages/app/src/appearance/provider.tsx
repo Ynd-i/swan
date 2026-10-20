@@ -22,6 +22,7 @@ import {
 import { PLUGIN_THEME_NAMES, PLUGIN_THEME_PREFERENCE, THEME_TO_UNISTYLES } from "@/styles/theme";
 import { applyAppearance } from "./apply";
 import { AppearanceSystemBars } from "./system-bars";
+import { AppReducedMotionProvider } from "./reduced-motion";
 
 interface ContributedThemes {
   options: PluginThemeOption[];
@@ -70,12 +71,17 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
     applyTheme({ preference: settings.theme, contributedTheme: selected });
     applyAppearance({
       uiFontFamily: settings.uiFontFamily,
+      contentFontFamily: settings.contentFontFamily,
       monoFontFamily: settings.monoFontFamily,
       uiBaseFontSize: settings.uiBaseFontSize,
       contentFontSize: settings.contentFontSize,
       codeFontSize: settings.codeFontSize,
+      codeFontWeight: settings.codeFontWeight,
+      contentFontWeight: settings.contentFontWeight,
+      uiFontWeight: settings.uiFontWeight,
       contentMaxWidth: resolveContentMaxWidth({ contentMaxWidth: settings.contentMaxWidth }),
       syntaxTheme: settings.syntaxTheme,
+      themeColors: settings.themeColors,
     });
     setHasAppliedAppearance(true);
   }, [
@@ -83,12 +89,17 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
     selected,
     settings.theme,
     settings.uiFontFamily,
+    settings.contentFontFamily,
     settings.monoFontFamily,
     settings.uiBaseFontSize,
     settings.contentFontSize,
     settings.codeFontSize,
+    settings.codeFontWeight,
+    settings.contentFontWeight,
+    settings.uiFontWeight,
     settings.contentMaxWidth,
     settings.syntaxTheme,
+    settings.themeColors,
   ]);
 
   const select = useCallback(
@@ -108,10 +119,12 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
   if (!hasAppliedAppearance) return null;
 
   return (
-    <ContributedThemesContext.Provider value={value}>
-      <AppearanceSystemBars />
-      {children}
-    </ContributedThemesContext.Provider>
+    <AppReducedMotionProvider preference={settings.reducedMotion}>
+      <ContributedThemesContext.Provider value={value}>
+        <AppearanceSystemBars />
+        {children}
+      </ContributedThemesContext.Provider>
+    </AppReducedMotionProvider>
   );
 }
 

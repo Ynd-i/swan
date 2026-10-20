@@ -1587,6 +1587,68 @@ describe("stream reducer canonical tool calls", () => {
 });
 
 describe("turn lifecycle events", () => {
+  const advisorCall = (turnId: string, callId: string) =>
+    ({
+      type: "timeline",
+      provider: "claude",
+      turnId,
+      item: {
+        type: "tool_call",
+        callId,
+        name: "advisor",
+        status: "running",
+        error: null,
+        detail: { type: "unknown", input: null, output: null },
+      },
+    }) satisfies AgentStreamEventPayload;
+  const statuses = (state: StreamItem[]) =>
+    state.filter(isAgentToolCallItem).map((item) => item.payload.data.status);
+
+  it("settles tool calls a provider never finished when the turn ends", () => {
+    const running = reduceStreamUpdate([], advisorCall("turn-1", "advisor-1"), new Date(1));
+    const completed = reduceStreamUpdate(
+      running,
+      { type: "turn_completed", provider: "claude", turnId: "turn-1" },
+      new Date(2),
+    );
+    const canceled = reduceStreamUpdate(
+      running,
+      { type: "turn_canceled", provider: "claude", reason: "stop", turnId: "turn-1" },
+      new Date(2),
+    );
+
+    assert.deepStrictEqual(statuses(completed), ["completed"]);
+    assert.deepStrictEqual(statuses(canceled), ["canceled"]);
+  });
+
+  it("keeps a plan awaiting approval running after its turn ends", () => {
+    const plan = {
+      ...advisorCall("turn-1", "plan-1"),
+      item: {
+        ...advisorCall("turn-1", "plan-1").item,
+        name: "plan_approval",
+        detail: { type: "plan", text: "Ship it" },
+      },
+    } satisfies AgentStreamEventPayload;
+    const running = reduceStreamUpdate([], plan, new Date(1));
+    const completed = reduceStreamUpdate(
+      running,
+      { type: "turn_completed", provider: "claude", turnId: "turn-1" },
+      new Date(2),
+    );
+
+    assert.deepStrictEqual(statuses(completed), ["running"]);
+  });
+
+  it("settles running calls of older turns on hydration and keeps the newest turn live", () => {
+    const state = hydrateStreamState([
+      { event: advisorCall("turn-1", "advisor-1"), timestamp: new Date(1) },
+      { event: advisorCall("turn-2", "advisor-2"), timestamp: new Date(2) },
+    ]);
+
+    assert.deepStrictEqual(statuses(state), ["completed", "running"]);
+  });
+
   it("finalizes active stream items without adding timeline rows", () => {
     const startedAt = new Date("2025-01-01T12:00:00Z");
     const completedAt = new Date("2025-01-01T12:00:05Z");

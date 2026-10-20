@@ -43,6 +43,7 @@ import {
   resolveClaudeDisabledThinkingForModel,
 } from "./model-manifest.js";
 import { parsePartialJsonObject } from "./partial-json.js";
+import { readClaudeBackgroundTasks } from "./background-tasks.js";
 import { ClaudeSidechainTracker } from "./sidechain-tracker.js";
 import { readClaudeSubagentHandback } from "./subagent-handback.js";
 import { ClaudeTaskState } from "./task-state.js";
@@ -121,6 +122,7 @@ import {
   type SteerResult,
   type AgentStreamEvent,
   type AgentTimelineItem,
+  type AgentContextUsage,
   type AgentUsage,
   type AgentRuntimeInfo,
   type FetchCatalogOptions,
@@ -376,6 +378,7 @@ const CLAUDE_CAPABILITIES: AgentCapabilityFlags = {
   supportsRewindConversation: true,
   supportsRewindFiles: true,
   supportsRewindBoth: true,
+  supportsNativeFork: true,
 };
 
 const DEFAULT_MODES: AgentMode[] = [
@@ -2037,8 +2040,22 @@ function readClaudeParentToolUseId(message: SDKMessage): string | null {
   return typeof parentToolUseId === "string" && parentToolUseId.length > 0 ? parentToolUseId : null;
 }
 
+interface CompactionWindowTicket {
+  modelEpoch: number;
+  turnGeneration: number;
+}
+
 class ClaudeContextUsageState {
   private contextWindowMaxTokens: number | undefined;
+  /**
+   * The window Claude itself measures against and compacts at. Settings, the account and the
+   * model all shape it, so only the CLI can resolve it, through its context breakdown.
+   */
+  private compactionWindowTokens: number | undefined;
+  /** One breakdown per model: each is a Claude API request (getpaseo/paseo#1685). */
+  private compactionWindowRequested = false;
+  private modelEpoch = 0;
+  private turnGeneration = 0;
   private streamRequestInputUsage: StreamRequestInputUsage | undefined;
   private streamRequestOutputTokens: number | undefined;
   private compactedContextWindowUsedTokens: number | undefined;
@@ -2049,6 +2066,7 @@ class ClaudeContextUsageState {
   }
 
   beginTurn(): void {
+    this.turnGeneration += 1;
     this.streamRequestInputUsage = undefined;
     this.streamRequestOutputTokens = undefined;
     this.compactedContextWindowUsedTokens = undefined;
@@ -2056,6 +2074,52 @@ class ClaudeContextUsageState {
 
   setInitialContextWindowMaxTokens(contextWindowMaxTokens: number | undefined): void {
     this.contextWindowMaxTokens = contextWindowMaxTokens;
+    this.modelEpoch += 1;
+    this.compactionWindowTokens = undefined;
+    this.compactionWindowRequested = false;
+  }
+
+  currentModelEpoch(): number {
+    return this.modelEpoch;
+  }
+
+  /** The ticket for this model's one breakdown request, or null once it has had it. */
+  requestCompactionWindow(): CompactionWindowTicket | null {
+    if (this.compactionWindowRequested) {
+      return null;
+    }
+    this.compactionWindowRequested = true;
+    return { modelEpoch: this.modelEpoch, turnGeneration: this.turnGeneration };
+  }
+
+  recordCompactionWindow(windowTokens: number, modelEpoch: number): void {
+    if (modelEpoch === this.modelEpoch) {
+      this.compactionWindowTokens = windowTokens;
+    }
+  }
+
+  /** Re-measures a completed turn against the compaction window, unless a newer turn has begun. */
+  buildCompactionWindowCorrection(
+    usage: AgentUsage,
+    ticket: CompactionWindowTicket,
+  ): AgentStreamEvent | null {
+    if (
+      ticket.modelEpoch !== this.modelEpoch ||
+      ticket.turnGeneration !== this.turnGeneration ||
+      this.compactionWindowTokens === undefined
+    ) {
+      return null;
+    }
+    return {
+      type: "usage_updated",
+      provider: "claude",
+      // The manager replaces lastUsage with this, so it carries the whole turn's usage.
+      usage: { ...usage, contextWindowMaxTokens: this.compactionWindowTokens },
+    };
+  }
+
+  private windowMaxTokens(): number | undefined {
+    return this.compactionWindowTokens ?? this.contextWindowMaxTokens;
   }
 
   recordModelUsage(modelUsage: unknown, modelId: string | null | undefined): number | undefined {
@@ -2117,11 +2181,10 @@ class ClaudeContextUsageState {
         totalCostUsd: message.total_cost_usd,
       };
 
-      const modelContextWindowMaxTokens = this.recordModelUsage(message.modelUsage, modelId);
-      if (this.contextWindowMaxTokens !== undefined) {
-        usage.contextWindowMaxTokens = this.contextWindowMaxTokens;
-      } else if (modelContextWindowMaxTokens !== undefined) {
-        usage.contextWindowMaxTokens = modelContextWindowMaxTokens;
+      this.recordModelUsage(message.modelUsage, modelId);
+      const windowMaxTokens = this.windowMaxTokens();
+      if (windowMaxTokens !== undefined) {
+        usage.contextWindowMaxTokens = windowMaxTokens;
       }
 
       const activeResultUsageTokens =
@@ -2156,8 +2219,9 @@ class ClaudeContextUsageState {
     const usage: AgentUsage = {
       contextWindowUsedTokens,
     };
-    if (this.contextWindowMaxTokens !== undefined) {
-      usage.contextWindowMaxTokens = this.contextWindowMaxTokens;
+    const windowMaxTokens = this.windowMaxTokens();
+    if (windowMaxTokens !== undefined) {
+      usage.contextWindowMaxTokens = windowMaxTokens;
     }
     return {
       type: "usage_updated",
@@ -2171,8 +2235,9 @@ class ClaudeContextUsageState {
     this.streamRequestOutputTokens = undefined;
     this.compactedContextWindowUsedTokens = postTokens;
     const usage: AgentUsage = {};
-    if (this.contextWindowMaxTokens !== undefined) {
-      usage.contextWindowMaxTokens = this.contextWindowMaxTokens;
+    const windowMaxTokens = this.windowMaxTokens();
+    if (windowMaxTokens !== undefined) {
+      usage.contextWindowMaxTokens = windowMaxTokens;
     }
     if (postTokens !== undefined) {
       usage.contextWindowUsedTokens = postTokens;
@@ -2951,6 +3016,36 @@ class ClaudeAgentSession implements AgentSession {
     );
   }
 
+  // Claude probes the API for this (issue #1685), so it runs only when someone asks.
+  async getContextUsage(): Promise<AgentContextUsage | null> {
+    if (!this.query) {
+      return null;
+    }
+    const modelEpoch = this.contextUsage.currentModelEpoch();
+    const response = await this.query.getContextUsage();
+    this.contextUsage.recordCompactionWindow(response.maxTokens, modelEpoch);
+    const categories: AgentContextUsage["categories"] = [];
+    let bufferTokens = 0;
+    for (const category of response.categories) {
+      // Deferred tool schemas sit outside the window, and free space is the remainder.
+      if (category.isDeferred || category.tokens <= 0 || category.name === "Free space") {
+        continue;
+      }
+      // "Autocompact buffer" or "Compact buffer": reserved, not used.
+      if (category.name.endsWith(" buffer")) {
+        bufferTokens += category.tokens;
+      } else {
+        categories.push({ name: category.name, tokens: category.tokens });
+      }
+    }
+    return {
+      maxTokens: response.maxTokens,
+      usedTokens: response.totalTokens,
+      bufferTokens,
+      categories,
+    };
+  }
+
   async listCommands(): Promise<AgentSlashCommand[]> {
     const q = await this.ensureQuery();
     const commands = await q.supportedCommands();
@@ -2988,6 +3083,29 @@ class ClaudeAgentSession implements AgentSession {
         this.rebindConversationSession(sessionId);
       },
     });
+  }
+
+  async forkConversation(input: { messageId: string }): Promise<AgentPersistenceHandle> {
+    const userMessageId = this.resolveClaudeMessageId(input.messageId);
+    const anchor = this.rewindTurnAnchors.find((entry) => entry.userMessageId === userMessageId);
+    if (!anchor?.assistantMessageId) {
+      throw new Error(`Claude fork target ${input.messageId} has no completed reply`);
+    }
+    const source = this.describePersistence();
+    const transcriptPath = source ? this.resolveHistoryPath(source.sessionId) : null;
+    if (!source || !transcriptPath) {
+      throw new Error("Claude session is not ready for fork");
+    }
+    const fork = await this.rewindSdk.forkSession(source.sessionId, {
+      upToMessageId: anchor.assistantMessageId,
+      transcriptPath,
+    });
+    return {
+      provider: "claude",
+      sessionId: fork.sessionId,
+      nativeHandle: fork.sessionId,
+      metadata: source.metadata,
+    };
   }
 
   async revertFiles(input: { messageId: string }): Promise<void> {
@@ -3952,11 +4070,14 @@ class ClaudeAgentSession implements AgentSession {
   }
 
   private failRunningRuntimeTasks(): void {
-    this.dispatchEvents(
-      foldSubagentObservations(this.taskProtocolSource.failRunningTasks()).map(
+    this.dispatchEvents([
+      ...foldSubagentObservations(this.taskProtocolSource.failRunningTasks()).map(
         (event): AgentStreamEvent => ({ type: "provider_subagent", provider: "claude", event }),
       ),
-    );
+      // Background work dies with the process, and a new process announces nothing until its
+      // set changes.
+      { type: "background_tasks_changed", provider: "claude", tasks: [] },
+    ]);
   }
 
   private startQueryPump(): void {
@@ -4210,6 +4331,27 @@ class ClaudeAgentSession implements AgentSession {
     }
 
     this.dispatchEvents(events);
+    void this.learnCompactionWindow(events);
+  }
+
+  /** Measures the ring against the window Claude compacts at, as Claude's own context card does. */
+  private async learnCompactionWindow(events: AgentStreamEvent[]): Promise<void> {
+    const completed = events.find((event) => event.type === "turn_completed");
+    const usage = completed?.type === "turn_completed" ? completed.usage : undefined;
+    const ticket = usage ? this.contextUsage.requestCompactionWindow() : null;
+    if (!usage || !ticket) {
+      return;
+    }
+    try {
+      await this.getContextUsage();
+    } catch (error) {
+      this.logger.debug({ err: error }, "Claude compaction window unavailable");
+      return;
+    }
+    const event = this.contextUsage.buildCompactionWindowCorrection(usage, ticket);
+    if (event) {
+      this.notifySubscribers(event);
+    }
   }
 
   private async buildPumpedMessageEvents(
@@ -4633,9 +4775,42 @@ class ClaudeAgentSession implements AgentSession {
       this.appendTaskNotificationEvents(message, events);
       return;
     }
+    if (message.subtype === "notification") {
+      this.appendFastModeRejectionEvents(message, events);
+      return;
+    }
     if (message.subtype === "task_progress") {
       return;
     }
+    if (message.subtype === "background_tasks_changed") {
+      events.push({
+        type: "background_tasks_changed",
+        provider: "claude",
+        tasks: readClaudeBackgroundTasks(message),
+      });
+    }
+  }
+
+  /**
+   * When usage credits run out, Claude Code drops fast mode and silently retries at standard
+   * speed. The user asked for fast, so stop the turn and show why instead.
+   */
+  private appendFastModeRejectionEvents(
+    message: Extract<SDKMessage, { type: "system"; subtype: "notification" }>,
+    events: AgentStreamEvent[],
+  ): void {
+    if (
+      message.key !== "fast-mode-overage-rejected" ||
+      this.config.featureValues?.fast_mode !== true ||
+      (!this.activeForegroundTurnId && !this.autonomousTurn)
+    ) {
+      return;
+    }
+    events.push(...this.sidechainTracker.finishAll("failed"));
+    events.push(this.buildTurnFailedEvent(message.text));
+    void this.interruptActiveTurn().catch((error) => {
+      this.logger.warn({ err: error }, "Failed to interrupt after fast mode was rejected");
+    });
   }
 
   private appendTaskNotificationEvents(
@@ -6374,6 +6549,12 @@ function mapAssistantHistoryBlocksWithMessageId(
   return items;
 }
 
+const CLAUDE_CONVERSATION_ENTRY_TYPES: ReadonlySet<unknown> = new Set([
+  "user",
+  "assistant",
+  "system",
+]);
+
 function convertClaudeHistoryEntryPreamble(
   entry: ClaudeHistoryEntry,
 ): { shortCircuit: AgentTimelineItem[] } | { proceed: { content: unknown } } {
@@ -6394,6 +6575,12 @@ function convertClaudeHistoryEntryPreamble(
   const taskNotificationItem = mapTaskNotificationSystemRecordToToolCall(entry);
   if (taskNotificationItem) {
     return { shortCircuit: [taskNotificationItem] };
+  }
+
+  // Bookkeeping records such as api-request-blob also carry message.content, repeating earlier
+  // blocks after their results; replaying them reopens finished tool calls as running.
+  if (!CLAUDE_CONVERSATION_ENTRY_TYPES.has(entry.type)) {
+    return { shortCircuit: [] };
   }
 
   if (entry.isCompactSummary) {

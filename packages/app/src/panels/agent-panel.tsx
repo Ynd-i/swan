@@ -18,9 +18,11 @@ import { useTranslation } from "react-i18next";
 import { StyleSheet as RNStyleSheet, Text, View } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import invariant from "tiny-invariant";
-import { shallow, useShallow } from "zustand/shallow";
+import { useShallow } from "zustand/shallow";
 import { useStoreWithEqualityFn } from "zustand/traditional";
 import { AgentStreamView, type AgentStreamViewHandle } from "@/agent-stream/view";
+import { useAgentPendingPermissions } from "@/agent-stream/use-pending-permissions";
+import { PermissionDock } from "@/agent-stream/permission-dock";
 import { ArchivedAgentCallout } from "@/components/archived-agent-callout";
 import { ComposerDock } from "@/composer/dock";
 import { FileDropZone } from "@/components/file-drop/file-drop-zone";
@@ -44,7 +46,8 @@ import { useToastHost, type ToastApi, type ToastState } from "@/components/toast
 import type { WorkspaceComposerAttachment } from "@/attachments/types";
 import { useWorkspaceAttachmentScopeKey } from "@/attachments/workspace-attachments-store";
 import { COMPACT_FORM_FACTOR_WIDTH, useIsCompactFormFactor } from "@/constants/layout";
-import { isNative, isWeb } from "@/constants/platform";
+import { getIsElectronMac, isNative, isWeb } from "@/constants/platform";
+import { DESKTOP_CHAT_UNREAD } from "@/components/desktop/desktop-chat-model";
 import { useAgentAttentionClear } from "@/hooks/use-agent-attention-clear";
 import { useAgentInputDraft, type AgentInputDraft } from "@/composer/draft/input-draft";
 import {
@@ -123,6 +126,7 @@ interface ChatAgentStateShape {
 interface ChatAgentSelectedState extends ChatAgentStateShape {
   archivedAt: Date | null;
   requiresAttention: boolean;
+  manualUnread: boolean;
   attentionReason: Agent["attentionReason"] | null;
 }
 
@@ -153,6 +157,7 @@ const EMPTY_CHAT_AGENT_STATE: ChatAgentSelectedState = {
   lastError: null,
   archivedAt: null,
   requiresAttention: false,
+  manualUnread: false,
   attentionReason: null,
 };
 
@@ -179,6 +184,7 @@ function selectChatAgentState(
     lastError: agent.lastError ?? null,
     archivedAt: agent.archivedAt ?? null,
     requiresAttention: agent.requiresAttention ?? false,
+    manualUnread: getIsElectronMac() && agent.labels[DESKTOP_CHAT_UNREAD] === "true",
     attentionReason: agent.attentionReason ?? null,
   };
 }
@@ -470,7 +476,6 @@ export function useDraftPanelDescriptor(
 const EMPTY_STREAM_ITEMS: StreamItem[] = [];
 const EMPTY_MESSAGE_SUBMISSIONS = [] as const;
 const EMPTY_PENDING_PERMISSIONS = new Map<string, PendingPermission>();
-const EMPTY_PENDING_PERMISSION_LIST: PendingPermission[] = [];
 
 type RouteBottomAnchorRequest = ReturnType<typeof deriveRouteBottomAnchorRequest>;
 
@@ -833,6 +838,7 @@ function ChatAgentContent({
     client,
     isConnected,
     requiresAttention: agentState.requiresAttention,
+    manualUnread: agentState.manualUnread,
     attentionReason: agentState.attentionReason,
     isScreenFocused: isPaneFocused,
   });
@@ -1169,6 +1175,10 @@ const ChatAgentReadyContent = memo(function ChatAgentReadyContent({
   const tasks = useSessionStore((state): TodoEntry[] | undefined =>
     state.sessions[serverId]?.agentTasks.get(agentId),
   );
+  const backgroundTasks = useSessionStore((state) => {
+    const session = state.sessions[serverId];
+    return (session?.agents.get(agentId) ?? session?.agentDetails.get(agentId))?.backgroundTasks;
+  });
   const archiveFinishedSubagents = useArchiveFinishedSubagents({
     serverId,
     parentAgentId: agentId,
@@ -1179,6 +1189,7 @@ const ChatAgentReadyContent = memo(function ChatAgentReadyContent({
   const hasVisibleAgentTracks = hasAgentTracks({
     subagentRows,
     tasks,
+    backgroundTasks,
     archiveFinishedStatus: archiveFinishedSubagents.status,
     hasPluginComposerPills,
   });
@@ -1273,6 +1284,7 @@ const ChatAgentReadyContent = memo(function ChatAgentReadyContent({
           cwd={cwd}
           subagentRows={subagentRows}
           tasks={tasks}
+          backgroundTasks={backgroundTasks}
           archiveFinishedStatus={archiveFinishedSubagents.status}
           onArchiveFinished={archiveFinishedSubagents.archiveFinished}
           hasPluginComposerPills={hasPluginComposerPills}
@@ -1440,32 +1452,24 @@ const AgentStreamSection = memo(function AgentStreamSection({
     ),
   );
   const streamItems = streamItemsRaw ?? EMPTY_STREAM_ITEMS;
-  const pendingPermissionList = useStoreWithEqualityFn(
-    useSessionStore,
-    (state) => {
-      if (!agentId) {
-        return EMPTY_PENDING_PERMISSION_LIST;
-      }
-      const allPendingPermissions = state.sessions[serverId]?.pendingPermissions;
-      if (!allPendingPermissions) {
-        return EMPTY_PENDING_PERMISSION_LIST;
-      }
-      const filtered: PendingPermission[] = [];
-      for (const permission of allPendingPermissions.values()) {
-        if (permission.agentId === agentId) {
-          filtered.push(permission);
-        }
-      }
-      return filtered.length > 0 ? filtered : EMPTY_PENDING_PERMISSION_LIST;
-    },
-    shallow,
-  );
+  const pendingPermissionList = useAgentPendingPermissions(serverId, agentId);
+  const dockRequests = getIsElectronMac() && hasActiveComposer;
+  const hasDockedPermissions =
+    dockRequests && pendingPermissionList.some((permission) => permission.request.kind === "tool");
   const pendingPermissions = useMemo(() => {
     if (pendingPermissionList.length === 0) {
       return EMPTY_PENDING_PERMISSIONS;
     }
-    return new Map(pendingPermissionList.map((permission) => [permission.key, permission]));
-  }, [pendingPermissionList]);
+    return new Map(
+      pendingPermissionList
+        .filter(
+          (permission) =>
+            !dockRequests ||
+            (permission.request.kind !== "tool" && permission.request.kind !== "question"),
+        )
+        .map((permission) => [permission.key, permission]),
+    );
+  }, [pendingPermissionList, dockRequests]);
 
   return (
     <AgentStreamView
@@ -1475,6 +1479,7 @@ const AgentStreamSection = memo(function AgentStreamSection({
       context={agent}
       streamItems={streamItems}
       pendingPermissions={pendingPermissions}
+      hasDockedPermissions={hasDockedPermissions}
       routeBottomAnchorRequest={routeBottomAnchorRequest}
       isAuthoritativeHistoryReady={hasAppliedAuthoritativeHistory}
       bottomOverlayTailClearance={bottomOverlayTailClearance}
@@ -1569,6 +1574,20 @@ function ActiveAgentComposer({
   onMessageSent: () => void;
 }) {
   const isCompactFormFactor = useIsCompactFormFactor();
+  const pendingPermissions = useAgentPendingPermissions(serverId, agentId);
+  const dockedPermissions = useMemo(
+    () =>
+      getIsElectronMac()
+        ? pendingPermissions.filter(
+            (permission) =>
+              permission.request.kind === "tool" || permission.request.kind === "question",
+          )
+        : [],
+    [pendingPermissions],
+  );
+  const hasToolPermissions = dockedPermissions.some(
+    (permission) => permission.request.kind === "tool",
+  );
   const { onLayout: onInputAreaLayout, isBelow: isCompactComposerLayout } = useContainerWidthBelow(
     COMPACT_FORM_FACTOR_WIDTH,
     { initialIsBelow: isCompactFormFactor },
@@ -1644,32 +1663,41 @@ function ActiveAgentComposer({
 
   return (
     <View style={animatedStaticStyles.inputAreaWrapper} onLayout={onInputAreaLayout}>
-      <Composer
-        agentId={agentId}
-        serverId={serverId}
-        workspaceId={workspaceId}
-        blurOnSubmit={isNative}
-        isPaneFocused={isPaneFocused}
-        textSource={agentInputDraft.textSource}
-        onChangeText={agentInputDraft.editText}
-        textReplacement={agentInputDraft.textReplacement}
-        attachments={agentInputDraft.attachments}
-        attachmentScopeKeys={attachmentScopeKeys}
-        onOpenWorkspaceAttachment={handleOpenWorkspaceAttachment}
-        onChangeAttachments={agentInputDraft.setAttachments}
-        cwd={cwd}
-        clearDraft={agentInputDraft.clear}
-        editingSession={editingSession}
-        autoFocus
-        autoFocusKey={String(agentInputDraft.attachmentFocusRequestId)}
-        isSubmitLoading={isSubmitLoading}
-        onAttentionInputFocus={onAttentionInputFocus}
-        onAttentionPromptSend={onAttentionPromptSend}
-        onComposerHeightChange={onComposerHeightChange}
-        onMessageSent={onMessageSent}
-        onClientSlashCommand={handleClientSlashCommand}
-        isCompactLayout={isCompactComposerLayout}
-      />
+      {dockedPermissions.length > 0 ? (
+        <PermissionDock
+          serverId={serverId}
+          permissions={dockedPermissions}
+          onHeightChange={onComposerHeightChange}
+        />
+      ) : null}
+      <View style={[styles.composerContent, hasToolPermissions && styles.hiddenComposer]}>
+        <Composer
+          agentId={agentId}
+          serverId={serverId}
+          workspaceId={workspaceId}
+          blurOnSubmit={isNative}
+          isPaneFocused={isPaneFocused && !hasToolPermissions}
+          textSource={agentInputDraft.textSource}
+          onChangeText={agentInputDraft.editText}
+          textReplacement={agentInputDraft.textReplacement}
+          attachments={agentInputDraft.attachments}
+          attachmentScopeKeys={attachmentScopeKeys}
+          onOpenWorkspaceAttachment={handleOpenWorkspaceAttachment}
+          onChangeAttachments={agentInputDraft.setAttachments}
+          cwd={cwd}
+          clearDraft={agentInputDraft.clear}
+          editingSession={editingSession}
+          autoFocus={!hasToolPermissions}
+          autoFocusKey={String(agentInputDraft.attachmentFocusRequestId)}
+          isSubmitLoading={isSubmitLoading}
+          onAttentionInputFocus={onAttentionInputFocus}
+          onAttentionPromptSend={onAttentionPromptSend}
+          onComposerHeightChange={onComposerHeightChange}
+          onMessageSent={onMessageSent}
+          onClientSlashCommand={handleClientSlashCommand}
+          isCompactLayout={isCompactComposerLayout}
+        />
+      </View>
     </View>
   );
 }
@@ -1758,6 +1786,8 @@ const animatedStaticStyles = RNStyleSheet.create({
 });
 
 const styles = StyleSheet.create((theme) => ({
+  hiddenComposer: { display: "none" },
+  composerContent: { flexShrink: 1, width: "100%" },
   root: {
     flex: 1,
     backgroundColor: theme.colors.surface0,

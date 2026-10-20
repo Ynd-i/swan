@@ -3,18 +3,21 @@ import { create } from "zustand";
 import {
   expireWorkingDiffComparisonsInState,
   resolveWorkingDiffComparisonFromState,
+  resolveWorkingDiffBaseRefFromState,
   selectWorkingDiffComparisonInState,
   type WorkingDiffCheckoutIdentity,
+  type WorkingDiffCheckoutSnapshot,
   type WorkingDiffComparison,
   type WorkingDiffComparisonState,
 } from "./state";
 
 interface WorkingDiffComparisonStore extends WorkingDiffComparisonState {
   select: (
-    input: WorkingDiffCheckoutIdentity & {
-      comparison: WorkingDiffComparison;
-      isDirty: boolean;
-    },
+    input: WorkingDiffCheckoutIdentity &
+      WorkingDiffCheckoutSnapshot & {
+        comparison: WorkingDiffComparison;
+        baseRef?: string | null;
+      },
   ) => void;
 }
 
@@ -24,44 +27,73 @@ const useWorkingDiffComparisonStore = create<WorkingDiffComparisonStore>((set) =
 }));
 
 export function useWorkingDiffComparison(
-  input: WorkingDiffCheckoutIdentity & { isDirty: boolean },
+  input: WorkingDiffCheckoutIdentity & WorkingDiffCheckoutSnapshot,
 ): {
   comparison: WorkingDiffComparison;
   selectComparison: (comparison: WorkingDiffComparison) => void;
+  selectedBaseRef: string | undefined;
+  selectBaseRef: (baseRef: string | null) => void;
 } {
-  const { serverId, workspaceId, cwd, isDirty } = input;
+  const { serverId, workspaceId, cwd, isDirty, currentBranch, defaultBaseRef } = input;
   const comparison = useWorkingDiffComparisonStore((state) =>
-    resolveWorkingDiffComparisonFromState(state, { serverId, workspaceId, cwd, isDirty }),
+    resolveWorkingDiffComparisonFromState(state, input),
   );
   const select = useWorkingDiffComparisonStore((state) => state.select);
+  const selectedBaseRef = useWorkingDiffComparisonStore((state) =>
+    resolveWorkingDiffBaseRefFromState(state, input),
+  );
   const selectComparison = useCallback(
     (next: WorkingDiffComparison) =>
-      select({ serverId, workspaceId, cwd, isDirty, comparison: next }),
-    [cwd, isDirty, select, serverId, workspaceId],
+      select({
+        serverId,
+        workspaceId,
+        cwd,
+        isDirty,
+        currentBranch,
+        defaultBaseRef,
+        comparison: next,
+      }),
+    [cwd, isDirty, currentBranch, defaultBaseRef, select, serverId, workspaceId],
   );
-  return { comparison, selectComparison };
+  const selectBaseRef = useCallback(
+    (baseRef: string | null) =>
+      select({
+        serverId,
+        workspaceId,
+        cwd,
+        isDirty,
+        currentBranch,
+        defaultBaseRef,
+        comparison: "base",
+        baseRef,
+      }),
+    [cwd, isDirty, currentBranch, defaultBaseRef, select, serverId, workspaceId],
+  );
+  return { comparison, selectComparison, selectedBaseRef, selectBaseRef };
 }
 
 export function selectWorkingDiffComparison(
-  input: WorkingDiffCheckoutIdentity & {
-    comparison: WorkingDiffComparison;
-    isDirty: boolean;
-  },
+  input: WorkingDiffCheckoutIdentity &
+    WorkingDiffCheckoutSnapshot & {
+      comparison: WorkingDiffComparison;
+      baseRef?: string | null;
+    },
 ): void {
   useWorkingDiffComparisonStore.getState().select(input);
 }
 
 export function resolveWorkingDiffComparison(
-  input: WorkingDiffCheckoutIdentity & { isDirty: boolean },
+  input: WorkingDiffCheckoutIdentity & WorkingDiffCheckoutSnapshot,
 ): WorkingDiffComparison {
   return resolveWorkingDiffComparisonFromState(useWorkingDiffComparisonStore.getState(), input);
 }
 
-export function expireWorkingDiffComparisons(input: {
-  serverId: string;
-  cwd: string;
-  isDirty: boolean;
-}): void {
+export function expireWorkingDiffComparisons(
+  input: WorkingDiffCheckoutSnapshot & {
+    serverId: string;
+    cwd: string;
+  },
+): void {
   useWorkingDiffComparisonStore.setState((state) =>
     expireWorkingDiffComparisonsInState(state, input),
   );

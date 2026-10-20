@@ -1,8 +1,10 @@
 import { useMemo } from "react";
+import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import { Text, View, type StyleProp, type ViewStyle } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
-import { clampPct, formatAmount, formatResetLabel } from "./format";
+import { clampPct, formatAmount } from "./format";
+import { UsageDeadline } from "./deadline";
 import type { UsageBalance, UsageTone } from "./types";
 
 interface ResolvedBalance {
@@ -10,7 +12,7 @@ interface ResolvedBalance {
   usedPct: number | null;
 }
 
-function resolveBalance(balance: UsageBalance, locale: string): ResolvedBalance {
+function resolveBalance(balance: UsageBalance, locale: string, t: TFunction): ResolvedBalance {
   const { used, remaining, limit, unit } = balance;
   const format = (value: number) => formatAmount(value, unit, locale);
   if (limit != null && limit > 0) {
@@ -20,7 +22,10 @@ function resolveBalance(balance: UsageBalance, locale: string): ResolvedBalance 
     return { amountText: `${usedText} / ${format(limit)}`, usedPct };
   }
   if (remaining != null) {
-    return { amountText: `${format(remaining)} left`, usedPct: null };
+    return {
+      amountText: t("usage.remainingBalance", { amount: format(remaining) }),
+      usedPct: null,
+    };
   }
   if (used != null) {
     return { amountText: format(used), usedPct: null };
@@ -48,10 +53,9 @@ export function UsageBalanceBar({
   balance: UsageBalance;
   retained?: boolean;
 }) {
-  const { i18n } = useTranslation();
-  const { amountText, usedPct } = resolveBalance(balance, i18n.language);
+  const { t, i18n } = useTranslation();
+  const { amountText, usedPct } = resolveBalance(balance, i18n.language, t);
   const tone = balance.tone ?? "default";
-  const resetLabel = formatResetLabel(balance.resetsAt, retained);
 
   const fillStyle = useMemo<StyleProp<ViewStyle>>(
     () => [styles.fill, fillToneStyle(tone), { width: `${clampPct(usedPct ?? 0)}%` }],
@@ -66,7 +70,12 @@ export function UsageBalanceBar({
         </Text>
         <Text style={styles.value}>
           {amountText}
-          {resetLabel ? <Text style={styles.reset}>{` · ${resetLabel}`}</Text> : null}
+          <UsageDeadline
+            at={balance.resetsAt}
+            retained={retained}
+            prefix=" · "
+            style={styles.reset}
+          />
         </Text>
       </View>
       {usedPct != null ? (

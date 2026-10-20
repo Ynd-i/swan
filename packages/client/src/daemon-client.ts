@@ -71,6 +71,7 @@ import type {
   ValidateBranchResponse,
   BranchSuggestionsResponse,
   ForgeSearchResponse,
+  ForgeChangeRequestGetResponse,
   ForgeSearchRequest,
   GitHubSearchResponse,
   GitHubSearchRequest,
@@ -131,6 +132,7 @@ import type {
   AgentSkillsSaveResult,
 } from "@getpaseo/protocol/messages";
 import type {
+  AgentContextUsage,
   AgentPermissionRequest,
   AgentPermissionResponse,
   AgentPersistenceHandle,
@@ -527,6 +529,7 @@ type StashListPayload = StashListResponse["payload"];
 type ValidateBranchPayload = ValidateBranchResponse["payload"];
 type BranchSuggestionsPayload = BranchSuggestionsResponse["payload"];
 type ForgeSearchPayload = ForgeSearchResponse["payload"];
+type ForgeChangeRequestGetPayload = ForgeChangeRequestGetResponse["payload"];
 type GitHubSearchPayload = GitHubSearchResponse["payload"];
 type DirectorySuggestionsPayload = DirectorySuggestionsResponse["payload"];
 type PaseoWorktreeListPayload = PaseoWorktreeListResponse["payload"];
@@ -2662,7 +2665,7 @@ export class DaemonClient {
   }
 
   async createProjectDirectory(
-    input: { parentPath: string; name: string },
+    input: { parentPath: string; name: string; createParents?: boolean },
     requestId?: string,
   ): Promise<ProjectCreateDirectoryPayload> {
     return this.sendNamespacedCorrelatedSessionRequest<"project.create_directory.response">({
@@ -2671,6 +2674,7 @@ export class DaemonClient {
         type: "project.create_directory.request",
         parentPath: input.parentPath,
         name: input.name,
+        ...(input.createParents ? { createParents: true } : {}),
       },
     });
   }
@@ -3369,6 +3373,33 @@ export class DaemonClient {
     return payload;
   }
 
+  async getAgentContextUsage(
+    agentId: string,
+    options: { requestId?: string; timeout?: number } = {},
+  ): Promise<AgentContextUsage | null> {
+    const requestId = this.createRequestId(options.requestId);
+    const message = SessionInboundMessageSchema.parse({
+      type: "agent.get_context_usage.request",
+      agentId,
+      requestId,
+    });
+    const payload = await this.sendRequest({
+      requestId,
+      message,
+      timeout: options.timeout,
+      options: { skipQueue: true },
+      select: (response) =>
+        response.type === "agent.get_context_usage.response" &&
+        response.payload.requestId === requestId
+          ? response.payload
+          : null,
+    });
+    if (payload.error) {
+      throw new Error(payload.error);
+    }
+    return payload.usage;
+  }
+
   async listProviderSubagents(
     parentAgentId: string,
     options: { requestId?: string; timeout?: number } = {},
@@ -3570,6 +3601,39 @@ export class DaemonClient {
       throw new Error(payload.error ?? "Agent rewind failed");
     }
     return payload;
+  }
+
+  /** Native fork; resolves with the new agent's id. */
+  async forkAgent(
+    agentId: string,
+    boundaryCursor?: { epoch: string; seq: number },
+  ): Promise<string> {
+    const requestId = this.createRequestId();
+    const message = SessionInboundMessageSchema.parse({
+      type: "agent.fork.request",
+      requestId,
+      agentId,
+      ...(boundaryCursor ? { boundaryCursor } : {}),
+    });
+    const payload = await this.sendRequest({
+      requestId,
+      message,
+      timeout: 120_000,
+      options: { skipQueue: true },
+      select: (msg) => {
+        if (msg.type !== "agent.fork.response") {
+          return null;
+        }
+        if (msg.payload.requestId !== requestId) {
+          return null;
+        }
+        return msg.payload;
+      },
+    });
+    if (!payload.ok || !payload.childAgentId) {
+      throw new Error(payload.error ?? "Agent fork failed");
+    }
+    return payload.childAgentId;
   }
 
   async cancelAgent(agentId: string): Promise<void> {
@@ -4698,6 +4762,21 @@ export class DaemonClient {
         kinds: options.kinds,
       },
       responseType: "forge.search.response",
+      timeout: 15000,
+    });
+  }
+
+  async getForgeChangeRequest(
+    options: { cwd: string; url: string },
+    requestId?: string,
+  ): Promise<ForgeChangeRequestGetPayload> {
+    return this.sendNamespacedCorrelatedSessionRequest<"forge.change_request.get.response">({
+      requestId,
+      message: {
+        type: "forge.change_request.get.request",
+        cwd: options.cwd,
+        url: options.url,
+      },
       timeout: 15000,
     });
   }

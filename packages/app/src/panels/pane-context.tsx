@@ -22,6 +22,7 @@ export interface PaneContextValue {
   setCurrentTabState: (state: JsonValue) => void;
   openFileInWorkspace: (request: WorkspaceFileOpenRequest) => void;
   openImportSheet: () => void;
+  runInTerminal?: (command: string) => void;
 }
 
 export interface PaneFocusContextValue {
@@ -72,6 +73,10 @@ export function usePaneContext(): PaneContextValue {
   const value = useContext(PaneContext);
   invariant(value, "PaneContext is required");
   return value;
+}
+
+export function useRunInTerminal(): ((command: string) => void) | undefined {
+  return useContext(PaneContext)?.runInTerminal;
 }
 
 export function usePaneFocus(): PaneFocusContextValue {

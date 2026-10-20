@@ -1,0 +1,237 @@
+# Swan releases for the Ynd-i/swan fork. See docs/release.md#custom-releases.
+# Follows upstream Paseo stable releases only; nothing publishes while the branch is on an
+# upstream beta, except a one-off run with upstream_beta.
+# beta (manual): test and publish the branch as the next v<stable>-v<N>-beta<M>.
+# stable (manual): rebuild the latest beta's commit and publish it as v<stable>-v<N>.
+# upstream-pr.yml opens a pull request for each new upstream stable release.
+name: Custom release
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "beta: release the branch; stable: promote the latest beta"
+        type: choice
+        options: [beta, stable]
+        default: beta
+      upstream_beta:
+        description: "beta or stable: release although the branch is on an upstream beta"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: custom-release
+  cancel-in-progress: false
+
+env:
+  BRANCH: main
+  UPSTREAM: https://github.com/getpaseo/paseo.git
+  FEED_BRANCH: update-feed
+  # rcodesign reads every RCODESIGN_* variable as configuration, so avoid that prefix.
+  APPLE_CODESIGN_URL: https://github.com/indygreg/apple-platform-rs/releases/download/apple-codesign/0.29.0/apple-codesign-0.29.0-macos-universal.tar.gz
+  APPLE_CODESIGN_SHA256: d98372d5524226ccf9dc0eda03d4e4f5826182dabb2fc3f2bd303ed9113a748d
+
+jobs:
+  plan:
+    if: github.repository == 'Ynd-i/swan'
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.plan.outputs.tag }}
+      backend: ${{ steps.plan.outputs.backend }}
+      prerelease: ${{ steps.plan.outputs.prerelease }}
+      version: ${{ steps.plan.outputs.version }}
+      title: ${{ steps.plan.outputs.title }}
+      sha: ${{ steps.commit.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.BRANCH }}
+          fetch-depth: 0
+
+      # Stable hotfixes can be cut off a release branch, so every upstream release tag counts.
+      - name: Fetch upstream releases
+        run: git fetch --no-tags "$UPSTREAM" "+refs/tags/v*:refs/tags/v*"
+
+      - name: Plan
+        id: plan
+        run: >-
+          node scripts/custom-release.mjs "${{ inputs.mode }}"
+          ${{ inputs.upstream_beta && '--upstream-beta' || '' }} | tee -a "$GITHUB_OUTPUT"
+
+      - name: Commit to release
+        id: commit
+        if: steps.plan.outputs.tag != ''
+        env:
+          FROM: ${{ steps.plan.outputs.from }}
+        run: echo "sha=$(git rev-parse "$FROM^{commit}")" >> "$GITHUB_OUTPUT"
+
+  test:
+    needs: plan
+    if: needs.plan.outputs.tag != ''
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.plan.outputs.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+      - run: node scripts/npm-retry.mjs ci
+      - run: npm run format:check
+      - run: npm run lint
+      - run: npm run build:server
+      - run: npm run typecheck
+      - run: node --test scripts/custom-release.test.mjs
+      # Provider tests resolve the installed agent binaries, as in upstream CI.
+      - run: node scripts/npm-retry.mjs install -g @anthropic-ai/claude-code opencode-ai
+      - run: npm run test:unit --workspace=@getpaseo/server
+      - run: npm run build:app-deps
+      # The app suite includes a browser project, as in upstream CI.
+      - run: npx playwright install chromium
+      - run: npm run test --workspace=@getpaseo/app
+
+  build:
+    needs: plan
+    if: needs.plan.outputs.tag != ''
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.plan.outputs.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+      - run: node scripts/npm-retry.mjs ci
+      # The app version stays upstream's to match the bundled daemon; the in-app updater
+      # compares this stamp instead.
+      - name: Build Swan
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+          # Metro's web bundle ran out of heap on the runner (run 37387649334).
+          NODE_OPTIONS: --max-old-space-size=4096
+          VERSION: ${{ needs.plan.outputs.version }}
+        run: npm run build:desktop:custom -- --arm64 --dir "-c.extraMetadata.paseoCustomUpdateVersion=$VERSION"
+      # Squirrel.Mac installs an update only when it is signed by the same certificate as the
+      # running app, so the self-signed certificate in these secrets must never change.
+      # rcodesign signs with it without trusting it in a keychain, which codesign requires.
+      - name: Point the app at the update feed and sign it
+        env:
+          P12: ${{ secrets.CUSTOM_SIGNING_P12 }}
+          P12_PASSWORD: ${{ secrets.CUSTOM_SIGNING_P12_PASSWORD }}
+        run: |
+          if [ -z "$P12" ] || [ -z "$P12_PASSWORD" ]; then
+            echo "::error::Set CUSTOM_SIGNING_P12 and CUSTOM_SIGNING_P12_PASSWORD; see docs/release.md#custom-releases"
+            exit 1
+          fi
+          app="packages/desktop/release-custom/mac-arm64/Swan.app"
+          printf 'provider: generic\nurl: https://raw.githubusercontent.com/%s/%s\nupdaterCacheDirName: paseo-custom-updater\n' \
+            "$GITHUB_REPOSITORY" "$FEED_BRANCH" > "$app/Contents/Resources/app-update.yml"
+          curl -fsSL -o rcodesign.tar.gz "$APPLE_CODESIGN_URL"
+          echo "$APPLE_CODESIGN_SHA256  rcodesign.tar.gz" | shasum -a 256 -c -
+          tar -xzf rcodesign.tar.gz --strip-components=1 apple-codesign-0.29.0-macos-universal/rcodesign
+          echo "$P12" | base64 --decode > "$RUNNER_TEMP/signing.p12"
+          ./rcodesign sign --p12-file "$RUNNER_TEMP/signing.p12" --p12-password "$P12_PASSWORD" \
+            --code-signature-flags runtime \
+            --entitlements-xml-path packages/desktop/assets/entitlements.custom.mac.plist "$app"
+          rm "$RUNNER_TEMP/signing.p12"
+          codesign -v --strict --deep "$app"
+      - name: Smoke-test the signed app
+        env:
+          PASEO_DESKTOP_EXPECT_CUSTOM: "1"
+        run: node packages/desktop/e2e/packaged-app-smoke.js --app "packages/desktop/release-custom/mac-arm64/Swan.app"
+      # Both downloads carry the smoke-tested app as signed, without packaging or signing it again.
+      - name: Package the smoke-tested app as a dmg and a zip
+        env:
+          TAG: ${{ needs.plan.outputs.tag }}
+          VERSION: ${{ needs.plan.outputs.version }}
+        run: |
+          app="packages/desktop/release-custom/mac-arm64/Swan.app"
+          base="Swan-$TAG-arm64"
+          (cd packages/desktop && npx electron-builder --config electron-builder.custom.yml -c.mac.identity=null \
+            --prepackaged "release-custom/mac-arm64/Swan.app" --mac dmg --arm64 --publish never)
+          mv packages/desktop/release-custom/Swan-*-arm64.dmg "$base.dmg"
+          ditto -c -k --sequesterRsrc --keepParent "$app" "$base.zip"
+          for file in "$base.dmg" "$base.zip"; do
+            shasum -a 256 "$file" > "$file.sha256"
+          done
+          cat > update-feed.yml <<EOF
+          version: $VERSION
+          files:
+            - url: https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG/$base.zip
+              sha512: $(openssl dgst -sha512 -binary "$base.zip" | base64)
+              size: $(stat -f %z "$base.zip")
+          releaseDate: '$(date -u +%Y-%m-%dT%H:%M:%S.000Z)'
+          EOF
+      - uses: actions/upload-artifact@v4
+        with:
+          name: swan
+          path: |
+            Swan-*-arm64.*
+            update-feed.yml
+
+  publish:
+    needs: [plan, test, build]
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      TAG: ${{ needs.plan.outputs.tag }}
+      SHA: ${{ needs.plan.outputs.sha }}
+      BACKEND: ${{ needs.plan.outputs.backend }}
+      TITLE: ${{ needs.plan.outputs.title }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/download-artifact@v4
+        with:
+          name: swan
+      - name: Publish the GitHub release
+        run: |
+          base="Swan-$TAG-arm64"
+          cat > notes.md <<EOF
+          Swan $TAG: the Codex-style macOS desktop on upstream Paseo [$BACKEND](https://github.com/getpaseo/paseo/releases/tag/$BACKEND).
+
+          - Open the \`.dmg\` and drag Swan to Applications; the \`.zip\` holds the same app.
+          - Apple Silicon only. Self-signed and not notarized: on first launch, right-click the app and choose Open, or run \`xattr -dr com.apple.quarantine "/Applications/Swan.app"\`.
+          - Later releases install from inside the app. Betas reach only the beta release channel. An app updated from Paseo Custom keeps its \`Paseo Custom.app\` name and data.
+          - Runs its own daemon and home; it does not replace or update the official Paseo app.
+          - Source: $SHA.
+          - SHA-256: dmg \`$(cut -d' ' -f1 "$base.dmg.sha256")\`, zip \`$(cut -d' ' -f1 "$base.zip.sha256")\`
+          EOF
+          flags=()
+          if [ "${{ needs.plan.outputs.prerelease }}" = "true" ]; then flags+=(--prerelease); fi
+          gh release create "$TAG" "$base.dmg" "$base.dmg.sha256" "$base.zip" "$base.zip.sha256" \
+            --target "$SHA" --title "$TITLE" --notes-file notes.md "${flags[@]}"
+      # The in-app updater reads beta-mac.yml on the beta channel and latest-mac.yml on stable.
+      - name: Point the update feed at the release
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git rev-parse -q --verify "origin/$FEED_BRANCH" >/dev/null; then
+            git worktree add --detach feed "origin/$FEED_BRANCH"
+          else
+            git worktree add --orphan -b "$FEED_BRANCH" feed
+          fi
+          cp update-feed.yml feed/beta-mac.yml
+          if [ "${{ needs.plan.outputs.prerelease }}" != "true" ]; then cp update-feed.yml feed/latest-mac.yml; fi
+          git -C feed add -A
+          git -C feed commit -m "Swan $TAG"
+          git -C feed push origin "HEAD:refs/heads/$FEED_BRANCH"
+      # Runs once the feed names the new release, so no installed app is left pointing at a
+      # deleted download. Their tags go too; see obsoletePrereleases in scripts/custom-release.mjs.
+      - name: Delete prereleases on older upstream releases
+        run: |
+          node scripts/custom-release.mjs prune "$TAG" feed/*.yml |
+            while read -r tag; do gh release delete "$tag" --yes --cleanup-tag; done
+      - name: Keep inherited upstream workflows disabled
+        run: |
+          gh workflow list --all --json path,state \
+            --jq '.[] | select(.state == "active" and .path != ".github/workflows/custom-release.yml" and .path != ".github/workflows/upstream-pr.yml") | .path' |
+            while read -r path; do gh workflow disable "$(basename "$path")"; done

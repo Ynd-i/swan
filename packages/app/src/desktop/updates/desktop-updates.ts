@@ -21,6 +21,8 @@ export interface DesktopAppUpdateInstallResult {
 
 export interface DesktopRuntimeInfo {
   appVersion: string | null;
+  // A published Paseo Custom build's tag, such as v0.11.0-beta.3-v1-beta7.
+  releaseTag: string | null;
   runningUnderARM64Translation: boolean;
 }
 
@@ -85,12 +87,14 @@ export function parseDesktopRuntimeInfo(raw: unknown): DesktopRuntimeInfo {
   if (!isRecord(raw)) {
     return {
       appVersion: null,
+      releaseTag: null,
       runningUnderARM64Translation: false,
     };
   }
 
   return {
     appVersion: toStringOrNull(raw.appVersion),
+    releaseTag: toStringOrNull(raw.releaseTag),
     runningUnderARM64Translation: raw.runningUnderARM64Translation === true,
   };
 }

@@ -63,6 +63,7 @@ export function MenuSubTrigger({
 
   const isOpen = isSubPageOpen(menu.path, { id, depth });
   const isPopover = menu.presentation === "popover";
+  const subDataSet = useMemo(() => ({ menuSubId: id }), [id]);
 
   const handleSelect = useCallback(() => {
     menu.openSub({ id, depth });
@@ -86,6 +87,7 @@ export function MenuSubTrigger({
     <View
       ref={anchorRef}
       collapsable={false}
+      dataSet={subDataSet}
       onPointerEnter={isPopover && !disabled ? handlePointerEnter : undefined}
       onPointerLeave={isPopover && !disabled ? handlePointerLeave : undefined}
     >

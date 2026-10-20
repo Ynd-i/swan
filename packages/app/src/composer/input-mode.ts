@@ -1,3 +1,5 @@
+import { getIsElectronMac } from "@/constants/platform";
+
 /**
  * What a composer is being used for. `Composer` and `MessageInput` are one
  * component with two jobs, not two components: a terminal prompt still wants
@@ -42,5 +44,6 @@ const PRESENTATION_BY_MODE: Record<ComposerInputMode, ComposerInputModePresentat
 };
 
 export function resolveComposerInputMode(mode: ComposerInputMode): ComposerInputModePresentation {
-  return PRESENTATION_BY_MODE[mode];
+  const presentation = PRESENTATION_BY_MODE[mode];
+  return getIsElectronMac() ? { ...presentation, showVoice: false } : presentation;
 }

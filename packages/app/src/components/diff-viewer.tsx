@@ -225,6 +225,7 @@ const styles = StyleSheet.create((theme) => {
       paddingVertical: theme.spacing[1],
     },
     lineText: {
+      ...(theme.codeFontWeight ? { fontWeight: theme.codeFontWeight } : {}),
       fontFamily: theme.fontFamily.mono,
       fontSize: theme.fontSize.code,
       color: theme.colors.foreground,

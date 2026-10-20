@@ -5,10 +5,12 @@ import {
   buildUnifiedDiffLines,
   type ReviewableDiffTarget,
   type SplitDiffDisplayLine,
+  type SplitDiffRow,
 } from "@/utils/diff-layout";
 import { compactHighlightTokens } from "@/utils/diff-rendering";
 import { getInlineReviewThreadState, getSplitInlineReviewThreadState } from "@/review/geometry";
 import { advancesFor, requiresShaping } from "./text-measurement";
+import { getIntralineRanges } from "./intraline-ranges";
 import type {
   BuildDiffDocumentModelInput,
   DiffCell,
@@ -35,6 +37,7 @@ interface CellSource {
   reviewTarget: ReviewableDiffTarget | null;
   tokenText: readonly { text: string; style?: string | null }[];
   sourceIdentity: DiffSourceIdentity;
+  comparisonText?: string;
 }
 
 interface GeometryLine {
@@ -165,15 +168,19 @@ function appendReusableFileRows(candidate: {
     if (
       nextRow.kind === "line" &&
       intersectsMaterializationWindow(candidate.input, top, top + nextRow.height) &&
-      nextRow.cells.some((cell) => cell && cell.fragments.length === 0)
+      nextRow.cells.some(
+        (cell) => cell && (cell.fragments.length === 0 || needsIntralineRanges(cell)),
+      )
     ) {
       nextRow = {
         ...nextRow,
-        cells: materializeCells(
-          nextRow.cells,
-          candidate.file.file,
-          candidate.file.gutterWidth,
-          candidate.input,
+        cells: materializeIntralineRanges(
+          materializeCells(
+            nextRow.cells,
+            candidate.file.file,
+            candidate.file.gutterWidth,
+            candidate.input,
+          ),
         ),
       };
     }
@@ -238,7 +245,15 @@ function appendNewFileRows(candidate: {
   }
 
   const lines = geometryLines(
-    lineSources(candidate.file, candidate.input.layout, false),
+    lineSources(
+      candidate.file,
+      candidate.input.layout,
+      false,
+      Boolean(
+        candidate.input.palette.additionInlineBackground ||
+        candidate.input.palette.deletionInlineBackground,
+      ),
+    ),
     candidate.input,
   );
   const fileBottom =
@@ -254,7 +269,7 @@ function appendNewFileRows(candidate: {
     const shouldMaterialize =
       candidate.input.wrapLines ||
       intersectsMaterializationWindow(candidate.input, top, top + line.height);
-    const cells = shouldMaterialize
+    let cells = shouldMaterialize
       ? materializeCells(line.cells, candidate.file, candidate.gutterWidth, candidate.input)
       : line.cells;
     const columnWidth = candidate.input.viewportWidth / cells.length;
@@ -276,6 +291,9 @@ function appendNewFileRows(candidate: {
       ...cells.map((cell) => (cell?.fragments.length ?? 1) * candidate.input.typography.lineHeight),
     );
     const height = textHeight + line.reviewHeight;
+    if (intersectsMaterializationWindow(candidate.input, top, top + height)) {
+      cells = materializeIntralineRanges(cells);
+    }
     candidate.rows.push({
       kind: "line",
       index: candidate.rows.length,
@@ -313,6 +331,24 @@ function materializeCells(
       availableWidth,
       input,
     });
+  }) as DiffLineRow["cells"];
+}
+
+function needsIntralineRanges(
+  cell: DiffCell | null,
+): cell is DiffCell & { comparisonText: string } {
+  return cell !== null && cell.comparisonText !== undefined && cell.intralineRanges === undefined;
+}
+
+function materializeIntralineRanges(cells: DiffLineRow["cells"]): DiffLineRow["cells"] {
+  if (!cells.some(needsIntralineRanges)) return cells;
+  return cells.map((cell) => {
+    if (!needsIntralineRanges(cell)) return cell;
+    const removal = cell.type === "remove";
+    const ranges = removal
+      ? getIntralineRanges(cell.content, cell.comparisonText)
+      : getIntralineRanges(cell.comparisonText, cell.content);
+    return { ...cell, intralineRanges: removal ? ranges.before : ranges.after };
   }) as DiffLineRow["cells"];
 }
 
@@ -360,13 +396,19 @@ function lineSources(
   file: BuildDiffDocumentModelInput["files"][number],
   layout: "unified" | "split",
   includeTokens: boolean,
+  highlightChanges: boolean,
 ): Array<[CellSource] | [CellSource | null, CellSource | null]> {
+  const splitRows = layout === "split" || highlightChanges ? buildSplitDiffRows(file) : [];
+  const partners = highlightChanges ? comparisonPartners(splitRows) : undefined;
   if (layout === "split") {
-    return buildSplitDiffRows(file).map((row) => {
+    return splitRows.map((row) => {
       if (row.kind === "header") {
         return [headerSource(row.content, row.hunkIndex, row.lineIndex)];
       }
-      return [cellSource(row.left, includeTokens), cellSource(row.right, includeTokens)];
+      return [
+        cellSource(row.left, includeTokens, partners),
+        cellSource(row.right, includeTokens, partners),
+      ];
     });
   }
   return buildUnifiedDiffLines(file).map((entry) => [
@@ -375,6 +417,7 @@ function lineSources(
       content: entry.line.content,
       lineNumber: entry.lineNumber,
       reviewTarget: entry.reviewTarget,
+      comparisonText: partners?.get(`${entry.hunkIndex}:${entry.lineIndex}`),
       tokenText: includeTokens ? compactHighlightTokens(entry.line.tokens ?? []) : [],
       sourceIdentity: {
         hunkIndex: entry.hunkIndex,
@@ -383,6 +426,16 @@ function lineSources(
       },
     },
   ]);
+}
+
+function comparisonPartners(rows: readonly SplitDiffRow[]): Map<string, string> {
+  const partners = new Map<string, string>();
+  for (const row of rows) {
+    if (row.kind !== "pair" || row.left?.type !== "remove" || row.right?.type !== "add") continue;
+    partners.set(`${row.left.hunkIndex}:${row.left.lineIndex}`, row.right.content);
+    partners.set(`${row.right.hunkIndex}:${row.right.lineIndex}`, row.left.content);
+  }
+  return partners;
 }
 
 function headerSource(content: string, hunkIndex: number, lineIndex: number): CellSource {
@@ -396,10 +449,15 @@ function headerSource(content: string, hunkIndex: number, lineIndex: number): Ce
   };
 }
 
-function cellSource(line: SplitDiffDisplayLine | null, includeTokens: boolean): CellSource | null {
+function cellSource(
+  line: SplitDiffDisplayLine | null,
+  includeTokens: boolean,
+  partners?: ReadonlyMap<string, string>,
+): CellSource | null {
   if (!line) return null;
   return {
     type: line.type,
+    comparisonText: partners?.get(`${line.hunkIndex}:${line.lineIndex}`),
     content: line.content,
     lineNumber: line.lineNumber,
     reviewTarget: line.reviewTarget,
@@ -421,6 +479,7 @@ function geometryCell(source: CellSource): DiffCell {
     fragments: [],
     reviewTarget: source.reviewTarget,
     sourceIdentity: source.sourceIdentity,
+    comparisonText: source.comparisonText,
   };
 }
 
@@ -539,6 +598,7 @@ function measureCell(input: {
     fragments,
     reviewTarget: input.source.reviewTarget,
     sourceIdentity: input.source.sourceIdentity,
+    comparisonText: input.source.comparisonText,
   };
 }
 

@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/isolated-bottom-sheet-modal";
 import { getCompactSheetSafeAreaPadding } from "@/components/adaptive-modal-sheet-layout";
 import { ScrollView } from "@/components/ui/scroll-view";
-import { isWeb } from "@/constants/platform";
+import { getIsElectronMac, isWeb } from "@/constants/platform";
 import { useKeyboardVisibility } from "@/hooks/use-keyboard-visibility";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AdaptiveTextInput } from "@/components/adaptive-text-input";
@@ -69,7 +69,20 @@ const SCROLL_CONTENT_GROW = { flexGrow: 1 };
 const ABSOLUTE_FILL_STYLE = { ...StyleSheet.absoluteFillObject };
 const NATIVE_DIALOG_SNAP_POINTS = ["100%"];
 
-const styles = StyleSheet.create((theme) => ({
+const styles = StyleSheet.create((theme, rt) => ({
+  macDesktopOverlay: { backgroundColor: "rgba(0,0,0,0.12)" },
+  macDesktopCard: {
+    backgroundColor: rt.themeName === "dark" ? theme.colors.surface2 : theme.colors.surface1,
+    borderRadius: 20,
+    borderWidth: 0,
+  },
+  macHeaderContainer: { borderBottomWidth: 0 },
+  macHeaderRow: {
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 0,
+  },
+  macTitle: { fontSize: theme.fontSize.xl, fontWeight: theme.fontWeight.semibold },
   nativeDialogSurface: {
     flex: 1,
   },
@@ -209,17 +222,21 @@ const styles = StyleSheet.create((theme) => ({
     flexShrink: 1,
     minHeight: 0,
   },
-  footer: {
+  footer: (macDesktop: boolean) => ({
     paddingHorizontal: theme.spacing[SHEET_HORIZONTAL_PADDING_SCALE],
     paddingVertical: theme.spacing[3],
-    borderTopWidth: 1,
+    borderTopWidth: macDesktop ? 0 : 1,
     borderTopColor: theme.colors.surface2,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     gap: theme.spacing[2],
-  },
+  }),
 }));
+
+function usesMacDesktopModal(compact: boolean): boolean {
+  return getIsElectronMac() && !compact;
+}
 
 const WEB_EXIT_DURATION_MS = 160;
 
@@ -331,9 +348,11 @@ export function SheetHeaderView({
 }) {
   const { theme } = useUnistyles();
   const { t } = useTranslation();
+  const compact = useIsCompactFormFactor();
+  const macDesktop = usesMacDesktopModal(compact);
   const titleStyle = useMemo(
-    () => [styles.title, { color: theme.colors.foreground }],
-    [theme.colors.foreground],
+    () => [styles.title, macDesktop && styles.macTitle, { color: theme.colors.foreground }],
+    [macDesktop, theme.colors.foreground],
   );
   const back = header.back;
   const handleBackPress = back?.onPress;
@@ -346,8 +365,8 @@ export function SheetHeaderView({
   );
 
   return (
-    <View style={styles.headerContainer} testID={testID}>
-      <View style={styles.headerRow}>
+    <View style={[styles.headerContainer, macDesktop && styles.macHeaderContainer]} testID={testID}>
+      <View style={[styles.headerRow, macDesktop && styles.macHeaderRow]}>
         {handleBackPress ? (
           <Pressable
             onPress={handleBackPress}
@@ -508,6 +527,7 @@ export function AdaptiveModalSheet({
 }: AdaptiveModalSheetProps) {
   const { t } = useTranslation();
   const isMobile = useIsCompactFormFactor();
+  const macDesktop = usesMacDesktopModal(isMobile);
   const insets = useSafeAreaInsets();
   const isKeyboardVisible = useKeyboardVisibility(visible);
   const resolvedSnapPoints = useMemo(() => snapPoints ?? ["65%", "90%"], [snapPoints]);
@@ -532,10 +552,10 @@ export function AdaptiveModalSheet({
     () =>
       footer ? (
         <View style={footerClearanceStyle}>
-          <View style={[styles.footer, footerContainerStyle]}>{footer}</View>
+          <View style={[styles.footer(macDesktop), footerContainerStyle]}>{footer}</View>
         </View>
       ) : null,
-    [footer, footerClearanceStyle, footerContainerStyle],
+    [footer, footerClearanceStyle, footerContainerStyle, macDesktop],
   );
   useEffect(() => {
     if (!isWeb && visible) {
@@ -561,14 +581,16 @@ export function AdaptiveModalSheet({
   const desktopCardStyle = useMemo(
     () => [
       styles.desktopCard,
+      macDesktop && styles.macDesktopCard,
       desktopHeight != null && { height: desktopHeight },
       desktopMaxWidth != null && { maxWidth: desktopMaxWidth },
     ],
-    [desktopMaxWidth, desktopHeight],
+    [desktopMaxWidth, desktopHeight, macDesktop],
   );
   const desktopOverlayStyle = useMemo(
     () => [
       styles.desktopOverlay,
+      macDesktop && styles.macDesktopOverlay,
       isWeb && {
         zIndex: modalLayer,
         opacity: isWebClosing ? 0 : 1,
@@ -577,7 +599,7 @@ export function AdaptiveModalSheet({
         transitionTimingFunction: "ease",
       },
     ],
-    [isWebClosing, modalLayer],
+    [isWebClosing, macDesktop, modalLayer],
   );
 
   const handleWebOverlayKeyDown = useCallback(

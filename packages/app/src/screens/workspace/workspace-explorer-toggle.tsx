@@ -28,12 +28,14 @@ export type WorkspaceExplorerToggleOwner = "mobile" | "header" | "window";
 export function resolveWorkspaceExplorerToggleOwner({
   isMobile,
   hasMacTrafficLights,
+  hasDesktopTitlebar = false,
 }: {
   isMobile: boolean;
   hasMacTrafficLights: boolean;
+  hasDesktopTitlebar?: boolean;
 }): WorkspaceExplorerToggleOwner {
   if (isMobile) return "mobile";
-  return hasMacTrafficLights ? "window" : "header";
+  return hasMacTrafficLights && !hasDesktopTitlebar ? "window" : "header";
 }
 
 export function WorkspaceExplorerToggle({

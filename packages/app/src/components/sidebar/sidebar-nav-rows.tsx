@@ -1,5 +1,5 @@
 import { router, usePathname } from "expo-router";
-import { CalendarClock, History, Plus, Search } from "lucide-react-native";
+import { CalendarClock, History, Plus, Search, SquarePen } from "lucide-react-native";
 import { memo, useCallback, useMemo, useRef, type ComponentType, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { View, type StyleProp, type ViewStyle } from "react-native";
@@ -26,6 +26,7 @@ import {
 
 interface SidebarNavRowProps {
   onBeforeNavigate?: () => void;
+  chatMode?: boolean;
 }
 
 interface SidebarNavRowsProps extends SidebarNavRowProps {
@@ -40,9 +41,21 @@ interface SidebarNavRowsProps extends SidebarNavRowProps {
  * `sidebarNavItems` preference. Renders nothing — not even the bordered group
  * wrapper — when every item is hidden and there is no `firstRowTrailing`.
  */
-export function SidebarNavRows({ style, onBeforeNavigate, firstRowTrailing }: SidebarNavRowsProps) {
+export function SidebarNavRows({
+  style,
+  onBeforeNavigate,
+  firstRowTrailing,
+  chatMode = false,
+}: SidebarNavRowsProps) {
   const { items } = useSidebarNavItems("header");
-  const visibleItems = useMemo(() => items.filter((item) => item.visible), [items]);
+  const visibleItems = useMemo(
+    () =>
+      items.filter(
+        (item) =>
+          item.visible && (!chatMode || item.kind === "plugin" || item.id === "new-workspace"),
+      ),
+    [items, chatMode],
+  );
   const groupRef = useRef<View | null>(null);
 
   if (visibleItems.length === 0 && !firstRowTrailing) return null;
@@ -60,7 +73,7 @@ export function SidebarNavRows({ style, onBeforeNavigate, firstRowTrailing }: Si
       );
     }
     const Row = BUILTIN_ROWS[item.id];
-    return <Row key={item.key} onBeforeNavigate={onBeforeNavigate} />;
+    return <Row key={item.key} onBeforeNavigate={onBeforeNavigate} chatMode={chatMode} />;
   });
 
   return (
@@ -80,6 +93,7 @@ export function SidebarNavRows({ style, onBeforeNavigate, firstRowTrailing }: Si
 
 const SidebarNewWorkspaceRow = memo(function SidebarNewWorkspaceRow({
   onBeforeNavigate,
+  chatMode,
 }: SidebarNavRowProps) {
   const { t } = useTranslation();
   const shortcutKeys = useShortcutKeys(builtinSidebarNavShortcutAction("new-workspace"));
@@ -115,8 +129,8 @@ const SidebarNewWorkspaceRow = memo(function SidebarNewWorkspaceRow({
 
   return (
     <SidebarHeaderRow
-      icon={Plus}
-      label={t(builtinSidebarNavLabelKey("new-workspace"))}
+      icon={chatMode ? SquarePen : Plus}
+      label={t(chatMode ? "desktopChat.newChat" : builtinSidebarNavLabelKey("new-workspace"))}
       onPress={handlePress}
       testID="sidebar-global-new-workspace"
       variant="compact"

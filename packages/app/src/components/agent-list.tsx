@@ -24,6 +24,11 @@ import { useArchiveAgent } from "@/hooks/use-archive-agent";
 import { HighlightedText } from "@/components/ui/highlighted-text";
 import { StatusBadge, type StatusBadgeVariant } from "@/components/ui/status-badge";
 import { findHighlightRanges } from "@/components/ui/highlighted-text-segments";
+import {
+  DATE_SECTION_ORDER,
+  deriveDateSectionKey,
+  type DateSectionKey,
+} from "@/utils/date-sections";
 
 interface AgentListProps {
   agents: AggregatedAgent[];
@@ -38,49 +43,11 @@ interface AgentListProps {
   search?: string;
 }
 
-type DateSectionKey = "today" | "yesterday" | "thisWeek" | "thisMonth" | "older";
-
-const DATE_SECTION_ORDER = [
-  "today",
-  "yesterday",
-  "thisWeek",
-  "thisMonth",
-  "older",
-] as const satisfies readonly DateSectionKey[];
-
 const HISTORY_MATCH_OPTIONS = { typoTolerant: true } as const;
 
 type FlatListItem =
   | { type: "header"; key: string; section: DateSectionKey }
   | { type: "agent"; key: string; agent: AggregatedAgent };
-
-function deriveDateSectionKey(lastActivityAt: Date): DateSectionKey {
-  const now = new Date();
-  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const yesterdayStart = new Date(todayStart.getTime() - 24 * 60 * 60 * 1000);
-  const activityStart = new Date(
-    lastActivityAt.getFullYear(),
-    lastActivityAt.getMonth(),
-    lastActivityAt.getDate(),
-  );
-
-  if (activityStart.getTime() >= todayStart.getTime()) {
-    return "today";
-  }
-  if (activityStart.getTime() >= yesterdayStart.getTime()) {
-    return "yesterday";
-  }
-
-  const diffTime = todayStart.getTime() - activityStart.getTime();
-  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-  if (diffDays <= 7) {
-    return "thisWeek";
-  }
-  if (diffDays <= 30) {
-    return "thisMonth";
-  }
-  return "older";
-}
 
 function formatDateSectionLabel(t: TFunction, section: DateSectionKey): string {
   switch (section) {

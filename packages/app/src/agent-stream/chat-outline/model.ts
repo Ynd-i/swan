@@ -29,11 +29,17 @@ export function promptTickMagnification(slotDistance: number): number {
  * The prompt whose turn the reader is inside: the last indexed prompt at or before the
  * timeline position under the top of the viewport. It reads the complete daemon index,
  * so a prompt outside the loaded window still lights up while its turn is on screen.
+ * At the bottom of the transcript the last prompt wins: a short final turn can never
+ * reach the top of the viewport, so the reading position would stay on the turn before.
  */
 export function resolveActivePromptSeq(
   prompts: readonly ChatOutlinePrompt[],
   anchorSeq: number | null,
+  atBottom = false,
 ): number | null {
+  if (atBottom && prompts.length > 0) {
+    return prompts[prompts.length - 1].seq;
+  }
   if (anchorSeq === null) {
     return null;
   }

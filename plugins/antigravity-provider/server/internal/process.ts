@@ -1,4 +1,5 @@
 import type { ChildProcessWithoutNullStreams } from "node:child_process";
+import { setTimeout as delay } from "node:timers/promises";
 import { spawnProcess } from "@getpaseo/plugin/server";
 import { signalProcess } from "./signals.js";
 import { createInterface } from "node:readline";
@@ -56,6 +57,7 @@ export function startDriver(options: DriverOptions): Driver {
     detached: process.platform !== "win32",
     stdio: "pipe",
   });
+  const processExited = new Promise<void>((resolve) => child.once("exit", () => resolve()));
   const lines = createInterface({ input: child.stdout });
   let cleanup = Promise.resolve();
   let stderr = "";
@@ -125,7 +127,16 @@ export function startDriver(options: DriverOptions): Driver {
     if (state === "ready") options.onExit(failure);
     if (state === "exited" || state === "stopping") return;
     state = "stopping";
-    cleanup = Promise.resolve(signalGroup(child, "SIGKILL"));
+    cleanup = Promise.resolve()
+      .then(() => signalGroup(child, "SIGKILL"))
+      .catch(async (error) => {
+        if (!(error instanceof Error && "code" in error && error.code === "EPERM")) throw error;
+        // macOS can reject signaling a zombie group before Node has reaped its leader.
+        // Retry only after this child exits; a live process or another denial remains an error.
+        await Promise.race([processExited, delay(100, undefined, { ref: false })]);
+        if (child.exitCode === null && child.signalCode === null) throw error;
+        await signalGroup(child, "SIGKILL");
+      });
     // The stop operation awaits cleanup and owns reporting its failure.
     void cleanup.catch(() => undefined);
   }
@@ -144,8 +155,8 @@ export function startDriver(options: DriverOptions): Driver {
       });
     },
     async stop(reason) {
-      if (process.platform === "win32") await cleanup;
-      if (state === "exited") return;
+      await cleanup;
+      if (state === "exited" || state === "stopping") return exited;
       if (state === "starting") rejectReady(new AntigravityError("Antigravity startup canceled"));
       clearTimeout(startupDeadline);
       state = "stopping";

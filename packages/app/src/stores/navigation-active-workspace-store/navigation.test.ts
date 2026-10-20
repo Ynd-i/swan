@@ -66,6 +66,28 @@ describe("workspace navigation", () => {
     expect(navigateToLastWorkspace(deps)).toBe(false);
   });
 
+  it("restores the last workspace without replacing its selected chat with an attention chat", () => {
+    const selection = { serverId: "server-1", workspaceId: "workspace-a" };
+    const { deps, navigations, openedTabs } = createFakeDeps({
+      getSessionWorkspaces: () =>
+        new Map([[selection.workspaceId, { id: selection.workspaceId } as WorkspaceDescriptor]]),
+      getSessionAgents: () => [
+        {
+          id: "unread-sibling",
+          workspaceId: selection.workspaceId,
+          requiresAttention: true,
+          attentionReason: "finished",
+          attentionTimestamp: new Date("2026-10-01T00:00:00Z"),
+        } as Agent,
+      ],
+    });
+    expect(navigateToLastWorkspace({ ...deps, getLastWorkspaceSelection: () => selection })).toBe(
+      true,
+    );
+    expect(navigations).toEqual(["/h/server-1/workspace/workspace-a"]);
+    expect(openedTabs).toEqual([]);
+  });
+
   it("navigates to a workspace route and remembers the selection", () => {
     const { deps, navigations, remembered } = createFakeDeps();
 

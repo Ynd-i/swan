@@ -2,6 +2,116 @@ import { en, type TranslationResources } from "./en";
 import { pluginSettings } from "./plugin-settings";
 
 export const ptBR: TranslationResources = {
+  usage: {
+    options: "Opções de uso",
+    displayAs: "Mostrar",
+    showInSidebar: "Mostrar na barra lateral",
+    showInSidebarHint: "As janelas fixadas aparecem no rodapé da barra lateral",
+    hostUnavailableNamed: "Conecte-se a {{host}} para ver o uso",
+    hostUpgradeRequiredNamed: "Atualize {{host}} para ver o uso",
+    pin: "Fixar",
+    unpin: "Desafixar",
+    displayUsed: "Usado",
+    displayRemaining: "Restante",
+    title: "Uso",
+    planUsage: "Uso do plano",
+    refresh: "Atualizar",
+    refreshing: "Atualizando…",
+    refreshFailed: "Não foi possível atualizar o uso",
+    refreshAll: "Atualizar tudo",
+    agentError: "Não foi possível carregar o uso: {{reason}}",
+    updated: "Atualizado {{time}}",
+    updatedNow: "Atualizado agora",
+    lastUpdated: "Última atualização {{time}}",
+    lastUpdatedNow: "Última atualização agora",
+    noSuccessfulUpdate: "Nenhuma atualização bem-sucedida",
+    loading: "Carregando uso…",
+    empty: "Sem dados de uso",
+    noHosts: "Nenhum host conectado",
+    errorTitle: "Não foi possível carregar o uso",
+    hostUnavailable: "Conecte este host para ver o uso",
+    hostUpgradeRequired: "Atualize o host para ver o uso",
+    clientUnavailable: "A conexão com o host não está pronta",
+    unavailable: "Indisponível",
+    remainingPercent: "{{percent}} restante",
+    usedPercent: "{{percent}} usado",
+    remainingBalance: "{{amount}} restantes",
+    resetsIn: "reinicia em {{duration}}",
+    resetDue: "Reinicialização pendente",
+    resetPassed: "O horário de reinicialização já passou",
+    runsOutIn: "esgota em {{duration}}",
+    runsOutNow: "Esgotamento iminente",
+    durationMinutes: "{{count}} min",
+    durationHours: "{{count}} h",
+    durationDays: "{{count}} d",
+    ago: "há {{duration}}",
+    lessThanMinute: "menos de 1 min",
+    problemExpired: "O login expirou {{ago}}. {{remedy}}",
+    problemRejected: "Login recusado (HTTP {{status}}). {{remedy}}",
+    problemRunToRefresh: "Execute {{command}} para atualizá-lo.",
+    problemSignInAgain: "Entre novamente.",
+  },
+  chatProposals: {
+    suggested: "Chat sugerido",
+    start: "Iniciar",
+    startFailed: "Não foi possível iniciar: {{error}}",
+    unknownModel: "Modelo desconhecido: {{model}}",
+    unknownThinking: "Nível de raciocínio desconhecido: {{thinking}}",
+    open: "Abrir {{title}}",
+    archived: "Arquivado",
+    task: "Tarefa",
+    context: "Contexto",
+    startedFrom: "Iniciado a partir de",
+    reportFrom: "Relatório de",
+    reportFailed: "Turno com falha em",
+    reply: "Resposta",
+  },
+  desktopChat: {
+    handoffs: { toggle: "Transferências anteriores ({{count}})" },
+    activity: "Atividade",
+    workedFor: "Duração: {{duration}}",
+    failedCount: "{{count}} com falha",
+    thinking: "Pensando",
+    startWork: "Em que vamos trabalhar?",
+    startInProject: "Em que vamos trabalhar em {{project}}?",
+    resetReasoning: "Redefinir intensidade do raciocínio",
+    newChat: "Nova conversa",
+    actions: "Ações da conversa",
+    markRead: "Marcar como lida",
+    markUnread: "Marcar como não lida",
+    fork: "Bifurcar",
+    forkNewChat: "Bifurcar em uma nova conversa",
+    sections: {
+      actions: "Ações da seção",
+      sortLatest: "Atualizados recentemente",
+      sortManual: "Ordem manual",
+      chatSort: "Ordenar chats",
+      show: "Mostrar",
+      projects: "Projetos",
+      newSection: "Nova seção",
+      newSectionMenu: "Nova seção…",
+      section: "Seção",
+      edit: "Editar",
+      markAllRead: "Marcar tudo como lido",
+      archiveChats: "Arquivar chats",
+      archiveConfirm: "Arquivar {{count}} chats desta seção?",
+      archiveProjectConfirm: "Arquivar {{count}} chats deste projeto?",
+      removeSection: "Remover seção",
+      createDescription: "Organize chats e projetos do seu jeito",
+      namePlaceholder: "Nome da seção",
+      create: "Criar seção",
+      editTitle: "Editar seção",
+      save: "Salvar",
+      notifications: "Notificações",
+      priority: "Prioridade",
+      priorityEmpty: "Nenhuma tarefa precisa de atenção",
+      organize: "Organizar barra lateral",
+      byProject: "Por projeto",
+      merged: "Combinado",
+      revealInFinder: "Mostrar no Finder",
+      removeProject: "Remover projeto",
+    },
+  },
   paneFind: {
     connectionFailure:
       "Não foi possível pesquisar nesta conversa. Verifique a conexão com o host e tente novamente.",
@@ -85,6 +195,10 @@ export const ptBR: TranslationResources = {
       close: "Fechar menu",
     },
     commandCenter: {
+      chatPlaceholder: "Buscar conversas",
+      chats: "Conversas",
+      quickActions: "Ações rápidas",
+      openFolder: "Abrir pasta",
       placeholder: "Buscar comandos, arquivos, espaços de trabalho e agentes...",
       filePlaceholder: "Pesquisar arquivos...",
       searchingFiles: "Pesquisando arquivos...",
@@ -116,7 +230,19 @@ export const ptBR: TranslationResources = {
     },
   },
   composer: {
+    queue: {
+      steer: "Direcionar",
+      delete: "Excluir",
+      more: "Mais",
+      edit: "Editar mensagem",
+      turnOff: "Desativar fila",
+    },
+    goalMode: {
+      label: "Objetivo",
+      placeholder: "Descreva seu objetivo e um resultado mensurável para obter melhores resultados",
+    },
     placeholders: {
+      chat: "Pergunte o que quiser",
       desktop: "Envie uma mensagem ao agente, marque @files ou use /commands e /skills",
       mobile: "Mensagem, @files, /commands",
       fallback: "Mensagem...",
@@ -224,6 +350,11 @@ export const ptBR: TranslationResources = {
       title: "Modo",
       searchPlaceholder: "Buscar modos...",
       selectWithValue: "Selecionar modo do agente ({{value}})",
+      desktop: {
+        askForReview: "Pedir revisão",
+        autoReview: "Revisão automática",
+        fullAccess: "Acesso total",
+      },
     },
     hints: {
       thinking: "Modo de raciocínio",
@@ -248,6 +379,8 @@ export const ptBR: TranslationResources = {
       implement: "Implementar",
       question: "Como você quer prosseguir?",
       proposedPlan: "Plano proposto",
+      waiting: "Aguardando aprovação",
+      responseFailed: "Não foi possível responder: {{message}}",
     },
   },
   agentPanel: {
@@ -332,6 +465,8 @@ export const ptBR: TranslationResources = {
     },
     actions: {
       copyCode: "Copiar código",
+      runInTerminal: "Executar no terminal",
+      plainText: "Texto simples",
       copyTurn: "Copiar turno",
       copyMessage: "Copiar mensagem",
       forkMenu: "Bifurcar mensagem",
@@ -340,6 +475,7 @@ export const ptBR: TranslationResources = {
       forkUnavailable: "Atualize o host para usar isto.",
       forkMissingWorkspace: "Este agente não está em um workspace.",
       forkFailed: "Falha ao bifurcar o chat",
+      forkOrigin: "Continuação do chat",
       openFile: "Abrir arquivo",
       copied: "Copiado",
     },
@@ -375,6 +511,9 @@ export const ptBR: TranslationResources = {
     },
     question: {
       responseFailed: "Não foi possível enviar sua resposta. Tente novamente.",
+      title: "Pergunta",
+      skip: "Pular",
+      send: "Enviar",
       submit: "Enviar",
       next: "Próximo",
       answerPlaceholder: "Digite sua resposta...",
@@ -521,6 +660,10 @@ export const ptBR: TranslationResources = {
         hideHiddenFiles: "Ocultar arquivos ocultos",
         showHiddenFiles: "Mostrar arquivos ocultos",
       },
+      filter: {
+        placeholder: "Filtrar arquivos...",
+        noResults: "Nenhum arquivo correspondente",
+      },
       empty: {
         noFiles: "Nenhum arquivo",
         noVisibleFiles: "Nenhum arquivo visível",
@@ -577,6 +720,11 @@ export const ptBR: TranslationResources = {
       },
     },
     browser: {
+      newTab: {
+        tools: "Ferramentas",
+        moreTools: "Mais ferramentas",
+        openPages: "Páginas abertas",
+      },
       unavailable: {
         title: "O navegador é exclusivo do desktop",
         subtitle: "Abra este workspace no Electron para usar o navegador integrado.",
@@ -709,9 +857,6 @@ export const ptBR: TranslationResources = {
         close: "Fechar",
         cancel: "Cancelar",
         archive: "Arquivar",
-        closeTerminalTitle: "Fechar terminal?",
-        closeTerminalMessage:
-          "Qualquer processo em execução neste terminal será interrompido imediatamente.",
         archiveRunningAgentTitle: "Arquivar agente em execução?",
         archiveRunningAgentMessage:
           "Este agente ainda está em execução. Arquivá-lo interromperá o agente e fechará a aba.",
@@ -902,7 +1047,7 @@ export const ptBR: TranslationResources = {
           mergePrNoGithub:
             "Merge da PR não está disponível agora porque o GitHub não está conectado",
           archiveNotWorktree:
-            "Arquivar não está disponível aqui porque este workspace não foi criado como um worktree do Paseo",
+            "Arquivar não está disponível aqui porque este workspace não foi criado como um worktree do Swan",
           mergePrNoForge:
             "Merge da {{noun}} não está disponível agora porque o {{brand}} não está conectado",
           mergePrMissing: "Merge da PR não está disponível porque ainda não há uma pull request",
@@ -987,6 +1132,7 @@ export const ptBR: TranslationResources = {
         modifiedFile: "Modificado",
         commits: {
           title: "Commits",
+          baseHint: "O histórico usa {{baseRef}}",
           countLabel: "{{count}} commits do espaço de trabalho",
           noneAhead: "Ainda não há commits à frente de {{baseRef}}",
           fileDiffEmpty: "Nenhuma alteração para exibir",
@@ -1087,6 +1233,8 @@ export const ptBR: TranslationResources = {
             cancelled: "Cancelado",
           },
         },
+        previewFiles_one: "{{count}} arquivo",
+        previewFiles_other: "{{count}} arquivos",
         states: {
           draft: "Rascunho",
           merged: "Mergeada",
@@ -1256,7 +1404,7 @@ export const ptBR: TranslationResources = {
       discord: "Discord",
       github: "Criar issue no GitHub",
       whatsNew: "Novidades",
-      appName: "Paseo",
+      appName: "Swan",
     },
     sections: {
       sessions: "Histórico",
@@ -1361,6 +1509,9 @@ export const ptBR: TranslationResources = {
     fields: {
       project: "Projeto",
       branch: "Branch",
+      noProject: "Sem projeto",
+      clearProject: "Remover projeto",
+      base: "Base",
       baseNotApplicable: "Não aplicável",
       host: "Host",
     },
@@ -1404,7 +1555,7 @@ export const ptBR: TranslationResources = {
       close: "Fechar janela",
     },
     quitting: {
-      title: "Saindo do Paseo...",
+      title: "Saindo do Swan...",
       detail: "Parando o daemon local.",
     },
     daemon: {
@@ -1419,20 +1570,20 @@ export const ptBR: TranslationResources = {
       },
       management: {
         title: "Gerenciar daemon integrado",
-        hint: "Permitir que o Paseo inicie e pare o daemon integrado",
+        hint: "Permitir que o Swan inicie e pare o daemon integrado",
         pauseTitle: "Pausar daemon integrado",
         pauseMessage:
           "Isso vai parar o daemon integrado imediatamente. Agentes e terminais em execução conectados ao daemon integrado serão interrompidos.",
         pauseAndStop: "Pausar e parar",
         registrationFailed:
-          "O daemon integrado foi iniciado, mas o Paseo não conseguiu salvar a conexão localhost. Desative e reative o gerenciamento do daemon ou adicione localhost manualmente.",
+          "O daemon integrado foi iniciado, mas o Swan não conseguiu salvar a conexão localhost. Desative e reative o gerenciamento do daemon ou adicione localhost manualmente.",
         pausedStopFailed:
-          "O gerenciamento do daemon integrado foi pausado, mas o Paseo não conseguiu parar o daemon.",
+          "O gerenciamento do daemon integrado foi pausado, mas o Swan não conseguiu parar o daemon.",
         updateFailed: "Não foi possível atualizar o gerenciamento do daemon integrado.",
       },
       keepRunning: {
         title: "Manter daemon em execução ao sair",
-        hint: "O daemon continua em execução quando você sai do Paseo",
+        hint: "O daemon continua em execução quando você sai do Swan",
       },
       logs: {
         title: "Arquivo de log",
@@ -1502,7 +1653,7 @@ export const ptBR: TranslationResources = {
     },
     rosetta: {
       title: "Baixar a build para Apple Silicon",
-      runningIntel: "Você está executando a build Intel do Paseo pelo Rosetta no Apple Silicon.",
+      runningIntel: "Você está executando a build Intel do Swan pelo Rosetta no Apple Silicon.",
       highCpu: "Isso causa alto uso de CPU. Baixe a build para Apple Silicon para corrigir.",
       download: "Baixar",
     },
@@ -1544,7 +1695,7 @@ export const ptBR: TranslationResources = {
         microphone: "O status do microfone ainda não foi verificado.",
       },
       testNotification: {
-        title: "Teste de notificação do Paseo",
+        title: "Teste de notificação do Swan",
         body: "Se você consegue ver isto, as notificações desktop funcionam.",
         notDelivered:
           "A notificação não foi entregue. Verifique Ajustes do Sistema > Notificações.",
@@ -1554,12 +1705,12 @@ export const ptBR: TranslationResources = {
     integrations: {
       cli: {
         statusFailed: "Não foi possível verificar o status de instalação da CLI.",
-        installFailed: "Não foi possível instalar a CLI do Paseo.",
+        installFailed: "Não foi possível instalar a CLI do Swan.",
       },
     },
   },
   rootError: {
-    title: "O Paseo encontrou um problema.",
+    title: "O Swan encontrou um problema.",
     body: "Tente novamente para recarregar o app. Se isso continuar acontecendo, inclua os detalhes abaixo ao relatar o problema.",
     details: "Detalhes",
   },
@@ -1624,6 +1775,12 @@ export const ptBR: TranslationResources = {
     later: "Depois",
     stashRestored: "Alterações em stash restauradas",
   },
+  diffBaseSelector: {
+    compareAgainst: "Comparar com {{ref}}",
+    workspaceDefault: "Padrão do workspace",
+    worktreeFixed: "A base de comparação deste worktree é fixa.",
+    unableToResolve: "Não foi possível resolver {{ref}}",
+  },
   agentAutocomplete: {
     searchingWorkspace: "Buscando workspace...",
     loadingCommands: "Carregando comandos...",
@@ -1656,7 +1813,7 @@ export const ptBR: TranslationResources = {
     },
   },
   onboarding: {
-    title: "Bem-vindo ao Paseo",
+    title: "Bem-vindo ao Swan",
     subtitle: "Conecte seu computador para começar",
     actions: {
       settings: "Configurações",
@@ -1764,7 +1921,7 @@ export const ptBR: TranslationResources = {
     },
     direct: {
       title: "Conexão direta",
-      helper: "Informe o endereço de um servidor Paseo.",
+      helper: "Informe o endereço de um servidor Swan.",
       fields: {
         host: "Host",
         port: "Porta",
@@ -1807,7 +1964,7 @@ export const ptBR: TranslationResources = {
     },
     remoteSsh: {
       title: "SSH remoto",
-      helper: "Conecte-se a um daemon Paseo no host remoto.",
+      helper: "Conecte-se a um daemon Swan no host remoto.",
       fields: {
         target: "Host SSH",
         password: "Senha do daemon",
@@ -1870,15 +2027,15 @@ export const ptBR: TranslationResources = {
       enableDescription:
         "O relay permite conectar este dispositivo de qualquer lugar. O tráfego de pareamento é criptografado de ponta a ponta.",
       relayDocs: "Como o relay funciona",
-      relayDocsAccessibility: "Leia como o relay do Paseo funciona",
+      relayDocsAccessibility: "Leia como o relay do Swan funciona",
       enableRelay: "Ativar relay",
       enablingRelay: "Ativando...",
       notNow: "Agora não",
       directConnectionHint:
         "Sem relay, conecte diretamente por TCP, Tailscale ou outra VPN. Nenhum código QR é criado.",
-      updateRequired: "Atualize o host para ativar o relay pelo Paseo Desktop.",
+      updateRequired: "Atualize o host para ativar o relay pelo Swan Desktop.",
       unavailable: "Oferta de pareamento indisponível.",
-      hint: "Escaneie este QR code com o Paseo no seu celular ou copie o link abaixo.",
+      hint: "Escaneie este QR code com o Swan no seu celular ou copie o link abaixo.",
       securityWarning:
         "Trate este link de pareamento como uma senha. Qualquer pessoa com o link pode acessar este daemon.",
       qrUnavailable: "QR code indisponível.",
@@ -1913,7 +2070,7 @@ export const ptBR: TranslationResources = {
   serviceUrl: {
     title: "Abrir URL do serviço",
     message: "Abrir {{url}}?",
-    inPaseo: "No Paseo",
+    inPaseo: "No Swan",
     externalBrowser: "Navegador externo",
     dontAskAgain: "Não perguntar novamente",
   },
@@ -1927,6 +2084,11 @@ export const ptBR: TranslationResources = {
   },
   menu: {
     backdrop: "Fundo do menu",
+  },
+  backgroundTasks: {
+    title: "Tarefas em segundo plano",
+    pillLabelOne: "1 tarefa em segundo plano",
+    pillLabelMany: "{{count}} tarefas em segundo plano",
   },
   subagents: {
     title: "Subagentes",
@@ -1984,6 +2146,7 @@ export const ptBR: TranslationResources = {
       subtitle: "Arquivos do espaço de trabalho",
       tooltip: "Explorar arquivos do espaço de trabalho",
       chooseFile: "Escolha um arquivo",
+      emptyDescription: "Selecione um arquivo na árvore do espaço de trabalho",
     },
     pullRequest: {
       label: "Pull request",
@@ -2033,10 +2196,35 @@ export const ptBR: TranslationResources = {
       other: "usou {{count}} outras ferramentas",
     },
     paseoCalls: {
-      one: "chamou o Paseo {{count}} vez",
-      other: "chamou o Paseo {{count}} vezes",
+      one: "chamou o Swan {{count}} vez",
+      other: "chamou o Swan {{count}} vezes",
     },
     and: "e",
+    verbSeparator: ", ",
+    verbs: {
+      loadTools: "ferramentas carregadas",
+      skill: "habilidades usadas",
+      read: "arquivos lidos",
+      search: "pesquisa feita",
+      edit: "arquivos editados",
+      command: "comandos executados",
+      paseo: "Swan chamado",
+      other: "ferramentas usadas",
+    },
+    done: {
+      read: "Lido",
+      edit: "Editado",
+      shell: "Executado",
+      search: "Pesquisado",
+      fetch: "Obtido",
+    },
+    running: {
+      read: "Lendo",
+      edit: "Editando",
+      shell: "Executando",
+      search: "Pesquisando",
+      fetch: "Buscando",
+    },
   },
   renameModal: {
     rename: "Renomear",
@@ -2049,8 +2237,10 @@ export const ptBR: TranslationResources = {
     noData: "Sem dados de contexto",
     accessibilityNoData: "Janela de contexto: sem dados de contexto",
     title: "Janela de contexto",
-    used: "{{percentage}}% usado",
-    tokens: "{{used}} / {{max}} tokens",
+    summary: "{{used}} / {{max}} ({{percentage}}%)",
+    used: "Usado",
+    free: "Espaço livre",
+    buffer: "Reserva de compactação automática",
     sessionCost: "Custo da sessão {{cost}}",
     accessibility: "Janela de contexto {{percentage}}% usada",
   },
@@ -2131,7 +2321,7 @@ export const ptBR: TranslationResources = {
       send: "Enviar",
       sending: "Enviando...",
       sentTitle: "Notificação de teste enviada",
-      sentDescription: "O Paseo entregou a notificação ao sistema operacional.",
+      sentDescription: "O Swan entregou a notificação ao sistema operacional.",
       sendFailedTitle: "Não foi possível enviar a notificação de teste",
     },
     hostSections: {
@@ -2150,14 +2340,14 @@ export const ptBR: TranslationResources = {
     metadataGeneration: {
       title: "Geração de metadados",
       description:
-        "Escolha o modelo usado pelo Paseo para títulos de espaços de trabalho, nomes de branches, mensagens de commit e rascunhos de pull request",
+        "Escolha o modelo usado pelo Swan para títulos de espaços de trabalho, nomes de branches, mensagens de commit e rascunhos de pull request",
       selection: "Seleção de modelo",
       automatic: "Automática",
       preferred: "Manual",
-      automaticHint: "O Paseo escolhe um modelo rápido disponível",
-      preferredHint: "Escolha o modelo que o Paseo usa",
+      automaticHint: "O Swan escolhe um modelo rápido disponível",
+      preferredHint: "Escolha o modelo que o Swan usa",
       model: "Modelo",
-      fallbackHint: "Se ele não estiver disponível, o Paseo usa outro modelo disponível",
+      fallbackHint: "Se ele não estiver disponível, o Swan usa outro modelo disponível",
       docs: "Documentação",
       saveError: "Não foi possível atualizar a geração de metadados",
     },
@@ -2167,7 +2357,7 @@ export const ptBR: TranslationResources = {
       browserData: {
         title: "Dados do navegador",
         siteData: "Cookies e dados de sites",
-        description: "As abas do navegador compartilham logins e dados de sites no Paseo.",
+        description: "As abas do navegador compartilham logins e dados de sites no Swan.",
         clear: "Limpar dados do navegador",
         clearing: "Limpando...",
         confirmTitle: "Limpar dados do navegador?",
@@ -2194,7 +2384,7 @@ export const ptBR: TranslationResources = {
       serviceUrls: {
         options: {
           ask: "Perguntar",
-          inApp: "No Paseo",
+          inApp: "No Swan",
           external: "Navegador externo",
         },
       },
@@ -2279,7 +2469,7 @@ export const ptBR: TranslationResources = {
         label: "Atualizações do app",
         readyToInstall: "Pronta para instalar: {{version}}",
         installTitle: "Instalar atualização desktop",
-        installMessage: "Isso atualiza o Paseo neste computador",
+        installMessage: "Isso atualiza o Swan neste computador",
         installConfirm: "Instalar atualização",
         update: "Atualizar",
         updateTo: "Atualizar para {{version}}",
@@ -2291,7 +2481,21 @@ export const ptBR: TranslationResources = {
       },
     },
     appearance: {
+      advanced: {
+        title: "Avançado",
+        reset: "Restaurar padrões",
+        resetLabel: "Redefinir configurações avançadas de aparência",
+      },
+      motion: {
+        title: "Reduzir movimento",
+        hint: "Reduz as animações ou segue a configuração do sistema.",
+        system: "Sistema",
+        on: "Ativado",
+        off: "Desativado",
+      },
       theme: {
+        visualStyle: "Estilo visual",
+        mode: "Modo",
         title: "Tema",
         accessibilityLabel: "Tema: {{value}}",
         options: {
@@ -2303,6 +2507,44 @@ export const ptBR: TranslationResources = {
           ghostty: "Ghostty",
           pureBlack: "Preto puro",
           auto: "Sistema",
+        },
+      },
+      colors: {
+        title: "Cores de {{theme}}",
+        info: "Escolha as cores das principais partes do app. Deixe um campo vazio para usar a cor do tema.",
+        reset: "Redefinir",
+        resetLabel: "Redefinir as cores de {{theme}}",
+        pickerAccessibility: "Escolher a cor de {{role}}",
+        fieldAccessibility: "Cor hexadecimal de {{role}}",
+        roles: {
+          main: {
+            title: "Tela principal",
+            hint: "Fundo da conversa e do espaço de trabalho",
+          },
+          sidebar: {
+            title: "Barra lateral",
+            hint: "Fundo da barra lateral",
+          },
+          selection: {
+            title: "Linha selecionada",
+            hint: "Destaque da linha selecionada na barra lateral",
+          },
+          accent: {
+            title: "Destaque",
+            hint: "Botões, chaves e outros destaques",
+          },
+          text: {
+            title: "Texto",
+            hint: "Texto principal",
+          },
+          mutedText: {
+            title: "Texto secundário",
+            hint: "Rótulos e descrições",
+          },
+          border: {
+            title: "Bordas",
+            hint: "Divisores e contornos",
+          },
         },
       },
       detailLevel: {
@@ -2334,6 +2576,10 @@ export const ptBR: TranslationResources = {
         interfaceSize: "Tamanho da interface",
         interfaceSizeHint: "Usado na navegação, nos controles e nos rótulos",
         interfaceSizeAccessibility: "Tamanho da fonte da interface",
+        contentFont: "Fonte do conteúdo",
+        contentFontHint:
+          "Usada no chat, no Markdown e na caixa de entrada. Deixe em branco para usar a fonte da interface",
+        contentFontAccessibility: "Família de fontes do conteúdo",
         contentSize: "Tamanho do conteúdo",
         contentSizeHint: "Usado no texto do chat e no Markdown renderizado",
         contentSizeAccessibility: "Tamanho da fonte do conteúdo",
@@ -2341,6 +2587,16 @@ export const ptBR: TranslationResources = {
         codeFontHint:
           "Usada em código, diffs e saída do terminal. Deixe vazio para usar o padrão do sistema",
         codeFontAccessibility: "Família da fonte de código",
+        interfaceStyle: "Estilo da fonte da interface",
+        interfaceWeightAccessibility: "Peso da fonte da interface: {{value}}",
+        contentWeightAccessibility: "Peso da fonte do conteúdo: {{value}}",
+        codeWeightAccessibility: "Peso da fonte de código: {{value}}",
+        weightOptions: {
+          default: "Padrão",
+          regular: "Normal",
+          medium: "Médio",
+          semibold: "Seminegrito",
+        },
         codeSize: "Tamanho do código",
         codeSizeHint: "Usado em código, diffs e saída do terminal",
         codeSizeAccessibility: "Tamanho da fonte de código",
@@ -2528,11 +2784,11 @@ export const ptBR: TranslationResources = {
         title: "Skills de orquestração",
         description: "Ensine seus agentes a orquestrar pela CLI",
         updateAvailable: "Atualização disponível",
-        updateTitle: "Atualizar Paseo skills?",
+        updateTitle: "Atualizar Swan skills?",
         updateFallback: "Sincronize as skills incluídas com sua máquina.",
-        uninstallTitle: "Desinstalar Paseo skills?",
+        uninstallTitle: "Desinstalar Swan skills?",
         uninstallMessage:
-          "Remove todas as skills de orquestração do Paseo de ~/.agents, ~/.claude e ~/.codex.",
+          "Remove todas as skills de orquestração do Swan de ~/.agents, ~/.claude e ~/.codex.",
         choose: "Escolher skills",
         chooseAll: "Todas as skills",
         chooseAllHint:
@@ -2569,9 +2825,9 @@ export const ptBR: TranslationResources = {
         title: "Orquestração",
         unavailable: "Conecte-se a este host para gerenciar a orquestração",
         enableTools: {
-          title: "Ativar ferramentas do Paseo",
+          title: "Ativar ferramentas do Swan",
           hint: "Agentes poderão gerenciar worktrees, agentes e agendamentos",
-          accessibilityLabel: "Injetar ferramentas do Paseo",
+          accessibilityLabel: "Injetar ferramentas do Swan",
         },
         systemPrompt: {
           title: "Prompt do sistema",
@@ -2676,15 +2932,15 @@ export const ptBR: TranslationResources = {
             "Este host não está conectado. Aguarde até ele ficar online antes de reiniciar.",
           offlineTitle: "Host offline",
           offlineMessage:
-            "Este host está offline. O Paseo reconecta automaticamente. Aguarde ele voltar a ficar online antes de reiniciar.",
+            "Este host está offline. O Swan reconecta automaticamente. Aguarde ele voltar a ficar online antes de reiniciar.",
           requestFailedTitle: "Erro",
           requestFailedMessage:
-            "Falha ao enviar a solicitação de reinício. O Paseo reconecta automaticamente. Tente novamente quando o host aparecer como online.",
+            "Falha ao enviar a solicitação de reinício. O Swan reconecta automaticamente. Tente novamente quando o host aparecer como online.",
           dialogFailedMessage: "Não foi possível abrir o diálogo de confirmação de reinício.",
         },
         update: {
           desktopManagedHint:
-            "Este daemon é gerenciado pelo Paseo Desktop. Atualize o Paseo Desktop no host.",
+            "Este daemon é gerenciado pelo Swan Desktop. Atualize o Swan Desktop no host.",
           title: "Atualizar daemon",
           hint: "Atualiza o daemon para a versão mais recente e o reinicia",
           confirm: "Atualizar",
@@ -2793,6 +3049,7 @@ export const ptBR: TranslationResources = {
       noEditableTarget: "Este projeto não pode ser editado neste host.",
       backToProjects: "Voltar para projetos",
       edit: {
+        sourceFolder: "Pasta de origem",
         title: "Editar projeto",
         name: "Nome",
         nameLabel: "Nome do projeto",
@@ -2846,7 +3103,7 @@ export const ptBR: TranslationResources = {
         newScript: "Novo script",
         editScript: "Editar {{name}}",
         runAsService: "Executar como serviço",
-        serviceHint: "O Paseo supervisiona o processo e atribui uma porta via $PASEO_PORT",
+        serviceHint: "O Swan supervisiona o processo e atribui uma porta via $PASEO_PORT",
         actions: {
           add: "Adicionar script",
           edit: "Editar",
@@ -2855,7 +3112,7 @@ export const ptBR: TranslationResources = {
       },
       metadata: {
         title: "Geração de metadados",
-        info: "Instruções específicas do projeto injetadas nos prompts de IA que o Paseo usa para gerar metadados. Use-as para aplicar convenções da sua equipe, como nomes de branch, estilo de commit ou formato de PR",
+        info: "Instruções específicas do projeto injetadas nos prompts de IA que o Swan usa para gerar metadados. Use-as para aplicar convenções da sua equipe, como nomes de branch, estilo de commit ou formato de PR",
         branchName: "Nomes de branch",
         branchNamePlaceholder: "Prefixe branches com feat/ ou fix/, mb/ para branches pessoais",
         commitMessage: "Mensagens de commit",

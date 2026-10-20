@@ -2,6 +2,116 @@ import { en, type TranslationResources } from "./en";
 import { pluginSettings } from "./plugin-settings";
 
 export const ko: TranslationResources = {
+  usage: {
+    options: "사용량 옵션",
+    displayAs: "표시",
+    showInSidebar: "사이드바에 표시",
+    showInSidebarHint: "고정한 창은 사이드바 하단에 표시됩니다",
+    hostUnavailableNamed: "사용량을 보려면 {{host}}에 연결하세요",
+    hostUpgradeRequiredNamed: "사용량을 보려면 {{host}}를 업데이트하세요",
+    pin: "고정",
+    unpin: "고정 해제",
+    displayUsed: "사용됨",
+    displayRemaining: "남은 양",
+    title: "사용량",
+    planUsage: "요금제 사용량",
+    refresh: "새로고침",
+    refreshing: "새로고침 중…",
+    refreshFailed: "사용량을 새로고침할 수 없습니다",
+    refreshAll: "모두 새로고침",
+    agentError: "사용량을 불러올 수 없습니다: {{reason}}",
+    updated: "{{time}} 업데이트",
+    updatedNow: "방금 업데이트",
+    lastUpdated: "마지막 업데이트: {{time}}",
+    lastUpdatedNow: "마지막 업데이트: 방금",
+    noSuccessfulUpdate: "성공한 업데이트 없음",
+    loading: "사용량을 불러오는 중…",
+    empty: "사용량 데이터가 없습니다",
+    noHosts: "연결된 호스트가 없습니다",
+    errorTitle: "사용량을 불러올 수 없습니다",
+    hostUnavailable: "사용량을 보려면 이 호스트에 연결하세요",
+    hostUpgradeRequired: "사용량을 보려면 호스트를 업데이트하세요",
+    clientUnavailable: "호스트 연결이 준비되지 않았습니다",
+    unavailable: "사용 불가",
+    remainingPercent: "{{percent}} 남음",
+    usedPercent: "{{percent}} 사용",
+    remainingBalance: "{{amount}} 남음",
+    resetsIn: "{{duration}} 후 초기화",
+    resetDue: "초기화 예정 시간 지남",
+    resetPassed: "초기화 시간이 지남",
+    runsOutIn: "{{duration}} 후 소진 예상",
+    runsOutNow: "곧 소진 예상",
+    durationMinutes: "{{count}}분",
+    durationHours: "{{count}}시간",
+    durationDays: "{{count}}일",
+    ago: "{{duration}} 전",
+    lessThanMinute: "1분 미만",
+    problemExpired: "로그인이 {{ago}}에 만료되었습니다. {{remedy}}",
+    problemRejected: "로그인이 거부되었습니다(HTTP {{status}}). {{remedy}}",
+    problemRunToRefresh: "{{command}}을(를) 실행해 갱신하세요.",
+    problemSignInAgain: "다시 로그인하세요.",
+  },
+  chatProposals: {
+    suggested: "제안된 채팅",
+    start: "시작",
+    startFailed: "시작할 수 없음: {{error}}",
+    unknownModel: "알 수 없는 모델: {{model}}",
+    unknownThinking: "알 수 없는 사고 수준: {{thinking}}",
+    open: "{{title}} 열기",
+    archived: "보관됨",
+    task: "작업",
+    context: "컨텍스트",
+    startedFrom: "시작한 채팅",
+    reportFrom: "보고한 채팅",
+    reportFailed: "실패한 채팅",
+    reply: "답장",
+  },
+  desktopChat: {
+    handoffs: { toggle: "이전 인계 ({{count}})" },
+    activity: "활동",
+    workedFor: "소요 시간: {{duration}}",
+    failedCount: "{{count}}개 실패",
+    thinking: "생각 중",
+    startWork: "어떤 작업을 할까요?",
+    startInProject: "{{project}}에서 어떤 작업을 할까요?",
+    resetReasoning: "추론 강도 재설정",
+    newChat: "새 채팅",
+    actions: "채팅 작업",
+    markRead: "읽음으로 표시",
+    markUnread: "읽지 않음으로 표시",
+    fork: "포크",
+    forkNewChat: "새 채팅으로 포크",
+    sections: {
+      actions: "섹션 작업",
+      sortLatest: "최근 업데이트",
+      sortManual: "수동 정렬",
+      chatSort: "채팅 정렬",
+      show: "표시",
+      projects: "프로젝트",
+      newSection: "새 섹션",
+      newSectionMenu: "새 섹션…",
+      section: "섹션",
+      edit: "편집",
+      markAllRead: "모두 읽음으로 표시",
+      archiveChats: "채팅 보관",
+      archiveConfirm: "이 섹션의 채팅 {{count}}개를 보관할까요?",
+      archiveProjectConfirm: "이 프로젝트의 채팅 {{count}}개를 보관할까요?",
+      removeSection: "섹션 제거",
+      createDescription: "채팅과 프로젝트를 자유롭게 정리하세요",
+      namePlaceholder: "섹션 이름",
+      create: "섹션 만들기",
+      editTitle: "섹션 편집",
+      save: "저장",
+      notifications: "알림",
+      priority: "우선순위",
+      priorityEmpty: "확인이 필요한 작업이 없습니다",
+      organize: "사이드바 정리",
+      byProject: "프로젝트별 표시",
+      merged: "통합 표시",
+      revealInFinder: "Finder에서 보기",
+      removeProject: "프로젝트 제거",
+    },
+  },
   paneFind: {
     connectionFailure: "이 채팅을 검색할 수 없습니다. 호스트 연결을 확인하고 다시 시도하세요.",
     historyChangedFailure: "검색 중에 채팅이 변경되었습니다. 다시 검색하세요.",
@@ -84,6 +194,10 @@ export const ko: TranslationResources = {
       close: "메뉴 닫기",
     },
     commandCenter: {
+      chatPlaceholder: "채팅 검색",
+      chats: "채팅",
+      quickActions: "빠른 작업",
+      openFolder: "폴더 열기",
       placeholder: "명령, 파일, 워크스페이스 및 에이전트 검색...",
       filePlaceholder: "파일 검색...",
       searchingFiles: "파일 검색 중...",
@@ -115,7 +229,19 @@ export const ko: TranslationResources = {
     },
   },
   composer: {
+    queue: {
+      steer: "조정",
+      delete: "삭제",
+      more: "더보기",
+      edit: "메시지 편집",
+      turnOff: "대기열 끄기",
+    },
+    goalMode: {
+      label: "목표",
+      placeholder: "최상의 결과를 위해 목표와 측정 가능한 성과를 설명하세요",
+    },
     placeholders: {
+      chat: "무엇이든 물어보세요",
       desktop: "에이전트에게 메시지를 보내거나 @files 태그, /commands, /skills를 사용하세요",
       mobile: "메시지, @files, /commands",
       fallback: "메시지...",
@@ -223,6 +349,11 @@ export const ko: TranslationResources = {
       title: "모드",
       searchPlaceholder: "모드 검색...",
       selectWithValue: "에이전트 모드 선택 ({{value}})",
+      desktop: {
+        askForReview: "검토 요청",
+        autoReview: "자동 검토",
+        fullAccess: "전체 액세스",
+      },
     },
     hints: {
       thinking: "사고 모드",
@@ -247,6 +378,8 @@ export const ko: TranslationResources = {
       implement: "구현",
       question: "어떻게 진행할까요?",
       proposedPlan: "제안된 계획",
+      waiting: "승인 대기 중",
+      responseFailed: "응답하지 못했습니다: {{message}}",
     },
   },
   agentPanel: {
@@ -329,6 +462,8 @@ export const ko: TranslationResources = {
     },
     actions: {
       copyCode: "코드 복사",
+      runInTerminal: "터미널에서 실행",
+      plainText: "일반 텍스트",
       copyTurn: "턴 복사",
       copyMessage: "메시지 복사",
       forkMenu: "여기에서 채팅 분기",
@@ -337,6 +472,7 @@ export const ko: TranslationResources = {
       forkUnavailable: "이를 사용하려면 호스트를 업데이트하세요.",
       forkMissingWorkspace: "이 에이전트는 워크스페이스에 속해 있지 않습니다.",
       forkFailed: "채팅을 분기하지 못했습니다.",
+      forkOrigin: "채팅에서 계속",
       openFile: "파일 열기",
       copied: "복사됨",
     },
@@ -372,6 +508,9 @@ export const ko: TranslationResources = {
     },
     question: {
       responseFailed: "응답을 보내지 못했습니다. 다시 시도해 주세요.",
+      title: "질문",
+      skip: "건너뛰기",
+      send: "보내기",
       submit: "제출",
       next: "다음",
       answerPlaceholder: "답변을 입력하세요...",
@@ -517,6 +656,10 @@ export const ko: TranslationResources = {
         hideHiddenFiles: "숨겨진 파일 숨기기",
         showHiddenFiles: "숨겨진 파일 표시",
       },
+      filter: {
+        placeholder: "파일 필터링...",
+        noResults: "일치하는 파일이 없습니다",
+      },
       empty: {
         noFiles: "파일 없음",
         noVisibleFiles: "표시되는 파일이 없습니다.",
@@ -573,6 +716,11 @@ export const ko: TranslationResources = {
       },
     },
     browser: {
+      newTab: {
+        tools: "도구",
+        moreTools: "더 많은 도구",
+        openPages: "열린 페이지",
+      },
       unavailable: {
         title: "브라우저는 데스크톱 전용입니다",
         subtitle: "내장 브라우저를 사용하려면 이 워크스페이스를 Electron에서 여세요.",
@@ -706,8 +854,6 @@ export const ko: TranslationResources = {
         closePaneTitle: "창을 닫으시겠어요?",
         bulkUnsaved:
           "{{count}} 탭에 저장되지 않은 변경 사항이 있습니다. 종료하면 해당 초안이 삭제됩니다.",
-        closeTerminalTitle: "터미널을 닫을까요?",
-        closeTerminalMessage: "이 터미널에서 실행 중인 프로세스가 즉시 중지됩니다.",
         archiveRunningAgentTitle: "실행 중인 에이전트를 보관할까요?",
         archiveRunningAgentMessage:
           "이 에이전트는 아직 실행 중입니다. 보관하면 에이전트가 중지되고 탭이 닫힙니다.",
@@ -888,7 +1034,7 @@ export const ko: TranslationResources = {
             "이 브랜치가 이미 {{baseRef}}와 최신 상태이므로 업데이트를 사용할 수 없습니다",
           mergePrNoGithub: "GitHub가 연결되어 있지 않아 지금은 PR 병합을 사용할 수 없습니다",
           archiveNotWorktree:
-            "이 워크스페이스가 Paseo 워크트리로 생성되지 않아 여기서 보관을 사용할 수 없습니다",
+            "이 워크스페이스가 Swan 워크트리로 생성되지 않아 여기서 보관을 사용할 수 없습니다",
           mergePrNoForge:
             "{{brand}}가 연결되어 있지 않기 때문에 지금은 {{noun}} 병합을 사용할 수 없습니다.",
           mergePrMissing: "아직 풀 리퀘스트가 없어 PR 병합을 사용할 수 없습니다",
@@ -971,6 +1117,7 @@ export const ko: TranslationResources = {
         modifiedFile: "수정됨",
         commits: {
           title: "커밋",
+          baseHint: "기록은 {{baseRef}}를 사용합니다",
           countLabel: "워크스페이스 커밋 {{count}}개",
           noneAhead: "아직 {{baseRef}}보다 앞서 커밋이 없습니다.",
           fileDiffEmpty: "표시할 변경사항이 없습니다.",
@@ -1071,6 +1218,8 @@ export const ko: TranslationResources = {
             cancelled: "취소됨",
           },
         },
+        previewFiles_one: "파일 {{count}}개",
+        previewFiles_other: "파일 {{count}}개",
         states: {
           draft: "초안",
           merged: "병합됨",
@@ -1237,7 +1386,7 @@ export const ko: TranslationResources = {
       discord: "Discord",
       github: "GitHub 이슈 만들기",
       whatsNew: "새로운 소식",
-      appName: "Paseo",
+      appName: "Swan",
     },
     sections: {
       sessions: "기록",
@@ -1342,6 +1491,9 @@ export const ko: TranslationResources = {
     fields: {
       project: "프로젝트",
       branch: "브랜치",
+      noProject: "프로젝트 없음",
+      clearProject: "프로젝트 제거",
+      base: "기준",
       baseNotApplicable: "해당 없음",
       host: "호스트",
     },
@@ -1385,7 +1537,7 @@ export const ko: TranslationResources = {
       close: "창 닫기",
     },
     quitting: {
-      title: "Paseo 종료 중...",
+      title: "Swan 종료 중...",
       detail: "로컬 데몬을 중지하는 중입니다.",
     },
     daemon: {
@@ -1400,19 +1552,19 @@ export const ko: TranslationResources = {
       },
       management: {
         title: "내장 데몬 관리",
-        hint: "Paseo가 내장 데몬을 시작하고 중지하도록 허용합니다",
+        hint: "Swan가 내장 데몬을 시작하고 중지하도록 허용합니다",
         pauseTitle: "내장 데몬 일시 중지",
         pauseMessage:
           "내장 데몬이 즉시 중지됩니다. 내장 데몬에 연결된 실행 중인 에이전트와 터미널이 중지됩니다.",
         pauseAndStop: "일시 중지 후 중지",
         registrationFailed:
-          "내장 데몬이 시작되었지만 Paseo가 localhost 연결을 저장하지 못했습니다. 데몬 관리를 껐다가 다시 켜거나 localhost를 수동으로 추가하세요.",
-        pausedStopFailed: "내장 데몬 관리가 일시 중지되었지만 Paseo가 데몬을 중지하지 못했습니다.",
+          "내장 데몬이 시작되었지만 Swan가 localhost 연결을 저장하지 못했습니다. 데몬 관리를 껐다가 다시 켜거나 localhost를 수동으로 추가하세요.",
+        pausedStopFailed: "내장 데몬 관리가 일시 중지되었지만 Swan가 데몬을 중지하지 못했습니다.",
         updateFailed: "내장 데몬 관리를 업데이트할 수 없습니다.",
       },
       keepRunning: {
         title: "종료 후에도 데몬 계속 실행",
-        hint: "Paseo를 종료해도 데몬이 계속 실행됩니다",
+        hint: "Swan를 종료해도 데몬이 계속 실행됩니다",
       },
       logs: {
         title: "로그 파일",
@@ -1481,7 +1633,7 @@ export const ko: TranslationResources = {
     },
     rosetta: {
       title: "Apple Silicon 빌드 다운로드",
-      runningIntel: "Apple Silicon에서 Rosetta로 Paseo의 Intel 빌드를 실행하고 있습니다.",
+      runningIntel: "Apple Silicon에서 Rosetta로 Swan의 Intel 빌드를 실행하고 있습니다.",
       highCpu:
         "이로 인해 CPU 사용량이 높아집니다. 이를 해결하려면 Apple Silicon 빌드를 다운로드하세요.",
       download: "다운로드",
@@ -1524,7 +1676,7 @@ export const ko: TranslationResources = {
         microphone: "마이크 상태를 아직 확인하지 않았습니다.",
       },
       testNotification: {
-        title: "Paseo 알림 테스트",
+        title: "Swan 알림 테스트",
         body: "이 메시지가 보이면 데스크톱 알림이 작동하는 것입니다.",
         notDelivered: "알림이 전달되지 않았습니다. 시스템 설정 > 알림을 확인하세요.",
         failed: "알림을 보내지 못했습니다.",
@@ -1533,12 +1685,12 @@ export const ko: TranslationResources = {
     integrations: {
       cli: {
         statusFailed: "CLI 설치 상태를 확인할 수 없습니다.",
-        installFailed: "Paseo CLI를 설치할 수 없습니다.",
+        installFailed: "Swan CLI를 설치할 수 없습니다.",
       },
     },
   },
   rootError: {
-    title: "Paseo에 문제가 발생했습니다.",
+    title: "Swan에 문제가 발생했습니다.",
     body: "앱을 다시 로드해 보세요. 이런 일이 계속 발생하면 신고할 때 아래 세부정보를 포함하세요.",
     details: "세부",
   },
@@ -1603,6 +1755,12 @@ export const ko: TranslationResources = {
     later: "나중에",
     stashRestored: "스태시된 변경 사항이 복원되었습니다",
   },
+  diffBaseSelector: {
+    compareAgainst: "{{ref}}와 비교",
+    workspaceDefault: "워크스페이스 기본값",
+    worktreeFixed: "이 worktree의 비교 기준은 고정되어 있습니다.",
+    unableToResolve: "{{ref}}을(를) 해석할 수 없습니다",
+  },
   agentAutocomplete: {
     searchingWorkspace: "워크스페이스 검색 중...",
     loadingCommands: "명령 불러오는 중...",
@@ -1635,7 +1793,7 @@ export const ko: TranslationResources = {
     },
   },
   onboarding: {
-    title: "Paseo에 오신 것을 환영합니다",
+    title: "Swan에 오신 것을 환영합니다",
     subtitle: "시작하려면 컴퓨터를 연결하세요",
     actions: {
       settings: "설정",
@@ -1743,7 +1901,7 @@ export const ko: TranslationResources = {
     },
     direct: {
       title: "직접 연결",
-      helper: "Paseo 서버의 주소를 입력하세요.",
+      helper: "Swan 서버의 주소를 입력하세요.",
       fields: {
         host: "호스트",
         port: "포트",
@@ -1784,7 +1942,7 @@ export const ko: TranslationResources = {
     },
     remoteSsh: {
       title: "원격 SSH",
-      helper: "원격 호스트에서 실행 중인 Paseo 데몬에 연결합니다.",
+      helper: "원격 호스트에서 실행 중인 Swan 데몬에 연결합니다.",
       fields: {
         target: "SSH 호스트",
         password: "데몬 비밀번호",
@@ -1847,15 +2005,15 @@ export const ko: TranslationResources = {
       enableDescription:
         "릴레이를 사용하면 이 장치를 어디에서나 연결할 수 있습니다. 페어링 트래픽은 종단 간 암호화됩니다.",
       relayDocs: "릴레이 작동 방식",
-      relayDocsAccessibility: "Paseo 릴레이 작동 방식 읽기",
+      relayDocsAccessibility: "Swan 릴레이 작동 방식 읽기",
       enableRelay: "릴레이 활성화",
       enablingRelay: "활성화 중...",
       notNow: "지금은 아님",
       directConnectionHint:
         "릴레이 없이 TCP, Tailscale 또는 다른 VPN을 통해 직접 연결하세요. QR 코드가 생성되지 않습니다.",
-      updateRequired: "Paseo 데스크톱에서 릴레이를 활성화하려면 호스트를 업데이트하세요.",
+      updateRequired: "Swan 데스크톱에서 릴레이를 활성화하려면 호스트를 업데이트하세요.",
       unavailable: "페어링 정보를 사용할 수 없습니다.",
-      hint: "휴대폰의 Paseo로 이 QR 코드를 스캔하거나 아래 링크를 복사하세요.",
+      hint: "휴대폰의 Swan로 이 QR 코드를 스캔하거나 아래 링크를 복사하세요.",
       securityWarning:
         "이 페어링 링크는 비밀번호처럼 취급하세요. 링크를 가진 사람은 누구나 이 데몬에 접근할 수 있습니다.",
       qrUnavailable: "QR 코드를 사용할 수 없습니다.",
@@ -1890,7 +2048,7 @@ export const ko: TranslationResources = {
   serviceUrl: {
     title: "서비스 URL 열기",
     message: "{{url}}을(를) 열까요?",
-    inPaseo: "Paseo에서",
+    inPaseo: "Swan에서",
     externalBrowser: "외부 브라우저",
     dontAskAgain: "다시 묻지 않기",
   },
@@ -1904,6 +2062,11 @@ export const ko: TranslationResources = {
   },
   menu: {
     backdrop: "메뉴 배경",
+  },
+  backgroundTasks: {
+    title: "백그라운드 작업",
+    pillLabelOne: "백그라운드 작업 1개",
+    pillLabelMany: "백그라운드 작업 {{count}}개",
   },
   subagents: {
     title: "하위 에이전트",
@@ -1961,6 +2124,7 @@ export const ko: TranslationResources = {
       subtitle: "워크스페이스 파일",
       tooltip: "워크스페이스 파일 탐색",
       chooseFile: "파일 선택",
+      emptyDescription: "작업 공간 트리에서 파일을 선택하세요",
     },
     pullRequest: {
       label: "풀 리퀘스트",
@@ -2010,10 +2174,35 @@ export const ko: TranslationResources = {
       other: "기타 도구 {{count}}개 사용함",
     },
     paseoCalls: {
-      one: "Paseo를 {{count}}회 호출함",
-      other: "Paseo를 {{count}}회 호출함",
+      one: "Swan를 {{count}}회 호출함",
+      other: "Swan를 {{count}}회 호출함",
     },
     and: "그리고",
+    verbSeparator: ", ",
+    verbs: {
+      loadTools: "도구 로드",
+      skill: "스킬 사용",
+      read: "파일 읽기",
+      search: "검색",
+      edit: "파일 편집",
+      command: "명령 실행",
+      paseo: "Swan 호출",
+      other: "도구 사용",
+    },
+    done: {
+      read: "읽음",
+      edit: "편집함",
+      shell: "실행함",
+      search: "검색함",
+      fetch: "가져옴",
+    },
+    running: {
+      read: "읽는 중",
+      edit: "편집 중",
+      shell: "실행 중",
+      search: "검색 중",
+      fetch: "가져오는 중",
+    },
   },
   renameModal: {
     rename: "이름 변경",
@@ -2026,8 +2215,10 @@ export const ko: TranslationResources = {
     noData: "컨텍스트 데이터 없음",
     accessibilityNoData: "컨텍스트 창: 컨텍스트 데이터 없음",
     title: "컨텍스트 윈도우",
-    used: "{{percentage}}% 사용됨",
-    tokens: "{{used}} / {{max}} 토큰",
+    summary: "{{used}} / {{max}} ({{percentage}}%)",
+    used: "사용됨",
+    free: "여유 공간",
+    buffer: "자동 압축 버퍼",
     sessionCost: "세션 비용 {{cost}}",
     accessibility: "컨텍스트 윈도우 {{percentage}}% 사용됨",
   },
@@ -2108,7 +2299,7 @@ export const ko: TranslationResources = {
       send: "보내기",
       sending: "보내는 중...",
       sentTitle: "테스트 알림을 보냈습니다",
-      sentDescription: "Paseo가 알림을 운영 체제에 전달했습니다.",
+      sentDescription: "Swan가 알림을 운영 체제에 전달했습니다.",
       sendFailedTitle: "테스트 알림을 보낼 수 없음",
     },
     hostSections: {
@@ -2131,10 +2322,10 @@ export const ko: TranslationResources = {
       selection: "모델 선택",
       automatic: "자동",
       preferred: "수동",
-      automaticHint: "Paseo가 사용 가능한 빠른 모델을 선택합니다",
-      preferredHint: "Paseo에서 사용할 모델을 선택하세요",
+      automaticHint: "Swan가 사용 가능한 빠른 모델을 선택합니다",
+      preferredHint: "Swan에서 사용할 모델을 선택하세요",
       model: "모델",
-      fallbackHint: "사용할 수 없으면 Paseo가 다른 사용 가능한 모델을 사용합니다",
+      fallbackHint: "사용할 수 없으면 Swan가 다른 사용 가능한 모델을 사용합니다",
       docs: "문서",
       saveError: "메타데이터 생성을 업데이트할 수 없습니다",
     },
@@ -2144,7 +2335,7 @@ export const ko: TranslationResources = {
       browserData: {
         title: "브라우저 데이터",
         siteData: "쿠키 및 사이트 데이터",
-        description: "브라우저 탭은 Paseo 전체에서 로그인 및 사이트 데이터를 공유합니다.",
+        description: "브라우저 탭은 Swan 전체에서 로그인 및 사이트 데이터를 공유합니다.",
         clear: "브라우저 데이터 지우기",
         clearing: "삭제 중...",
         confirmTitle: "브라우저 데이터를 삭제하시겠습니까?",
@@ -2171,7 +2362,7 @@ export const ko: TranslationResources = {
       serviceUrls: {
         options: {
           ask: "물어보기",
-          inApp: "Paseo에서",
+          inApp: "Swan에서",
           external: "외부 브라우저",
         },
       },
@@ -2255,7 +2446,7 @@ export const ko: TranslationResources = {
         label: "앱 업데이트",
         readyToInstall: "설치 준비됨: {{version}}",
         installTitle: "데스크톱 업데이트 설치",
-        installMessage: "이 컴퓨터의 Paseo를 업데이트합니다",
+        installMessage: "이 컴퓨터의 Swan를 업데이트합니다",
         installConfirm: "업데이트 설치",
         update: "업데이트",
         updateTo: "{{version}}(으)로 업데이트",
@@ -2267,7 +2458,21 @@ export const ko: TranslationResources = {
       },
     },
     appearance: {
+      advanced: {
+        title: "고급",
+        reset: "기본값으로 재설정",
+        resetLabel: "고급 모양 설정 재설정",
+      },
+      motion: {
+        title: "동작 줄이기",
+        hint: "애니메이션을 줄이거나 시스템 설정을 따릅니다.",
+        system: "시스템",
+        on: "켜기",
+        off: "끄기",
+      },
       theme: {
+        visualStyle: "시각적 스타일",
+        mode: "모드",
         title: "테마",
         accessibilityLabel: "테마: {{value}}",
         options: {
@@ -2279,6 +2484,44 @@ export const ko: TranslationResources = {
           ghostty: "Ghostty",
           pureBlack: "순수 검정",
           auto: "시스템",
+        },
+      },
+      colors: {
+        title: "{{theme}} 색상",
+        info: "앱 주요 영역의 색상을 선택합니다. 비워 두면 테마 색상을 사용합니다.",
+        reset: "재설정",
+        resetLabel: "{{theme}} 색상 재설정",
+        pickerAccessibility: "{{role}} 색상 선택",
+        fieldAccessibility: "{{role}} 16진수 색상",
+        roles: {
+          main: {
+            title: "메인 화면",
+            hint: "대화 및 작업 공간 배경",
+          },
+          sidebar: {
+            title: "사이드바",
+            hint: "사이드바 배경",
+          },
+          selection: {
+            title: "선택된 행",
+            hint: "사이드바에서 선택된 행의 강조 표시",
+          },
+          accent: {
+            title: "강조 색상",
+            hint: "버튼, 토글 및 기타 강조 표시",
+          },
+          text: {
+            title: "텍스트",
+            hint: "기본 텍스트",
+          },
+          mutedText: {
+            title: "보조 텍스트",
+            hint: "레이블 및 설명",
+          },
+          border: {
+            title: "테두리",
+            hint: "구분선 및 윤곽선",
+          },
         },
       },
       detailLevel: {
@@ -2310,6 +2553,10 @@ export const ko: TranslationResources = {
         interfaceSize: "인터페이스 크기",
         interfaceSizeHint: "탐색, 컨트롤 및 레이블에 사용됩니다",
         interfaceSizeAccessibility: "인터페이스 글꼴 크기",
+        contentFont: "본문 글꼴",
+        contentFontHint:
+          "채팅 본문, Markdown 및 입력창에 사용됩니다. 비워 두면 인터페이스 글꼴을 사용합니다",
+        contentFontAccessibility: "본문 글꼴 모음",
         contentSize: "콘텐츠 크기",
         contentSizeHint: "채팅 텍스트와 렌더링된 Markdown에 사용됩니다",
         contentSizeAccessibility: "콘텐츠 글꼴 크기",
@@ -2317,6 +2564,16 @@ export const ko: TranslationResources = {
         codeFontHint:
           "코드, diff, 터미널 출력에 사용됩니다. 시스템 기본값을 사용하려면 비워 두세요",
         codeFontAccessibility: "코드 글꼴 패밀리",
+        interfaceStyle: "인터페이스 글꼴 스타일",
+        interfaceWeightAccessibility: "인터페이스 글꼴 굵기: {{value}}",
+        contentWeightAccessibility: "콘텐츠 글꼴 굵기: {{value}}",
+        codeWeightAccessibility: "코드 글꼴 굵기: {{value}}",
+        weightOptions: {
+          default: "기본값",
+          regular: "보통",
+          medium: "중간",
+          semibold: "약간 굵게",
+        },
         codeSize: "코드 크기",
         codeSizeHint: "코드, diff 및 터미널 출력에 사용됩니다",
         codeSizeAccessibility: "코드 글꼴 크기",
@@ -2502,11 +2759,11 @@ export const ko: TranslationResources = {
         title: "오케스트레이션 스킬",
         description: "CLI를 통해 에이전트가 오케스트레이션하도록 가르칩니다",
         updateAvailable: "업데이트 사용 가능",
-        updateTitle: "Paseo 스킬을 업데이트할까요?",
+        updateTitle: "Swan 스킬을 업데이트할까요?",
         updateFallback: "번들된 스킬을 내 컴퓨터에 동기화합니다.",
-        uninstallTitle: "Paseo 스킬을 제거할까요?",
+        uninstallTitle: "Swan 스킬을 제거할까요?",
         uninstallMessage:
-          "~/.agents, ~/.claude, ~/.codex에서 모든 Paseo 오케스트레이션 스킬을 제거합니다.",
+          "~/.agents, ~/.claude, ~/.codex에서 모든 Swan 오케스트레이션 스킬을 제거합니다.",
         choose: "스킬 선택",
         chooseAll: "모든 스킬",
         chooseAllHint: "나중에 추가되는 항목을 포함하여 모든 번들 스킬을 설치된 상태로 유지합니다.",
@@ -2542,9 +2799,9 @@ export const ko: TranslationResources = {
         title: "오케스트레이션",
         unavailable: "오케스트레이션을 관리하려면 이 호스트에 연결하세요",
         enableTools: {
-          title: "Paseo 도구 활성화",
+          title: "Swan 도구 활성화",
           hint: "에이전트가 워크트리, 에이전트, 일정을 관리할 수 있습니다",
-          accessibilityLabel: "Paseo 도구 주입",
+          accessibilityLabel: "Swan 도구 주입",
         },
         systemPrompt: {
           title: "시스템 프롬프트",
@@ -2648,15 +2905,15 @@ export const ko: TranslationResources = {
             "이 호스트는 연결되어 있지 않습니다. 재시작하기 전에 온라인 상태가 될 때까지 기다리세요.",
           offlineTitle: "호스트 오프라인",
           offlineMessage:
-            "이 호스트는 오프라인입니다. Paseo가 자동으로 다시 연결하므로 다시 온라인이 될 때까지 기다린 후 재시작하세요.",
+            "이 호스트는 오프라인입니다. Swan가 자동으로 다시 연결하므로 다시 온라인이 될 때까지 기다린 후 재시작하세요.",
           requestFailedTitle: "오류",
           requestFailedMessage:
-            "재시작 요청을 보내지 못했습니다. Paseo가 자동으로 다시 연결하므로 호스트가 온라인으로 표시되면 다시 시도하세요.",
+            "재시작 요청을 보내지 못했습니다. Swan가 자동으로 다시 연결하므로 호스트가 온라인으로 표시되면 다시 시도하세요.",
           dialogFailedMessage: "재시작 확인 대화 상자를 열 수 없습니다.",
         },
         update: {
           desktopManagedHint:
-            "이 데몬은 Paseo Desktop에서 관리됩니다. 호스트에서 Paseo 데스크톱을 업데이트합니다.",
+            "이 데몬은 Swan Desktop에서 관리됩니다. 호스트에서 Swan 데스크톱을 업데이트합니다.",
           title: "데몬 업데이트",
           hint: "데몬을 최신 버전으로 업데이트하고 다시 시작하세요.",
           confirm: "업데이트",
@@ -2766,6 +3023,7 @@ export const ko: TranslationResources = {
       noEditableTarget: "이 호스트에서는 이 프로젝트를 편집할 수 없습니다.",
       backToProjects: "프로젝트로 돌아가기",
       edit: {
+        sourceFolder: "소스 폴더",
         title: "프로젝트 편집",
         name: "이름",
         nameLabel: "프로젝트 이름",
@@ -2817,7 +3075,7 @@ export const ko: TranslationResources = {
         newScript: "새 스크립트",
         editScript: "{{name}} 편집",
         runAsService: "서비스로 실행",
-        serviceHint: "Paseo가 프로세스를 감독하고 $PASEO_PORT를 통해 포트를 할당합니다",
+        serviceHint: "Swan가 프로세스를 감독하고 $PASEO_PORT를 통해 포트를 할당합니다",
         actions: {
           add: "스크립트 추가",
           edit: "편집",
@@ -2826,7 +3084,7 @@ export const ko: TranslationResources = {
       },
       metadata: {
         title: "메타데이터 생성",
-        info: "Paseo가 메타데이터를 생성하는 데 사용하는 AI 프롬프트에 주입되는 프로젝트별 지침 - 브랜치 이름, 커밋 스타일, PR 형식 같은 팀 규칙을 적용하는 데 사용하세요",
+        info: "Swan가 메타데이터를 생성하는 데 사용하는 AI 프롬프트에 주입되는 프로젝트별 지침 - 브랜치 이름, 커밋 스타일, PR 형식 같은 팀 규칙을 적용하는 데 사용하세요",
         branchName: "브랜치 이름",
         branchNamePlaceholder:
           "브랜치에 feat/ 또는 fix/를 접두사로, 개인 브랜치에는 mb/를 붙이세요",

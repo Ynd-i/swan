@@ -7,7 +7,7 @@ import invariant from "tiny-invariant";
 import { useRetainedPanelActive } from "@/components/retained-panel";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { PaneContentToolbar } from "@/components/ui/pane-content-toolbar";
-import { isWeb } from "@/constants/platform";
+import { getIsElectronMac, isWeb } from "@/constants/platform";
 import { DiffDocument } from "@/git/diff-document";
 import { ChangesSurface, DiffLayoutToggle, resolveDiffLayout } from "@/git/diff-pane";
 import { useCommitDiffFiles } from "@/git/use-diff-files";
@@ -80,7 +80,7 @@ function resolveChangesPresentation(
   isTree: boolean,
   inlineDiff: boolean,
 ): "tree" | "diff" | "combined" {
-  if (!isTree) return "diff";
+  if (!isTree) return getIsElectronMac() ? "combined" : "diff";
   return inlineDiff ? "combined" : "tree";
 }
 
@@ -135,6 +135,7 @@ function ChangesPanel() {
           cwd={cwd}
           enabled={isActive}
           presentation={presentation}
+          standaloneDiff={!isTree}
           focusPath={target.kind === "working_diff" ? target.focusPath : undefined}
           focusRequestId={target.kind === "working_diff" ? target.focusRequestId : undefined}
           onSelectDiffFile={isTree ? handleSelectDiffFile : undefined}

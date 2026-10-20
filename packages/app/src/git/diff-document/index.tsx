@@ -1,13 +1,20 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { withUnistyles } from "react-native-unistyles";
 import { RenderProfile } from "@/utils/render-profiler";
+import { getIsElectronMac } from "@/constants/platform";
 import { createDiffPalette, retainDiffPalette } from "./palette";
 import { DiffSurface } from "./surface";
-import type { DiffDocumentProps, DiffHeaderTypography, DiffPalette } from "./types";
+import type {
+  DiffDocumentProps,
+  DiffHeaderTypography,
+  DiffPalette,
+  DiffSurfaceProps,
+} from "./types";
 
 export type { DiffDocumentProps, WorkingDiffMode } from "./types";
 
 type ThemedDiffDocumentProps = DiffDocumentProps & {
+  codeFontWeight: DiffSurfaceProps["codeFontWeight"];
   palette: DiffPalette;
   headerTypography: DiffHeaderTypography;
 };
@@ -44,8 +51,9 @@ function ThemedDiffDocument(props: ThemedDiffDocumentProps) {
   );
 }
 
-const StyledDiffDocument = withUnistyles(ThemedDiffDocument, (theme) => ({
-  palette: createDiffPalette(theme),
+const StyledDiffDocument = withUnistyles(ThemedDiffDocument, (theme, rt) => ({
+  codeFontWeight: theme.codeFontWeight ?? (getIsElectronMac() ? "600" : null),
+  palette: createDiffPalette(theme, getIsElectronMac() && rt.themeName === "dark"),
   headerTypography: {
     family: theme.fontFamily.ui,
     size: theme.fontSize.base,

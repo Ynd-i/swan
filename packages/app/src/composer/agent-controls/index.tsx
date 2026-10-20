@@ -25,6 +25,19 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { useShallow } from "zustand/shallow";
 import { Settings2 } from "lucide-react-native";
 import { getAgentFeatureIcon, ThinkingIcon } from "@/agent-controls/icons";
+import {
+  DRAFT_PLAN_OWNER,
+  FAST_MODE_FEATURE_ID,
+  PLAN_MODE_FEATURE_ID,
+} from "@/agent-controls/policy";
+import type { PlanToggle } from "@/agent-controls/policy";
+import {
+  GoalModeToggle,
+  PlanModeToggle,
+  useDesktopPlanMode,
+  usePlanModeShortcut,
+  usePublishComposerModes,
+} from "@/composer/agent-controls/plan-mode";
 import { formatThinkingOptionLabel } from "@/agent-controls/labels";
 import { ComboboxTrigger } from "@/components/ui/combobox-trigger";
 import { CombinedModelSelector } from "@/components/combined-model-selector";
@@ -70,7 +83,7 @@ import {
   type AgentControlCommandCenterSource,
 } from "@/command-center/agent-control-registration";
 import { useComposerKeyboardScope } from "@/composer/keyboard-scope";
-import { isNative } from "@/constants/platform";
+import { getIsElectronMac, isNative } from "@/constants/platform";
 import {
   resolveComposerControlDensity,
   resolveComposerControlPresentation,
@@ -96,6 +109,7 @@ import { buildSettingsHostSectionRoute } from "@/utils/host-routes";
 interface AgentControlOption {
   id: string;
   label: string;
+  isDefault?: boolean;
 }
 
 type AgentControlSelector = "provider" | "mode" | "model" | "thinking" | `feature-${string}`;
@@ -103,6 +117,7 @@ type AgentControlSelector = "provider" | "mode" | "model" | "thinking" | `featur
 const EMPTY_AGENT_PROVIDER_DEFINITIONS: AgentProviderDefinition[] = [];
 
 interface ControlledAgentControlsProps {
+  ownerKey: string;
   provider: string;
   providerOptions?: AgentControlOption[];
   selectedProviderId?: string;
@@ -211,20 +226,19 @@ function getModeProviderDefinitions(modeControl: AgentModeControlValue | null) {
   return modeControl?.providerDefinitions ?? EMPTY_AGENT_PROVIDER_DEFINITIONS;
 }
 
-function getFeatureIconColor(
-  feature: AgentFeature,
-  palette: {
-    blue: { 400: string };
-    green: { 400: string };
-    yellow: { 400: string };
-  },
+interface FeatureIconPalette {
+  blue: { 400: string };
+  green: { 400: string };
+  yellow: { 400: string };
+}
+
+/** The accent an active feature's icon carries, for callers that already know it is on. */
+function getActiveFeatureIconColor(
+  featureId: string,
+  palette: FeatureIconPalette,
   foregroundMuted: string,
 ): string {
-  if (!isFeatureActive(feature)) {
-    return foregroundMuted;
-  }
-
-  switch (getFeatureHighlightColor(feature.id)) {
+  switch (getFeatureHighlightColor(featureId)) {
     case "blue":
       return palette.blue[400];
     case "green":
@@ -234,6 +248,84 @@ function getFeatureIconColor(
     default:
       return foregroundMuted;
   }
+}
+
+function getFeatureIconColor(
+  feature: AgentFeature,
+  palette: FeatureIconPalette,
+  foregroundMuted: string,
+): string {
+  if (!isFeatureActive(feature)) {
+    return foregroundMuted;
+  }
+  return getActiveFeatureIconColor(feature.id, palette, foregroundMuted);
+}
+
+// Providers whose CLI has a `/goal` command: Codex (0.128+) and Claude Code.
+const GOAL_PROVIDERS = new Set(["codex", "claude"]);
+
+// As in Codex, plan and goal show only while on; Shift+Tab, the "+" menu or the command center
+// turns them on.
+function DesktopComposerModes({
+  toggle,
+  provider,
+  disabled,
+}: {
+  toggle: PlanToggle | null;
+  provider: string;
+  disabled: boolean;
+}) {
+  const { theme } = useUnistyles();
+  usePlanModeShortcut(toggle, disabled);
+  const goalAvailable = getIsElectronMac() && GOAL_PROVIDERS.has(provider);
+  const modes = usePublishComposerModes(toggle, goalAvailable);
+  const setGoalOn = modes?.setGoalOn;
+  const turnOffGoal = useCallback(() => setGoalOn?.(false), [setGoalOn]);
+  const planOn = toggle?.isOn === true;
+  const goalOn = goalAvailable && modes?.goalOn === true;
+  if (!planOn && !goalOn) return null;
+  const iconColor = getActiveFeatureIconColor(
+    PLAN_MODE_FEATURE_ID,
+    theme.colors.palette,
+    theme.colors.foregroundMuted,
+  );
+  return (
+    <>
+      {toggle && planOn ? (
+        <PlanModeToggle toggle={toggle} iconColor={iconColor} disabled={disabled} />
+      ) : null}
+      {goalOn ? (
+        <GoalModeToggle iconColor={iconColor} disabled={disabled} onTurnOff={turnOffGoal} />
+      ) : null}
+    </>
+  );
+}
+
+function resolveFastControl(
+  features: AgentFeature[] | undefined,
+  onSetFeature: ((featureId: string, value: unknown) => void) | undefined,
+) {
+  const fast = features?.find((feature) => feature.id === FAST_MODE_FEATURE_ID);
+  if (fast?.type !== "toggle" || !onSetFeature) return undefined;
+  return {
+    on: fast.value,
+    label: getFeatureTooltip(fast),
+    onToggle: () => onSetFeature(FAST_MODE_FEATURE_ID, !fast.value),
+  };
+}
+
+// On the Mac, plan is the toggle beside the mode and fast lives in the model popover.
+function filterToolbarFeatures(
+  features: AgentFeature[] | undefined,
+  desktopThinking: { fast?: unknown } | undefined,
+) {
+  const hasFastControl = Boolean(desktopThinking?.fast);
+  if (!getIsElectronMac()) return features;
+  return features?.filter(
+    (feature) =>
+      feature.id !== PLAN_MODE_FEATURE_ID &&
+      !(feature.id === FAST_MODE_FEATURE_ID && hasFastControl),
+  );
 }
 
 type ActiveSheet = "thinking" | "features" | null;
@@ -268,6 +360,7 @@ function toThinkingControlOptions(options: AgentControlOption[] | undefined): Ag
   return (options ?? []).map((option) => ({
     id: option.id,
     label: formatThinkingOptionLabel(option),
+    isDefault: option.isDefault,
   }));
 }
 
@@ -474,6 +567,7 @@ function buildOpenChangeHandler(
 }
 
 function ControlledAgentControls({
+  ownerKey,
   provider,
   providerOptions,
   selectedProviderId,
@@ -541,6 +635,14 @@ function ControlledAgentControls({
     selectedThinkingOptionId,
     formattedThinkingOptions[0]?.label ?? t("agentControls.thinking.unknown"),
   );
+
+  const { modeControl: desktopModeControl, planToggle } = useDesktopPlanMode({
+    enabled: getIsElectronMac() && !isCompact,
+    ownerKey,
+    modeControl,
+    features,
+    onSetFeature,
+  });
 
   const hasAnyControl = resolveHasAnyControl({
     providerOptions,
@@ -779,7 +881,8 @@ function ControlledAgentControls({
             handleOpenChange={handleOpenChange}
             handleNestedOpenChange={handleSheetOpenChange}
             renderThinkingOption={renderThinkingOption}
-            modeControl={modeControl}
+            modeControl={desktopModeControl}
+            planToggle={planToggle}
             presentation={presentation}
             glyphSize={layoutContextValue.glyphSize}
             activeSheet={activeSheet}
@@ -880,6 +983,7 @@ interface DesktopAgentControlsContentProps {
     onPress: () => void;
   }) => ReactElement;
   modeControl?: AgentModeControlValue | null;
+  planToggle: PlanToggle | null;
   presentation: ComposerControlPresentation;
   glyphSize: number;
   activeSheet: ActiveSheet;
@@ -937,6 +1041,7 @@ function DesktopAgentControlsContent(props: DesktopAgentControlsContentProps) {
     handleNestedOpenChange,
     renderThinkingOption,
     modeControl,
+    planToggle,
     presentation,
     glyphSize,
     activeSheet,
@@ -948,13 +1053,49 @@ function DesktopAgentControlsContent(props: DesktopAgentControlsContentProps) {
     () => ({ glyphSize, showCaret: presentation.showCarets }),
     [glyphSize, presentation.showCarets],
   );
+  const fastControl = useMemo(
+    () => resolveFastControl(features, onSetFeature),
+    [features, onSetFeature],
+  );
+  const desktopThinking = useMemo(
+    () =>
+      getIsElectronMac() && thinkingOptions?.length
+        ? {
+            options: thinkingOptions,
+            selectedId: selectedThinkingOptionId,
+            label: displayThinking,
+            disabled: disabled || !canSelectThinking,
+            onSelect: handleThinkingSelect,
+            fast: fastControl,
+          }
+        : undefined,
+    [
+      thinkingOptions,
+      selectedThinkingOptionId,
+      displayThinking,
+      disabled,
+      canSelectThinking,
+      handleThinkingSelect,
+      fastControl,
+    ],
+  );
+  const toolbarFeatures = useMemo(
+    () => filterToolbarFeatures(features, desktopThinking),
+    [features, desktopThinking],
+  );
   const featuresSheetHeader = useMemo<SheetHeader>(
     () => ({ title: t("agentControls.features.title") }),
     [t],
   );
   const handleOpenFeatures = useCallback(() => handleOpenSheet("features"), [handleOpenSheet]);
+  const desktopChat = getIsElectronMac();
+  const modeButton = modeControl ? (
+    <AgentModeControl {...modeControl} onClose={onDropdownClose} />
+  ) : null;
   return (
     <>
+      {desktopChat ? modeButton : null}
+      <DesktopComposerModes toggle={planToggle} provider={provider} disabled={disabled} />
       {providerOptions && providerOptions.length > 0 ? (
         <>
           <ComboboxTrigger
@@ -983,7 +1124,7 @@ function DesktopAgentControlsContent(props: DesktopAgentControlsContentProps) {
       ) : null}
 
       {canSelectModel ? (
-        <Tooltip delayDuration={0} enabledOnDesktop enabledOnMobile={false}>
+        <Tooltip delayDuration={0} enabledOnDesktop={!desktopChat} enabledOnMobile={false}>
           <TooltipTrigger asChild triggerRefProp="ref">
             <View style={styles.modelControl}>
               <CombinedModelSelector
@@ -1005,6 +1146,7 @@ function DesktopAgentControlsContent(props: DesktopAgentControlsContentProps) {
                 serverId={modelSelectorServerId}
                 desktopPlacement="top-start"
                 desktopMinWidth={360}
+                desktopThinking={desktopThinking}
                 toolbar={modelToolbar}
               />
             </View>
@@ -1015,7 +1157,7 @@ function DesktopAgentControlsContent(props: DesktopAgentControlsContentProps) {
         </Tooltip>
       ) : null}
 
-      {thinkingOptions && thinkingOptions.length > 0 ? (
+      {(!desktopChat || !canSelectModel) && thinkingOptions && thinkingOptions.length > 0 ? (
         <>
           <Tooltip delayDuration={0} enabledOnDesktop enabledOnMobile={false}>
             <TooltipTrigger asChild triggerRefProp="ref">
@@ -1055,9 +1197,9 @@ function DesktopAgentControlsContent(props: DesktopAgentControlsContentProps) {
         </>
       ) : null}
 
-      {modeControl ? <AgentModeControl {...modeControl} onClose={onDropdownClose} /> : null}
+      {desktopChat ? null : modeButton}
 
-      {presentation.aggregateFeatures && features?.length ? (
+      {presentation.aggregateFeatures && toolbarFeatures?.length ? (
         <>
           <Pressable
             onPress={handleOpenFeatures}
@@ -1077,7 +1219,7 @@ function DesktopAgentControlsContent(props: DesktopAgentControlsContentProps) {
             onClose={handleCloseSheet}
             testID="agent-features-sheet"
           >
-            {features.map((feature) => (
+            {toolbarFeatures.map((feature) => (
               <SheetFeatureItem
                 key={`feature-${feature.id}`}
                 feature={feature}
@@ -1090,7 +1232,7 @@ function DesktopAgentControlsContent(props: DesktopAgentControlsContentProps) {
           </AdaptiveModalSheet>
         </>
       ) : (
-        features?.map((feature) => (
+        toolbarFeatures?.map((feature) => (
           <DesktopFeatureItem
             key={`feature-${feature.id}`}
             feature={feature}
@@ -1600,12 +1742,18 @@ export const AgentControls = memo(function AgentControls({
     });
   }, [agentProviderDefinitions, agentProviderModels, snapshotSelectedEntry]);
 
+  const {
+    runtimeModelId,
+    model: configuredModelId,
+    runtimeThinkingOptionId,
+    thinkingOptionId: explicitThinkingOptionId,
+  } = agent ?? {};
   const modelSelection = resolveAgentModelSelection({
     models,
-    runtimeModelId: agent?.runtimeModelId,
-    configuredModelId: agent?.model,
-    runtimeThinkingOptionId: agent?.runtimeThinkingOptionId,
-    explicitThinkingOptionId: agent?.thinkingOptionId,
+    runtimeModelId,
+    configuredModelId,
+    runtimeThinkingOptionId,
+    explicitThinkingOptionId,
   });
 
   const modelOptions = useMemo<AgentControlOption[]>(() => {
@@ -1616,8 +1764,10 @@ export const AgentControls = memo(function AgentControls({
     return (modelSelection.thinkingOptions ?? []).map((option) => ({
       id: option.id,
       label: formatThinkingOptionLabel(option),
+      isDefault:
+        option.isDefault || option.id === modelSelection.selectedModel?.defaultThinkingOptionId,
     }));
-  }, [modelSelection.thinkingOptions]);
+  }, [modelSelection.thinkingOptions, modelSelection.selectedModel?.defaultThinkingOptionId]);
 
   const agentProvider = agent?.provider;
   const activeModelId = modelSelection.activeModelId;
@@ -1794,6 +1944,7 @@ export const AgentControls = memo(function AgentControls({
       {commandCenterRegistration}
       {profileEditor.element}
       <ControlledAgentControls
+        ownerKey={agentId}
         provider={agent.provider}
         modelSelectorProviders={agentModelSelectorProviders}
         modelOptions={modelOptions}
@@ -1912,6 +2063,7 @@ export function DraftAgentControls({
     <>
       {profileEditor.element}
       <ControlledAgentControls
+        ownerKey={DRAFT_PLAN_OWNER}
         provider={selectedProvider ?? ""}
         modelSelectorProviders={modelSelectorProviders}
         modelOptions={modelOptions}
@@ -1951,6 +2103,10 @@ const styles = StyleSheet.create((theme) => ({
     alignItems: "center",
     gap: theme.spacing[1],
     overflow: "hidden",
+    // Room above and below the 28px controls so the clip keeps their focus rings.
+    paddingVertical: theme.spacing[1],
+    marginVertical: -theme.spacing[1],
+    pointerEvents: "box-none",
   },
   modeBadge: {
     height: 28,
@@ -1964,6 +2120,7 @@ const styles = StyleSheet.create((theme) => ({
   modelControl: {
     minWidth: 0,
     flexShrink: 1,
+    marginLeft: getIsElectronMac() ? "auto" : 0,
   },
   toolbarCaret: {
     width: 14,

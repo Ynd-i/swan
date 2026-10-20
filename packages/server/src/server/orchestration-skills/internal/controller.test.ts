@@ -163,6 +163,19 @@ async function writeUserFile(
   }
 }
 
+async function writeSharedUserFile(
+  targets: SkillTargets,
+  skill: string,
+  relativePath: string,
+  contents: string,
+): Promise<void> {
+  for (const dir of [targets.agentsDir, targets.claudeDir]) {
+    const file = path.join(dir, skill, relativePath);
+    await mkdir(path.dirname(file), { recursive: true });
+    await writeFile(file, contents);
+  }
+}
+
 async function readUserFile(
   targets: SkillTargets,
   skill: string,
@@ -1165,7 +1178,7 @@ describe("skills controller", () => {
     const transactionStarted = waitForTransactionDirectory(path.dirname(harness.targets.agentsDir));
     const save = harness.controller.save(selection);
     await transactionStarted;
-    await writeUserFile(harness.targets, "paseo-chat", "notes/mine.md", "hand written");
+    await writeSharedUserFile(harness.targets, "paseo-chat", "notes/mine.md", "hand written");
 
     const result = await save;
 
@@ -1174,7 +1187,7 @@ describe("skills controller", () => {
     expect(await readUserFile(harness.targets, "paseo-chat", "notes/mine.md")).toEqual([
       "hand written",
       "hand written",
-      "hand written",
+      null,
     ]);
   });
 

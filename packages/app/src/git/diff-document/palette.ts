@@ -2,7 +2,7 @@ import type { Theme } from "@/styles/theme";
 import { hexColorWithAlpha } from "@/utils/color";
 import type { DiffCell, DiffPalette } from "./types";
 
-export function createDiffPalette(theme: Theme): DiffPalette {
+export function createDiffPalette(theme: Theme, codexDark = false): DiffPalette {
   return {
     surface: theme.colors.surface0,
     headerSurface: theme.colors.surface0,
@@ -21,10 +21,32 @@ export function createDiffPalette(theme: Theme): DiffPalette {
     statusDanger: theme.colors.statusDanger,
     statusWarning: theme.colors.statusWarning,
     syntax: theme.colors.syntax,
+    ...(codexDark
+      ? {
+          addition: "#00c853",
+          deletion: "#ff5f38",
+          additionBackground: "#334a34",
+          deletionBackground: "#55392e",
+          additionGutterBackground: "#122013",
+          deletionGutterBackground: "#28150e",
+          emptyStripe: "#3c3c3a",
+          additionInlineBackground: "#33633b",
+          deletionInlineBackground: "#774130",
+        }
+      : {}),
   };
 }
 
 export function retainDiffPalette(previous: DiffPalette, next: DiffPalette): DiffPalette {
+  for (const key of [
+    "additionGutterBackground",
+    "deletionGutterBackground",
+    "emptyStripe",
+    "additionInlineBackground",
+    "deletionInlineBackground",
+  ] as const) {
+    if (previous[key] !== next[key]) return next;
+  }
   if (
     previous.surface !== next.surface ||
     previous.headerSurface !== next.headerSurface ||

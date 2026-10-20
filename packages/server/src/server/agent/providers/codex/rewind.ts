@@ -1,3 +1,4 @@
+import { z } from "zod";
 import type {
   CodexThreadForkParams,
   CodexThreadForkResponse,
@@ -58,6 +59,49 @@ async function rollbackCodexThread(
     return client.rollbackThread(params);
   }
   return parseCodexThreadRollbackResponse(await client.request("thread/rollback", params));
+}
+
+const CodexThreadTurnIdsSchema = z.object({
+  thread: z.object({ turns: z.array(z.object({ id: z.string() }).passthrough()) }).passthrough(),
+});
+
+async function readCodexThreadTurnIds(
+  client: CodexRewindClient,
+  threadId: string,
+): Promise<string[]> {
+  const response = await client.request("thread/read", { threadId, includeTurns: true });
+  return CodexThreadTurnIdsSchema.parse(response).thread.turns.map((turn) => turn.id);
+}
+
+/** Fork the thread through `lastTurnId`, inclusive, without touching the source thread. */
+export async function forkCodexConversation(input: {
+  client: CodexRewindClient;
+  threadId: string;
+  lastTurnId: string;
+  cwd?: string | null;
+  model?: string | null;
+  serviceTier?: string | null;
+  config?: Record<string, unknown> | null;
+}): Promise<string> {
+  // A fork carries neither the parent's model nor its provider config.
+  const forked = await forkCodexThread(input.client, {
+    threadId: input.threadId,
+    lastTurnId: input.lastTurnId,
+    cwd: input.cwd ?? null,
+    model: input.model ?? null,
+    serviceTier: input.serviceTier ?? null,
+    ...(input.config ? { config: input.config } : {}),
+    excludeTurns: true,
+    persistExtendedHistory: true,
+  });
+  // A binary without lastTurnId ignores it and copies the whole thread.
+  const childTurnIds = await readCodexThreadTurnIds(input.client, forked.thread.id);
+  if (childTurnIds.at(-1) !== input.lastTurnId) {
+    throw new Error(
+      `Codex fork did not end at turn ${input.lastTurnId}; update Codex to a version with thread/fork lastTurnId`,
+    );
+  }
+  return forked.thread.id;
 }
 
 export async function revertCodexConversation(input: {

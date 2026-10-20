@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+const desktop = vi.hoisted(() => ({ mac: false }));
+vi.mock("@/constants/platform", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/constants/platform")>()),
+  getIsElectronMac: () => desktop.mac,
+}));
+
 vi.mock("@react-native-async-storage/async-storage", () => {
   const storage = new Map<string, string>();
   return {
@@ -78,6 +84,347 @@ function createDeterministicWorkspaceLayoutIds() {
 
 const workspaceLayoutIds = createDeterministicWorkspaceLayoutIds();
 const workspaceLayoutStore = createWorkspaceLayoutStore(workspaceLayoutIds);
+
+describe("macOS single-chat placement", () => {
+  beforeEach(() => {
+    desktop.mac = true;
+    return () => {
+      desktop.mac = false;
+    };
+  });
+
+  it("registers Explorer when a terminal deep link initializes the workspace", () => {
+    const store = createWorkspaceLayoutStore();
+    const workspaceKey = createWorkspaceKey();
+    store.setState({ layoutByWorkspace: {}, explorerSidebarPaneIdByWorkspace: {} });
+    const terminalTabId = store.getState().openTab({
+      workspaceKey,
+      target: { kind: "terminal", terminalId: "deep-linked-terminal" },
+      intent: "reveal",
+    });
+    const state = store.getState();
+    const layout = state.layoutByWorkspace[workspaceKey];
+    expect(state.explorerSidebarPaneIdByWorkspace[workspaceKey]).toBe("explorer");
+    expect(findPaneById(layout.root, "explorer")?.focusedTabId).toBe(terminalTabId);
+    expect(findPaneById(layout.root, "explorer")?.hidden).not.toBe(true);
+    expect(collectAllPanes(layout.root).map((pane) => pane.id)).toEqual(["main", "explorer"]);
+    expect(layout.focusedPaneId).toBe("main");
+    const main = findPaneById(layout.root, "main")!;
+    expect(
+      collectAllTabs(layout.root).find((tab) => tab.tabId === main.focusedTabId)?.target.kind,
+    ).toBe("draft");
+  });
+
+  it.each([
+    { kind: "terminal", terminalId: "new-chat-terminal" },
+    { kind: "changes_tree" },
+  ] as const)("keeps the new chat draft in main when its dock opens $kind", (tool) => {
+    const store = createWorkspaceLayoutStore();
+    const workspaceKey = createWorkspaceKey();
+    store.setState({ layoutByWorkspace: {}, explorerSidebarPaneIdByWorkspace: {} });
+    const draftTabId = store.getState().openTab({
+      workspaceKey,
+      target: { kind: "draft", draftId: "new-chat-draft" },
+      intent: "reveal",
+    });
+    const paneId = store.getState().showExplorerSidebar(workspaceKey);
+    const toolTabId = store.getState().openTab({
+      workspaceKey,
+      target: tool,
+      intent: "reveal",
+      placement: paneId ? { mode: "pane", paneId } : undefined,
+    });
+    const layout = store.getState().layoutByWorkspace[workspaceKey];
+    expect(findPaneById(layout.root, "main")?.focusedTabId).toBe(draftTabId);
+    expect(collectAllTabs(layout.root).filter((tab) => tab.target.kind === "draft")).toHaveLength(
+      1,
+    );
+    expect(findPaneById(layout.root, "explorer")?.focusedTabId).toBe(toolTabId);
+    expect(findPaneById(layout.root, "explorer")?.hidden).not.toBe(true);
+    expect(layout.focusedPaneId).toBe("main");
+  });
+
+  it("opens a chat launched from the Explorer launcher in main and keeps the launcher", () => {
+    const store = createWorkspaceLayoutStore();
+    const workspaceKey = createWorkspaceKey();
+    store.setState({ layoutByWorkspace: {}, explorerSidebarPaneIdByWorkspace: {} });
+    store
+      .getState()
+      .openTab({ workspaceKey, target: { kind: "agent", agentId: "chat" }, intent: "reveal" });
+    const paneId = store.getState().showExplorerSidebar(workspaceKey)!;
+    const launcherTabId = store.getState().openTab({
+      workspaceKey,
+      target: { kind: "new_tab" },
+      intent: "new",
+      placement: { mode: "pane", paneId },
+    })!;
+    const draftTabId = store
+      .getState()
+      .replaceTab(workspaceKey, launcherTabId, { kind: "draft", draftId: "explorer-agent" });
+    const layout = store.getState().layoutByWorkspace[workspaceKey];
+    expect(findPaneById(layout.root, "main")?.focusedTabId).toBe(draftTabId);
+    expect(findPaneById(layout.root, "explorer")?.focusedTabId).toBe(launcherTabId);
+    expect(findPaneById(layout.root, "explorer")?.hidden).not.toBe(true);
+    expect(layout.focusedPaneId).toBe("main");
+  });
+
+  it("opens Explorer on the launcher instead of Files and Changes", () => {
+    const store = createWorkspaceLayoutStore();
+    const workspaceKey = createWorkspaceKey();
+    store.setState({ layoutByWorkspace: {}, explorerSidebarPaneIdByWorkspace: {} });
+    store
+      .getState()
+      .openTab({ workspaceKey, target: { kind: "agent", agentId: "chat" }, intent: "reveal" });
+    store.getState().showExplorerSidebar(workspaceKey);
+    const layout = store.getState().layoutByWorkspace[workspaceKey];
+    const explorer = findPaneById(layout.root, "explorer");
+    expect(explorer?.hidden).not.toBe(true);
+    expect(
+      collectAllTabs(layout.root)
+        .filter((tab) => explorer?.tabIds.includes(tab.tabId))
+        .map((tab) => tab.target),
+    ).toEqual([{ kind: "new_tab" }]);
+  });
+
+  it("keeps Explorer open on the launcher after its last tool closes", () => {
+    const store = createWorkspaceLayoutStore();
+    const workspaceKey = createWorkspaceKey();
+    store.setState({ layoutByWorkspace: {}, explorerSidebarPaneIdByWorkspace: {} });
+    store
+      .getState()
+      .openTab({ workspaceKey, target: { kind: "agent", agentId: "chat" }, intent: "reveal" });
+    const terminalTabId = store.getState().openTab({
+      workspaceKey,
+      target: { kind: "terminal", terminalId: "shell" },
+      intent: "reveal",
+    })!;
+    store.getState().closeTab(workspaceKey, terminalTabId);
+    const layout = store.getState().layoutByWorkspace[workspaceKey];
+    const explorer = findPaneById(layout.root, "explorer");
+    expect(explorer?.hidden).not.toBe(true);
+    expect(
+      collectAllTabs(layout.root).find((tab) => tab.tabId === explorer?.focusedTabId)?.target,
+    ).toEqual({ kind: "new_tab" });
+    expect(findPaneById(layout.root, "main")?.focusedTabId).toBe("agent_chat");
+  });
+
+  it("opens a local draft in an empty main area without revealing Explorer", () => {
+    const store = createWorkspaceLayoutStore();
+    const workspaceKey = createWorkspaceKey();
+    store.setState({ layoutByWorkspace: {} });
+    const tabId = store
+      .getState()
+      .openTab({ workspaceKey, target: { kind: "new_tab" }, intent: "new" });
+    const layout = store.getState().layoutByWorkspace[workspaceKey];
+    expect(collectAllTabs(layout.root).find((tab) => tab.tabId === tabId)?.target.kind).toBe(
+      "draft",
+    );
+    expect(findPaneById(layout.root, "main")?.focusedTabId).toBe(tabId);
+    expect(findPaneById(layout.root, "explorer")?.hidden).toBe(true);
+  });
+
+  it("keeps the current chat while opening tools in Explorer despite a main placement", () => {
+    const store = createWorkspaceLayoutStore();
+    const workspaceKey = createWorkspaceKey();
+    store.setState({ layoutByWorkspace: {} });
+    const chat = store
+      .getState()
+      .openTab({ workspaceKey, target: { kind: "agent", agentId: "chat" }, intent: "reveal" });
+    for (const target of [
+      { kind: "terminal", terminalId: "shell" },
+      { kind: "browser", browserId: "browser" },
+      { kind: "file", path: "/repo/changed.ts" },
+      { kind: "working_diff" },
+      { kind: "setup", workspaceId: WORKSPACE_ID },
+      { kind: "provider_subagent", parentAgentId: "chat", subagentId: "child" },
+    ] as const) {
+      const tab = store.getState().openTab({
+        workspaceKey,
+        target,
+        intent: "reveal",
+        placement: { mode: "pane", paneId: "main" },
+      });
+      const layout = store.getState().layoutByWorkspace[workspaceKey];
+      expect(findPaneContainingTab(layout.root, tab!)?.id).toBe("explorer");
+      expect(findPaneById(layout.root, "main")?.focusedTabId).toBe(chat);
+      expect(layout.focusedPaneId).toBe("main");
+      expect(findPaneById(layout.root, "explorer")?.hidden).not.toBe(true);
+    }
+  });
+
+  it("deactivates a hidden Explorer browser and restores its identity when shown again", () => {
+    const store = createWorkspaceLayoutStore();
+    const workspaceKey = createWorkspaceKey();
+    store.setState({ layoutByWorkspace: {} });
+    store.getState().openTab({
+      workspaceKey,
+      target: { kind: "agent", agentId: "chat" },
+      intent: "reveal",
+    });
+    const browserTabId = store.getState().openTab({
+      workspaceKey,
+      target: { kind: "browser", browserId: "retained-browser" },
+      intent: "background",
+    })!;
+    const currentLayout = () => store.getState().layoutByWorkspace[workspaceKey];
+    expect(getFocusedBrowserId(currentLayout())).toBeNull();
+    expect(findPaneById(currentLayout().root, "explorer")?.hidden).toBe(true);
+
+    store.getState().focusTab(workspaceKey, browserTabId);
+    expect(getFocusedBrowserId(currentLayout())).toBe("retained-browser");
+    store.getState().hideExplorerSidebar(workspaceKey);
+    expect(findPaneById(currentLayout().root, "explorer")?.focusedTabId).toBe(browserTabId);
+    expect(getFocusedBrowserId(currentLayout())).toBeNull();
+    store.getState().showExplorerSidebar(workspaceKey);
+    expect(getFocusedBrowserId(currentLayout())).toBe("retained-browser");
+    expect(findPaneById(currentLayout().root, "explorer")?.focusedTabId).toBe(browserTabId);
+  });
+
+  it("preserves chats, terminal and browser identities, edited state and parent links when restoring a split layout", async () => {
+    const workspaceKey = createWorkspaceKey();
+    const persisted = {
+      root: {
+        kind: "group" as const,
+        group: {
+          id: "saved-root",
+          direction: "horizontal" as const,
+          sizes: [0.4, 0.3, 0.3],
+          children: [
+            createPane({
+              id: "main",
+              tabIds: ["chat-a", "edited"],
+              focusedTabId: "chat-a",
+              targetsByTabId: {
+                "chat-a": { kind: "agent", agentId: "agent-a" },
+                edited: { kind: "file", path: "/repo/a.ts" },
+              },
+              stateByTabId: { edited: { content: "unsaved", modified: true, scroll: 92 } },
+            }),
+            createPane({
+              id: "old-side",
+              tabIds: ["chat-b", "terminal", "browser"],
+              focusedTabId: "browser",
+              targetsByTabId: {
+                "chat-b": { kind: "agent", agentId: "agent-b" },
+                terminal: { kind: "terminal", terminalId: "live-terminal" },
+                browser: { kind: "browser", browserId: "live-browser" },
+              },
+              stateByTabId: {
+                browser: { url: "https://example.test/path", scroll: 12 },
+                terminal: { followTail: false },
+              },
+            }),
+            createPane({
+              id: "saved-explorer",
+              tabIds: ["files"],
+              hidden: true,
+              targetsByTabId: { files: { kind: "files" } },
+            }),
+          ],
+        },
+      },
+      focusedPaneId: "main",
+      parentTabIdByTabId: { edited: "chat-a", terminal: "chat-b" },
+    };
+    await AsyncStorage.setItem(
+      "workspace-layout-state",
+      JSON.stringify({
+        version: 2,
+        state: {
+          layoutByWorkspace: { [workspaceKey]: persisted },
+          explorerPaneIdByWorkspace: { [workspaceKey]: "saved-explorer" },
+          sidePaneIdByWorkspace: { [workspaceKey]: "old-side" },
+          explorerSidebarWidthByWorkspace: { [workspaceKey]: 456 },
+        },
+      }),
+    );
+    const store = createWorkspaceLayoutStore();
+    await store.persist.rehydrate();
+    const layout = store.getState().layoutByWorkspace[workspaceKey];
+    expect(collectAllPanes(layout.root).map((pane) => pane.id)).toEqual(["main", "saved-explorer"]);
+    expect(collectAllTabs(layout.root).sort((a, b) => a.tabId.localeCompare(b.tabId))).toEqual(
+      collectAllTabs(persisted.root).sort((a, b) => a.tabId.localeCompare(b.tabId)),
+    );
+    expect(findPaneById(layout.root, "main")?.tabIds).toEqual(["chat-a", "chat-b"]);
+    expect(findPaneById(layout.root, "main")?.focusedTabId).toBe("chat-a");
+    expect(findPaneById(layout.root, "saved-explorer")?.focusedTabId).toBe("browser");
+    expect(layout.parentTabIdByTabId).toEqual(persisted.parentTabIdByTabId);
+    expect(store.getState().explorerSidebarWidthByWorkspace[workspaceKey]).toBe(456);
+    expect(store.getState().sidePaneIdByWorkspace[workspaceKey]).toBeNull();
+    expect(getFocusedBrowserId(layout)).toBe("live-browser");
+    store.getState().focusTab(workspaceKey, "chat-b");
+    expect(
+      findPaneById(store.getState().layoutByWorkspace[workspaceKey].root, "main")?.focusedTabId,
+    ).toBe("chat-b");
+  });
+
+  it("keeps the chat and its draft when a launcher replacement requests a terminal", () => {
+    const store = createWorkspaceLayoutStore();
+    const workspaceKey = createWorkspaceKey();
+    store.setState({ layoutByWorkspace: {} });
+    const draft = store.getState().openTab({
+      workspaceKey,
+      target: { kind: "draft", draftId: "draft-content" },
+      intent: "reveal",
+    })!;
+    const terminal = store
+      .getState()
+      .replaceTab(workspaceKey, draft, { kind: "terminal", terminalId: "shell" });
+    expect(
+      store.getState().replaceTab(workspaceKey, draft, { kind: "terminal", terminalId: "shell" }),
+    ).toBe(terminal);
+    const layout = store.getState().layoutByWorkspace[workspaceKey];
+    expect(findPaneContainingTab(layout.root, draft)?.id).toBe("main");
+    expect(collectAllTabs(layout.root).find((tab) => tab.tabId === draft)?.target).toEqual({
+      kind: "draft",
+      draftId: "draft-content",
+    });
+    expect(findPaneContainingTab(layout.root, terminal!)?.id).toBe("explorer");
+    expect(findPaneById(layout.root, "main")?.focusedTabId).toBe(draft);
+    expect(
+      store.getState().splitPaneEmpty(workspaceKey, { targetPaneId: "main", position: "right" }),
+    ).toBeNull();
+    store.getState().moveTabToPane(workspaceKey, terminal!, "main");
+    expect(
+      findPaneContainingTab(store.getState().layoutByWorkspace[workspaceKey].root, terminal!)?.id,
+    ).toBe("explorer");
+  });
+
+  it("adds only a local draft when restoring a workspace containing tools alone", async () => {
+    const workspaceKey = createWorkspaceKey();
+    await AsyncStorage.setItem(
+      "workspace-layout-state",
+      JSON.stringify({
+        version: 2,
+        state: {
+          layoutByWorkspace: {
+            [workspaceKey]: {
+              root: createPane({
+                id: "main",
+                tabIds: ["terminal"],
+                targetsByTabId: { terminal: { kind: "terminal", terminalId: "keep-shell" } },
+              }),
+              focusedPaneId: "main",
+            },
+          },
+        },
+      }),
+    );
+    const store = createWorkspaceLayoutStore();
+    await store.persist.rehydrate();
+    const layout = store.getState().layoutByWorkspace[workspaceKey];
+    const main = findPaneById(layout.root, "main")!;
+    expect(main.tabIds).toHaveLength(1);
+    expect(
+      collectAllTabs(layout.root).find((tab) => tab.tabId === main.focusedTabId)?.target.kind,
+    ).toBe("draft");
+    expect(collectAllTabs(layout.root).find((tab) => tab.tabId === "terminal")?.target).toEqual({
+      kind: "terminal",
+      terminalId: "keep-shell",
+    });
+    expect(findPaneContainingTab(layout.root, "terminal")?.id).not.toBe("main");
+  });
+});
 
 it("observes open chats across unmounted workspaces until their tabs close", () => {
   const store = createWorkspaceLayoutStore(workspaceLayoutIds);
@@ -4240,6 +4587,42 @@ describe("workspace-layout-store actions", () => {
     const layout = workspaceLayoutStore.getState().layoutByWorkspace[workspaceKey];
     expect(findPaneById(layout.root, paneId)?.hidden).toBeUndefined();
     expect(findPaneById(layout.root, paneId)?.tabIds).toEqual(["changes_tree", "working_diff"]);
+  });
+
+  it("closing the last Explorer tab shows the launcher instead of hiding Explorer", () => {
+    const workspaceKey = createWorkspaceKey();
+    const store = workspaceLayoutStore.getState();
+    store.openTab({
+      workspaceKey: workspaceKey,
+      target: { kind: "agent", agentId: "kept" },
+      intent: "reveal",
+    });
+    const paneId = store.showExplorerSidebar(workspaceKey) as string;
+    for (const tabId of findPaneById(
+      workspaceLayoutStore.getState().layoutByWorkspace[workspaceKey].root,
+      paneId,
+    )!.tabIds.slice(1)) {
+      store.closeTab(workspaceKey, tabId);
+    }
+    const lastTabId = findPaneById(
+      workspaceLayoutStore.getState().layoutByWorkspace[workspaceKey].root,
+      paneId,
+    )!.tabIds[0]!;
+
+    store.closeTab(workspaceKey, lastTabId);
+
+    let layout = workspaceLayoutStore.getState().layoutByWorkspace[workspaceKey];
+    const explorer = findPaneById(layout.root, paneId);
+    expect(explorer?.hidden).toBeUndefined();
+    expect(explorer?.tabIds).toHaveLength(1);
+    const launcher = collectAllTabs(layout.root).find(
+      (tab) => tab.tabId === explorer?.focusedTabId,
+    );
+    expect(launcher?.target).toEqual({ kind: "new_tab" });
+
+    store.closeTab(workspaceKey, launcher!.tabId);
+    layout = workspaceLayoutStore.getState().layoutByWorkspace[workspaceKey];
+    expect(findPaneById(layout.root, paneId)?.hidden).toBe(true);
   });
 
   it("closing Files keeps Changes on screen without removing the final ordinary pane", () => {

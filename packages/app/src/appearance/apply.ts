@@ -1,24 +1,56 @@
 import { UnistylesRuntime } from "react-native-unistyles";
-import { resolveSyntaxColors, type SyntaxThemeId } from "@getpaseo/highlight";
+import { getIsElectronMac } from "@/constants/platform";
+import { resolveSyntaxColors, type SyntaxThemeId } from "./syntax-theme";
+import { REGISTERED_THEME_TINTS } from "@/styles/registered-themes";
 import {
+  buildDarkSemanticColors,
+  buildLightSemanticColors,
   DEFAULT_UI_FONT_STACK,
   DEFAULT_MONO_FONT_STACK,
   FONT_SIZE,
+  FONT_WEIGHT,
   REGISTERED_THEMES,
+  THEME_TO_UNISTYLES,
   type Theme,
+  type ThemeColorSettings,
+  type ThemeName,
+  type ThemeTint,
+  withColorOverrides,
 } from "@/styles/theme";
-import { applyRootUiFont } from "./apply-root-font";
+import { applyRootFonts } from "./apply-root-font";
 
 const ALL_THEME_KEYS = Object.keys(REGISTERED_THEMES) as (keyof typeof REGISTERED_THEMES)[];
+const BUILT_IN_THEME_NAMES = new Map(
+  (Object.entries(THEME_TO_UNISTYLES) as [ThemeName, string][]).map(([name, key]) => [key, name]),
+);
 
 export interface AppearanceInput {
   uiFontFamily: string; // "" -> default stack
+  contentFontFamily: string; // "" -> selected UI font
   monoFontFamily: string; // "" -> default stack
   uiBaseFontSize: number; // already clamped
   contentFontSize: number; // already clamped
   codeFontSize: number; // already clamped
+  codeFontWeight: Theme["codeFontWeight"];
+  contentFontWeight: Theme["contentFontWeight"];
+  uiFontWeight: Theme["uiFontWeight"];
   contentMaxWidth: number; // already clamped, default resolved
   syntaxTheme: SyntaxThemeId;
+  themeColors: ThemeColorSettings;
+}
+
+/**
+ * Built-in themes rebuild their semantic colors from the authored tint plus the user's
+ * colors, so clearing a color restores the original. Contributed themes keep theirs.
+ */
+function resolveTint(key: string, themeColors: ThemeColorSettings): ThemeTint | null {
+  const name = BUILT_IN_THEME_NAMES.get(key);
+  if (!name) return null;
+  const tint = REGISTERED_THEME_TINTS[name];
+  const overrides = themeColors[name] ?? {};
+  return tint.colorScheme === "light"
+    ? { colorScheme: "light", config: withColorOverrides(tint.config, overrides) }
+    : { colorScheme: "dark", config: withColorOverrides(tint.config, overrides) };
 }
 
 /**
@@ -55,14 +87,18 @@ function scaleFontSize(
  * and adaptive mode can flip light/dark — patching all keys keeps the active key
  * always current and makes ordering vs `setTheme`/`setAdaptiveThemes` irrelevant.
  *
- * The updater preserves the active theme wholesale (surfaces, accents,
- * terminal) and only patches the font ramp, content width, and syntax palette.
+ * The updater patches the font ramp, content width, syntax palette, and the
+ * built-in themes' semantic colors.
  * `updateTheme` replaces the stored theme rather than merging, so we spread
  * `...t` first.
  */
 export function applyAppearance(input: AppearanceInput): void {
   const ui = input.uiFontFamily.trim() || DEFAULT_UI_FONT_STACK;
+  const content = input.contentFontFamily.trim() || ui;
   const mono = input.monoFontFamily.trim() || DEFAULT_MONO_FONT_STACK;
+  const codeFontWeight = getIsElectronMac() ? input.codeFontWeight : null;
+  const contentFontWeight = getIsElectronMac() ? input.contentFontWeight : null;
+  const uiFontWeight = getIsElectronMac() ? input.uiFontWeight : null;
   const diffLineHeight = Math.round(input.codeFontSize * 1.5); // couple to code size
   const activeTheme = UnistylesRuntime.themeName;
   // Unistyles web emits after each registry patch. Updating the mounted theme
@@ -74,35 +110,57 @@ export function applyAppearance(input: AppearanceInput): void {
 
   for (const key of themeKeys) {
     UnistylesRuntime.updateTheme(key, (t) => {
-      const fontFamily = { ui, mono };
+      const tint = resolveTint(key, input.themeColors);
+      const fontFamily = { ui, content, mono };
       const fontSize = scaleFontSize(
         input.uiBaseFontSize,
         input.contentFontSize,
         input.codeFontSize,
       );
+      const fontWeight = { ...FONT_WEIGHT, normal: uiFontWeight ?? FONT_WEIGHT.normal };
       const lineHeight = { ...t.lineHeight, diff: diffLineHeight };
       if (t.colorScheme === "light") {
+        const semanticColors =
+          tint?.colorScheme === "light" ? buildLightSemanticColors(tint.config) : null;
         return {
           ...t,
           fontFamily,
+          codeFontWeight,
+          contentFontWeight,
+          uiFontWeight,
+          fontWeight,
           fontSize,
           lineHeight,
           contentMaxWidth: input.contentMaxWidth,
-          colors: { ...t.colors, syntax: resolveSyntaxColors(input.syntaxTheme, t.colorScheme) },
+          colors: {
+            ...t.colors,
+            ...semanticColors,
+            syntax: resolveSyntaxColors(input.syntaxTheme, t.colorScheme),
+          },
         };
       }
+      const semanticColors =
+        tint?.colorScheme === "dark" ? buildDarkSemanticColors(tint.config) : null;
       return {
         ...t,
         fontFamily,
+        codeFontWeight,
+        contentFontWeight,
+        uiFontWeight,
+        fontWeight,
         fontSize,
         lineHeight,
         contentMaxWidth: input.contentMaxWidth,
-        colors: { ...t.colors, syntax: resolveSyntaxColors(input.syntaxTheme, t.colorScheme) },
+        colors: {
+          ...t.colors,
+          ...semanticColors,
+          syntax: resolveSyntaxColors(input.syntaxTheme, t.colorScheme),
+        },
       };
     });
   }
 
-  // Web: apply the UI font app-wide (RN-web stamps a default font on every text
-  // element, so it can't be done through the theme alone). No-op on native.
-  applyRootUiFont(ui);
+  // Web: RN-web stamps a default font on each text element, so apply UI/content
+  // stacks through the scoped root rules as well as the theme. No-op on native.
+  applyRootFonts(ui, content, uiFontWeight);
 }

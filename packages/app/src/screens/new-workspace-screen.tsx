@@ -6,16 +6,22 @@ import type { AgentSnapshotPayload, CreationSnapshot } from "@getpaseo/protocol/
 import { encodeImages } from "@/utils/encode-images";
 import { getHostRuntimeStore } from "@/runtime/host-runtime";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
-import type { ReactNode } from "react";
+import type { ReactNode, RefObject } from "react";
 import { useTranslation } from "react-i18next";
 import { router } from "expo-router";
 import { Text, View } from "react-native";
-import { StyleSheet } from "react-native-unistyles";
+import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { createNameId } from "mnemonic-id";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Composer } from "@/composer";
 import { ComposerDock } from "@/composer/dock";
 import { useComposerEditingSession, useComposerFullscreen } from "@/composer/editing-session";
+import { PaseoLogo } from "@/components/icons/paseo-logo";
+import { getIsElectron, getIsElectronMac } from "@/constants/platform";
+import { BROWSER_NEW_TAB_URL } from "@/desktop/browser/new-tab-url";
+import { createWorkspaceBrowser } from "@/desktop/browser/store";
+import type { NewTabLauncher } from "@/workspace-tabs/launcher";
+import type { NewTabSelection } from "@/workspace-tabs/new-tab";
 import { FileDropZone } from "@/components/file-drop/file-drop-zone";
 import {
   resolveComposerAttachmentSubmitFormat,
@@ -25,6 +31,7 @@ import { TitlebarDragRegion } from "@/components/desktop/titlebar-drag-region";
 import { MenuHeader } from "@/components/headers/menu-header";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { useToast } from "@/contexts/toast-context";
+import { useBranchSwitcher } from "@/hooks/use-branch-switcher";
 import { useAgentInputDraft } from "@/composer/draft/input-draft";
 import { useForgeSearchQuery } from "@/git/use-forge-search-query";
 import { useCheckoutStatusQuery } from "@/git/use-status-query";
@@ -32,9 +39,16 @@ import { ensureCheckoutStatus } from "@/git/checkout-status-cache";
 import { useDaemonConfig } from "@/hooks/use-daemon-config";
 import { resolveTerminalProfiles } from "@getpaseo/protocol/terminal-profiles";
 import type { TerminalProfile } from "@getpaseo/protocol/messages";
-import { resolveLaunchTarget, type LaunchTarget } from "@/new-workspace-launch/target";
+import {
+  CHAT_LAUNCH_TARGET,
+  resolveLaunchTarget,
+  type LaunchTarget,
+} from "@/new-workspace-launch/target";
 import { useTerminalComposerState } from "@/new-workspace-launch/composer-state";
-import { runCreateTerminalWorkspace } from "./new-workspace-terminal";
+import {
+  runCreateTerminalWorkspace,
+  type CreateTerminalWorkspaceInput,
+} from "./new-workspace-terminal";
 import {
   useHostRuntimeClient,
   useHostRuntimeConnectionStatuses,
@@ -48,9 +62,18 @@ import {
   navigateToWorkspace,
   useLastWorkspaceSelection,
 } from "@/stores/navigation-active-workspace-store";
-import { normalizeWorkspaceDescriptor, type WorkspaceDescriptor } from "@/stores/session-store";
+import {
+  normalizeProjectDescriptor,
+  normalizeWorkspaceDescriptor,
+  type WorkspaceDescriptor,
+} from "@/stores/session-store";
 import { useWorkspace } from "@/stores/session-store-hooks";
-import { buildNewWorkspaceDraftKey, generateDraftId } from "@/stores/draft-keys";
+import {
+  buildDraftStoreKey,
+  buildNewWorkspaceDraftKey,
+  generateDraftId,
+} from "@/stores/draft-keys";
+import { useDraftStore } from "@/stores/draft-store";
 import { useOpenAddProject } from "@/hooks/use-open-add-project";
 import { isActiveCreateFlowForDraft, useCreateFlowStore } from "@/stores/create-flow-store";
 import {
@@ -73,6 +96,8 @@ import {
   type HostProjectListItem,
 } from "@/projects/host-projects";
 import { useProjectIcons } from "@/projects/icons";
+import { chatFolderParentPath } from "@/projects/chat-folder";
+import type { Theme } from "@/styles/theme";
 import type { ComposerAttachment } from "@/attachments/types";
 import { useDraftWorkspaceAttachmentScopeKey } from "@/attachments/workspace-attachments-store";
 import type { MessagePayload } from "@/composer/types";
@@ -108,7 +133,7 @@ import {
 } from "./new-workspace-initial-context";
 import { buildNewWorkspaceProjectIconTargets } from "./new-workspace/project-icon-targets";
 import { useNewWorkspaceProjectPicker } from "./new-workspace/project-picker";
-import { useNewWorkspaceForm } from "./new-workspace/form";
+import { useNewWorkspaceForm, type NewWorkspaceFormProps } from "./new-workspace/form";
 import { ImportSessionButton } from "./new-workspace/import-session-button";
 import { useImportSession } from "@/hooks/use-import-session";
 import {
@@ -118,6 +143,10 @@ import {
 } from "./workspace/terminals/state";
 import { captureWorkspaceDraftCleanup } from "./new-workspace/background-handoff";
 import { useNewWorkspaceScreenPresence } from "./new-workspace/screen-presence";
+import { NewChatExplorerDock, revealNewChatExplorer } from "./new-workspace/new-chat-explorer";
+
+const ThemedPaseoLogo = withUnistyles(PaseoLogo);
+const passiveColorMapping = (theme: Theme) => ({ color: theme.colors.foregroundExtraMuted });
 
 function useIsNewWorkspaceDraftHandoffActive(input: {
   draftId: string | undefined;
@@ -223,6 +252,52 @@ function useWorkspaceIsolation(input: {
   };
 }
 
+// Local isolation runs in the project checkout itself, so picking a branch
+// switches that checkout (with the same stash prompt as the diff pane switcher).
+function useLocalBranchControl(input: {
+  enabled: boolean;
+  serverId: string;
+  sourceDirectory: string | null;
+  checkoutStatus: { currentBranch: string | null } | null;
+  anchorRef: RefObject<View | null>;
+  isPending: boolean;
+}): NewWorkspaceFormProps["localBranch"] {
+  const { enabled, serverId, sourceDirectory, anchorRef, isPending } = input;
+  const currentBranch =
+    enabled && sourceDirectory ? (input.checkoutStatus?.currentBranch ?? null) : null;
+  const client = useHostRuntimeClient(serverId);
+  const isConnected = useHostRuntimeIsConnected(serverId);
+  const toast = useToast();
+  const queryClient = useQueryClient();
+  const { branchOptions, pendingBranch, isOpen, setIsOpen, handleBranchSelect } = useBranchSwitcher(
+    {
+      client,
+      normalizedServerId: serverId,
+      normalizedWorkspaceId: sourceDirectory ?? "",
+      workspaceDirectory: sourceDirectory,
+      currentBranchName: currentBranch,
+      isGitCheckout: currentBranch !== null,
+      isConnected,
+      toast,
+      queryClient,
+    },
+  );
+  const open = useCallback(() => setIsOpen(true), [setIsOpen]);
+
+  if (!currentBranch) return null;
+  return {
+    anchorRef,
+    open,
+    openState: isOpen,
+    onOpenChange: setIsOpen,
+    currentBranch,
+    triggerLabel: pendingBranch ?? currentBranch,
+    disabled: isPending || pendingBranch !== null,
+    options: branchOptions,
+    onSelect: handleBranchSelect,
+  };
+}
+
 function normalizeBranchDetails(
   data: { branchDetails?: BranchPickerDetail[]; branches?: string[] } | undefined,
 ): BranchPickerDetail[] {
@@ -280,12 +355,33 @@ interface WorkspaceCreationResult {
   agent?: AgentSnapshotPayload;
 }
 
+/** Opens a new chat dock tool in the workspace the dock just created. */
+async function createDockToolTarget(input: {
+  selection: Exclude<NewTabSelection, { kind: "agent" }>;
+  workspace: { id: string; workspaceDirectory: string };
+  createTerminal: CreateTerminalWorkspaceInput["createTerminal"];
+}): Promise<WorkspaceTabTarget> {
+  const { selection, workspace } = input;
+  if (selection.kind === "target") return selection.target;
+  if (selection.kind === "browser") {
+    const { browserId } = createWorkspaceBrowser(
+      getIsElectronMac() ? { initialUrl: BROWSER_NEW_TAB_URL } : undefined,
+    );
+    return { kind: "browser", browserId };
+  }
+  const { terminalId } = await input.createTerminal({
+    workspaceDirectory: workspace.workspaceDirectory,
+    workspaceId: workspace.id,
+  });
+  return { kind: "terminal", terminalId };
+}
+
 async function createMultiplicityWorkspace(input: {
   idempotencyKey: string;
   worktreeSlug: string;
   client: NonNullable<ReturnType<typeof useHostRuntimeClient>>;
   isolation: "local" | "worktree";
-  project: HostProjectListItem;
+  projectId: string;
   sourceDirectory: string;
   checkoutRequest: PickerCheckoutRequest | undefined;
   withInitialAgent: boolean;
@@ -300,8 +396,7 @@ async function createMultiplicityWorkspace(input: {
   serverId: string;
   createFailedMessage: string;
 }): Promise<WorkspaceCreationResult> {
-  const projectId = getHostProjectId(input.project, input.serverId);
-  if (!projectId) throw new Error("Project is not available on the selected host");
+  const { projectId } = input;
   const isWorktree = input.isolation === "worktree";
   const firstAgentContext = buildFirstAgentContext({
     prompt: input.prompt,
@@ -335,6 +430,37 @@ async function createMultiplicityWorkspace(input: {
     : normalizedWorkspace;
   input.mergeWorkspaces(input.serverId, [workspaceForInitialMerge]);
   return { workspace: normalizedWorkspace, agent: payload.agent };
+}
+
+interface ChatFolder {
+  projectId: string;
+  directoryPath: string;
+}
+
+/** Creates today's folder for a chat without a project; a taken name gets a fresh one. */
+async function createChatFolder(input: {
+  client: DaemonClient;
+  serverId: string;
+  name: string;
+}): Promise<ChatFolder> {
+  const parentPath = chatFolderParentPath(new Date());
+  for (let attempt = 1; ; attempt += 1) {
+    const payload = await input.client.createProjectDirectory({
+      parentPath,
+      name: attempt === 1 ? input.name : createNameId(),
+      createParents: true,
+    });
+    if (payload.project && payload.directoryPath) {
+      getHostRuntimeStore().acceptProjectSnapshot(
+        input.serverId,
+        normalizeProjectDescriptor(payload.project),
+      );
+      return { projectId: payload.project.projectId, directoryPath: payload.directoryPath };
+    }
+    if (payload.errorCode !== "directory_exists" || attempt === 3) {
+      throw new Error(payload.error ?? "Unable to create the chat folder");
+    }
+  }
 }
 
 interface CreateChatAgentInput {
@@ -645,6 +771,7 @@ function submitWorkspaceDraft(input: SubmitDraftInput): SubmitOutcome {
     workspaceId,
     target: submission.target,
   });
+  revealNewChatExplorer(serverId, workspaceId);
   return "navigated";
 }
 
@@ -846,6 +973,7 @@ function useNewWorkspaceInitialContext({
   };
 }
 
+// oxlint-disable-next-line complexity -- upstream screen plus the Mac new chat layout branches
 export function NewWorkspaceScreen({
   serverId,
   sourceDirectory: sourceDirectoryProp,
@@ -885,11 +1013,14 @@ export function NewWorkspaceScreen({
   // COMPAT(workspaceMultiplicity): added in v0.1.97, drop the gate when floor >= v0.1.97
   const supportsWorkspaceMultiplicity = useHostFeature(selectedServerId, "workspaceMultiplicity");
   const supportsForgeSearch = useHostFeature(selectedServerId, "forgeSearch");
+  // COMPAT(projectCreateDirectoryParents): added in Paseo Custom v0.11.0-beta.3-v1-beta4, remove gate after 2027-04-01.
+  const supportsChatFolders = useHostFeature(selectedServerId, "projectCreateDirectoryParents");
   const [creationIdentity] = useState(() => ({
     draftId: draftId ?? generateDraftId(),
     worktreeSlug: createNameId(),
   }));
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const chatFolderRef = useRef<ChatFolder | null>(null);
   const [creationResult, setCreationResult] = useState<
     WorkspaceCreationResult | { workspace: null }
   >({ workspace: null });
@@ -903,6 +1034,7 @@ export function NewWorkspaceScreen({
   const pickerAnchorRef = useRef<View>(null);
   const projectPickerAnchorRef = useRef<View>(null);
   const isolationPickerAnchorRef = useRef<View>(null);
+  const localBranchPickerAnchorRef = useRef<View>(null);
   const hostPickerAnchorRef = useRef<View | null>(null);
   const isDraftHandoffActive = useIsNewWorkspaceDraftHandoffActive({ draftId, selectedServerId });
   const isStillOnCreateScreen = useNewWorkspaceScreenPresence();
@@ -925,7 +1057,10 @@ export function NewWorkspaceScreen({
   // daemon-side falls back to chat rather than leaving a dead selection.
   const [manualLaunchTarget, setManualLaunchTarget] = useState<LaunchTarget | null>(null);
   const launchTarget = useMemo(
-    () => resolveLaunchTarget(manualLaunchTarget ?? formPreferences.launchTarget, terminalProfiles),
+    () =>
+      getIsElectronMac()
+        ? CHAT_LAUNCH_TARGET
+        : resolveLaunchTarget(manualLaunchTarget ?? formPreferences.launchTarget, terminalProfiles),
     [manualLaunchTarget, formPreferences.launchTarget, terminalProfiles],
   );
   const [terminalPromptText, setTerminalPromptText] = useState("");
@@ -967,6 +1102,8 @@ export function NewWorkspaceScreen({
     selectedProjectOptionId,
     projectTriggerLabel,
     handleSelectProjectOption: selectProjectOption,
+    projectCleared,
+    clearProject,
   } = useNewWorkspaceProjectPicker({
     selectedServerId,
     projects,
@@ -1043,6 +1180,15 @@ export function NewWorkspaceScreen({
       supportsMultiplicity: supportsWorkspaceMultiplicity,
       worktreeSupport,
     });
+
+  const localBranch = useLocalBranchControl({
+    enabled: effectiveIsolation === "local",
+    serverId: selectedServerId,
+    sourceDirectory: selectedSourceDirectory,
+    checkoutStatus,
+    anchorRef: localBranchPickerAnchorRef,
+    isPending,
+  });
 
   const branchSuggestionsQuery = useQuery({
     queryKey: [
@@ -1153,6 +1299,11 @@ export function NewWorkspaceScreen({
     [clearPickerSelectionForTargetChange, selectProjectOption, selectedProjectOptionId],
   );
 
+  const handleClearProject = useCallback(() => {
+    clearProject();
+    clearPickerSelectionForTargetChange(selectedProjectOptionId, "");
+  }, [clearPickerSelectionForTargetChange, clearProject, selectedProjectOptionId]);
+
   const handleSelectWorkspaceHost = useCallback(
     (id: string) => {
       handleSelectHost(id);
@@ -1229,12 +1380,46 @@ export function NewWorkspaceScreen({
       if (creationResult.workspace) {
         return creationResult;
       }
+      if (projectCleared) {
+        const connectedClient = withConnectedClient();
+        // One folder per draft, so retrying a failed create reuses it.
+        chatFolderRef.current ??= await createChatFolder({
+          client: connectedClient,
+          serverId: selectedServerId,
+          name: creationIdentity.worktreeSlug,
+        });
+        const { directoryPath } = chatFolderRef.current;
+        const chatFolderWorkspace = await createMultiplicityWorkspace({
+          idempotencyKey: creationIdentity.draftId,
+          worktreeSlug: creationIdentity.worktreeSlug,
+          client: connectedClient,
+          isolation: "local",
+          projectId: chatFolderRef.current.projectId,
+          sourceDirectory: directoryPath,
+          checkoutRequest: undefined,
+          withInitialAgent: input.withInitialAgent,
+          prompt: input.prompt,
+          attachments: input.attachments,
+          // The composer has no cwd without a project; the agent runs in the chat folder.
+          agent: input.agent?.config
+            ? { ...input.agent, config: { ...input.agent.config, cwd: directoryPath } }
+            : input.agent,
+          onEvent: input.onEvent,
+          mergeWorkspaces,
+          serverId: selectedServerId,
+          createFailedMessage: t("newWorkspace.errors.createWorktreeFailed"),
+        });
+        setCreationResult(chatFolderWorkspace);
+        return chatFolderWorkspace;
+      }
       if (!selectedProject) {
         throw new Error("Choose a project");
       }
       if (!selectedSourceDirectory) {
         throw new Error("Choose a host for this project");
       }
+      const hostProjectId = getHostProjectId(selectedProject, selectedServerId);
+      if (!hostProjectId) throw new Error("Project is not available on the selected host");
       const connectedClient = withConnectedClient();
       const createsWorktree = !supportsWorkspaceMultiplicity || effectiveIsolation === "worktree";
       const checkoutStatusForCreate = createsWorktree
@@ -1255,7 +1440,7 @@ export function NewWorkspaceScreen({
         worktreeSlug: creationIdentity.worktreeSlug,
         client: connectedClient,
         isolation: createsWorktree ? "worktree" : "local",
-        project: selectedProject,
+        projectId: hostProjectId,
         sourceDirectory: selectedSourceDirectory,
         checkoutRequest,
         withInitialAgent: input.withInitialAgent,
@@ -1275,6 +1460,7 @@ export function NewWorkspaceScreen({
       creationResult,
       effectiveIsolation,
       mergeWorkspaces,
+      projectCleared,
       queryClient,
       selectedItem,
       selectedProject,
@@ -1306,6 +1492,7 @@ export function NewWorkspaceScreen({
               outcome = "navigated";
               leaveFullscreen();
               navigateToWorkspace({ serverId: targetServerId, workspaceId });
+              revealNewChatExplorer(targetServerId, workspaceId);
             },
           });
           // Nothing navigated, so this screen may still be mounted under another route. Release
@@ -1365,6 +1552,33 @@ export function NewWorkspaceScreen({
     ],
   );
 
+  const createWorkspaceTerminal = useCallback(
+    async (input: Parameters<CreateTerminalWorkspaceInput["createTerminal"]>[0]) => {
+      const connectedClient = withConnectedClient();
+      const createdTerminal = await connectedClient.createTerminal(
+        input.workspaceDirectory,
+        input.name,
+        undefined,
+        { command: input.command, args: input.args, workspaceId: input.workspaceId },
+      );
+      const terminal = createdTerminal.terminal;
+      if (!terminal) {
+        throw new Error(createdTerminal.error ?? t("newWorkspace.errors.createWorktreeFailed"));
+      }
+      queryClient.setQueryData<ListTerminalsPayload>(
+        buildTerminalsQueryKey(selectedServerId, input.workspaceDirectory, input.workspaceId),
+        (current) =>
+          upsertCreatedTerminalPayload({
+            current,
+            terminal,
+            workspaceDirectory: input.workspaceDirectory,
+          }),
+      );
+      return { terminalId: terminal.id };
+    },
+    [queryClient, selectedServerId, t, withConnectedClient],
+  );
+
   const handleSubmitTerminalLaunch = useCallback(async () => {
     try {
       setErrorMessage(null);
@@ -1377,29 +1591,7 @@ export function NewWorkspaceScreen({
         profile: selectedTerminalProfile,
         profileName: selectedTerminalProfile?.name,
         ensureWorkspace: async (request) => (await ensureWorkspace(request)).workspace,
-        createTerminal: async (input) => {
-          const connectedClient = withConnectedClient();
-          const createdTerminal = await connectedClient.createTerminal(
-            input.workspaceDirectory,
-            input.name,
-            undefined,
-            { command: input.command, args: input.args, workspaceId: input.workspaceId },
-          );
-          const terminal = createdTerminal.terminal;
-          if (!terminal) {
-            throw new Error(createdTerminal.error ?? t("newWorkspace.errors.createWorktreeFailed"));
-          }
-          queryClient.setQueryData<ListTerminalsPayload>(
-            buildTerminalsQueryKey(selectedServerId, input.workspaceDirectory, input.workspaceId),
-            (current) =>
-              upsertCreatedTerminalPayload({
-                current,
-                terminal,
-                workspaceDirectory: input.workspaceDirectory,
-              }),
-          );
-          return { terminalId: terminal.id };
-        },
+        createTerminal: createWorkspaceTerminal,
         sendTerminalInput: (terminalId, data) => {
           withConnectedClient().sendTerminalInput(terminalId, { type: "input", data });
         },
@@ -1414,6 +1606,7 @@ export function NewWorkspaceScreen({
           outcome = "navigated";
           leaveFullscreen();
           navigateToWorkspace({ serverId: targetServerId, workspaceId, target });
+          revealNewChatExplorer(targetServerId, workspaceId);
         },
       });
       if (outcome === "background") {
@@ -1426,20 +1619,110 @@ export function NewWorkspaceScreen({
       toast.error(message);
     }
   }, [
+    createWorkspaceTerminal,
     ensureWorkspace,
     isStillOnCreateScreen,
     launchTarget,
-    queryClient,
     selectedServerId,
     selectedSourceDirectory,
     selectedTerminalProfile,
-    t,
     terminalPromptText,
     toast,
     leaveFullscreen,
     updateFormPreferences,
     withConnectedClient,
   ]);
+
+  // The tool needs the workspace the first message would create, so create it now and move the
+  // unsent draft, with its provider setup, into the workspace's chat draft.
+  const clearChatDraft = chatDraft.clear;
+  const handleOpenExplorerTool = useCallback(
+    async (selection: NewTabSelection) => {
+      if (selection.kind === "agent" || isPending) return;
+      try {
+        setErrorMessage(null);
+        setPendingAction(selection.kind === "terminal" ? "terminal" : "empty");
+        const draft = useDraftStore.getState().getDraftInput(draftKey);
+        const { workspace: createdWorkspace } = await ensureWorkspace({
+          cwd: selectedSourceDirectory ?? "",
+          // Names the workspace and branch after the unsent draft, as the terminal launcher does.
+          prompt: draft?.text ?? "",
+          attachments: [],
+          withInitialAgent: false,
+        });
+        const toolTarget = await createDockToolTarget({
+          selection,
+          workspace: createdWorkspace,
+          createTerminal: createWorkspaceTerminal,
+        });
+        if (!isStillOnCreateScreen()) {
+          setPendingAction(null);
+          return;
+        }
+        const workspaceDraftId = creationIdentity.draftId;
+        if (draft) {
+          useDraftStore.getState().saveDraftInput({
+            draftKey: buildDraftStoreKey({
+              serverId: selectedServerId,
+              agentId: workspaceDraftId,
+              draftId: workspaceDraftId,
+            }),
+            draft,
+          });
+        }
+        clearChatDraft("sent");
+        const provider = composerState?.selectedProvider;
+        navigateToWorkspace({
+          serverId: selectedServerId,
+          workspaceId: createdWorkspace.id,
+          target: {
+            kind: "draft",
+            draftId: workspaceDraftId,
+            ...(composerState && provider
+              ? {
+                  setup: buildWorkspaceDraftSetupFromComposer({
+                    cwd: createdWorkspace.workspaceDirectory,
+                    provider,
+                    composerState,
+                  }),
+                }
+              : {}),
+          },
+        });
+        revealNewChatExplorer(selectedServerId, createdWorkspace.id, toolTarget);
+      } catch (error) {
+        const message = toErrorMessage(error);
+        setPendingAction(null);
+        setErrorMessage(message);
+        toast.error(message);
+      }
+    },
+    [
+      clearChatDraft,
+      composerState,
+      createWorkspaceTerminal,
+      creationIdentity,
+      draftKey,
+      ensureWorkspace,
+      isPending,
+      isStillOnCreateScreen,
+      selectedServerId,
+      selectedSourceDirectory,
+      toast,
+    ],
+  );
+  const explorerLauncher = useMemo<NewTabLauncher>(
+    () => ({
+      showChanges: !projectCleared && worktreeSupport !== "unsupported",
+      showPullRequest: false,
+      showBrowser: getIsElectron(),
+      terminalDisabled: isPending,
+      launch: (selection) => {
+        void handleOpenExplorerTool(selection);
+      },
+    }),
+    [handleOpenExplorerTool, isPending, projectCleared, worktreeSupport],
+  );
 
   const agentControlsWithDisabled = useMemo(
     () =>
@@ -1475,6 +1758,9 @@ export function NewWorkspaceScreen({
       supportsWorkspaceMultiplicity,
       onSelect: handleSelectProjectOption,
       onAddProject: handleAddProject,
+      cleared: projectCleared,
+      canClear: supportsChatFolders,
+      onClear: handleClearProject,
     },
     host: {
       anchorRef: hostPickerAnchorRef,
@@ -1511,6 +1797,7 @@ export function NewWorkspaceScreen({
       emptyText: pickerEmptyText,
       showRefPicker,
     },
+    localBranch,
     launch: {
       serverId: selectedServerId,
       target: launchTarget,
@@ -1562,7 +1849,7 @@ export function NewWorkspaceScreen({
       allowEmptySubmit={true}
       submitButtonAccessibilityLabel={t("newWorkspace.create")}
       submitButtonTestID="workspace-create-submit"
-      submitIcon="return"
+      submitIcon={getIsElectronMac() ? "arrow" : "return"}
       isSubmitLoading={isPending}
       waitForForgeAutoAttachOnSubmit
       submitBehavior="preserve-and-lock"
@@ -1588,9 +1875,12 @@ export function NewWorkspaceScreen({
       <NewWorkspaceLayout
         isCompact={isCompact}
         fullscreen={isComposerFullscreen}
+        project={selectedProject}
+        serverId={selectedServerId}
         title={t("newWorkspace.title")}
         formStack={formStack}
         onImportSession={importSession.open}
+        explorerLauncher={explorerLauncher}
       >
         {composer}
         {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
@@ -1624,19 +1914,57 @@ function useNewWorkspaceComposerEditing() {
 function NewWorkspaceLayout({
   isCompact,
   fullscreen,
+  project,
+  serverId,
   title,
   formStack,
   onImportSession,
+  explorerLauncher,
   children,
 }: {
   isCompact: boolean;
   /** The composer covers the screen; the header leaves and the dock fills the content. */
   fullscreen: boolean;
+  project: Pick<HostProjectListItem, "projectName"> | null;
+  serverId: string | null;
   title: string;
   formStack: ReactNode;
   onImportSession: () => void;
+  explorerLauncher: NewTabLauncher;
   children: ReactNode;
 }) {
+  const { t } = useTranslation();
+  if (getIsElectronMac() && !isCompact) {
+    const projectName = project?.projectName;
+    return (
+      <View style={styles.content}>
+        <View style={styles.desktopRow}>
+          <View style={styles.desktopLayout}>
+            <View style={styles.desktopHero} pointerEvents="none">
+              <View aria-hidden>
+                <ThemedPaseoLogo size={56} uniProps={passiveColorMapping} />
+              </View>
+              <Text
+                style={styles.desktopHeroTitle}
+                accessibilityRole="header"
+                testID="desktop-new-chat-hero"
+              >
+                {projectName
+                  ? t("desktopChat.startInProject", { project: projectName })
+                  : t("desktopChat.startWork")}
+              </Text>
+            </View>
+            <View style={styles.desktopSetupRail}>
+              <View style={styles.desktopSetup}>{formStack}</View>
+            </View>
+            {/* Mac imports through History and Cmd+K, like Codex keeping this area clear. */}
+            {children}
+          </View>
+          <NewChatExplorerDock serverId={serverId ?? ""} launcher={explorerLauncher} />
+        </View>
+      </View>
+    );
+  }
   // In the header on compact layouts, under the composer otherwise.
   const importSessionButton = <ImportSessionButton compact={isCompact} onPress={onImportSession} />;
   // Compact has no title: the fields name themselves. The free space above pushes them down onto
@@ -1674,6 +2002,31 @@ function NewWorkspaceLayout({
 }
 
 const styles = StyleSheet.create((theme) => ({
+  desktopRow: { flex: 1, flexDirection: "row" },
+  desktopLayout: { flex: 1, minWidth: 0 },
+  desktopHero: {
+    flex: 1,
+    minHeight: 0,
+    overflow: "hidden",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: theme.spacing[6],
+    padding: theme.spacing[4],
+    paddingBottom: theme.spacing[4] + theme.spacing[6],
+  },
+  desktopHeroTitle: {
+    maxWidth: theme.contentMaxWidth,
+    textAlign: "center",
+    fontSize: theme.fontSize["4xl"],
+    fontWeight: theme.fontWeight.normal,
+    color: theme.colors.foreground,
+  },
+  // Matches the composer's inset and width; the tray insets itself from there.
+  desktopSetupRail: {
+    paddingHorizontal: theme.spacing[4],
+    alignItems: "center",
+  },
+  desktopSetup: { width: "100%", maxWidth: theme.contentMaxWidth },
   container: {
     flex: 1,
     backgroundColor: theme.colors.surface0,

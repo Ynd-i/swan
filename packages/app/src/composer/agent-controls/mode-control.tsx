@@ -27,6 +27,8 @@ import { showProviderNoticeToast } from "@/utils/provider-notice-toast";
 import type { AgentMode } from "@getpaseo/protocol/agent-types";
 import type { AgentProviderDefinition } from "@getpaseo/protocol/provider-manifest";
 import { getAgentModeIcon, getAgentModeOptionIcon } from "@/agent-controls/icons";
+import { getSelectableAgentModes } from "@/agent-controls/policy";
+import { getIsElectronMac } from "@/constants/platform";
 interface ModeComboboxOptionProps {
   option: ComboboxOption;
   selected: boolean;
@@ -103,11 +105,16 @@ export function AgentModeControl({
 
   const Icon = getAgentModeIcon(provider, selectedMode?.id ?? "", providerDefinitions);
   const iconColor = theme.colors.foregroundMuted;
-  const selectedModeLabel = selectedMode ? formatAgentModeLabel(selectedMode) : "";
+  const selectedModeLabel = selectedMode ? formatAgentModeLabel(selectedMode, provider) : "";
 
+  // The trigger keeps showing a planning mode's own label; only the list and cycling are filtered.
+  const selectableModes = useMemo(
+    () => (surface === "toolbar" ? getSelectableAgentModes(modeOptions) : modeOptions),
+    [modeOptions, surface],
+  );
   const allOptions = useMemo<ComboboxOption[]>(
-    () => modeOptions.map((m) => ({ id: m.id, label: formatAgentModeLabel(m) })),
-    [modeOptions],
+    () => selectableModes.map((m) => ({ id: m.id, label: formatAgentModeLabel(m, provider) })),
+    [selectableModes, provider],
   );
   const options = useMemo<ComboboxOption[]>(() => {
     const q = normalizeSearchQuery(searchQuery);
@@ -141,18 +148,21 @@ export function AgentModeControl({
     (action: KeyboardActionDefinition): boolean => {
       if (action.id !== "message-input.mode-cycle") return false;
       if (disabled || !isActiveComposer) return false;
-      const nextModeId = resolveNextAgentModeId({ modeOptions, selectedMode: selectedModeId });
+      const nextModeId = resolveNextAgentModeId({
+        modeOptions: selectableModes,
+        selectedMode: selectedModeId,
+      });
       if (!nextModeId) return false;
       onSelectMode(nextModeId);
       return true;
     },
-    [disabled, isActiveComposer, modeOptions, onSelectMode, selectedModeId],
+    [disabled, isActiveComposer, selectableModes, onSelectMode, selectedModeId],
   );
 
   useKeyboardActionHandler({
     handlerId: keyboardHandlerIdRef.current,
     actions: ["message-input.mode-cycle"],
-    enabled: isActiveComposer && !disabled && modeOptions.length > 1,
+    enabled: isActiveComposer && !disabled && selectableModes.length > 1,
     priority: 200,
     handle: handleKeyboardAction,
   });
@@ -203,7 +213,7 @@ export function AgentModeControl({
             label={t("agentControls.mode.title")}
             value={selectedModeLabel}
             showToolbarLabel={presentation.showModeLabel}
-            showCaret={surface === "toolbar" && presentation.showCarets}
+            showCaret={surface === "toolbar" && presentation.showCarets && !getIsElectronMac()}
             open={open}
             disabled={disabled}
             onPress={handlePress}
@@ -216,7 +226,10 @@ export function AgentModeControl({
         <TooltipContent side="top" align="center" offset={8}>
           <View style={styles.tooltipRow}>
             <Text style={styles.tooltipText}>{t(getAgentControlHintKey("mode"))}</Text>
-            {isActiveComposer && cycleShortcutKeys ? <Shortcut chord={cycleShortcutKeys} /> : null}
+            {/* On the Mac desktop Shift+Tab toggles plan instead (plan-mode.tsx). */}
+            {isActiveComposer && cycleShortcutKeys && !getIsElectronMac() ? (
+              <Shortcut chord={cycleShortcutKeys} />
+            ) : null}
           </View>
         </TooltipContent>
       </Tooltip>

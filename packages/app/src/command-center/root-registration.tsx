@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { router, type Href } from "expo-router";
+import { router, usePathname, type Href } from "expo-router";
 import { useTranslation } from "react-i18next";
 import {
   CalendarClock,
@@ -13,8 +13,12 @@ import {
   PanelLeft,
   Plus,
   Settings,
+  Search,
+  SquarePen,
+  FolderOpen,
 } from "lucide-react-native";
 import { withUnistyles } from "react-native-unistyles";
+import { getIsElectronMac } from "@/constants/platform";
 import { getIsElectronRuntime, useIsCompactFormFactor } from "@/constants/layout";
 import { useKeyboardShortcutOverrides } from "@/hooks/use-keyboard-shortcut-overrides";
 import { useOpenAddProject } from "@/hooks/use-open-add-project";
@@ -31,12 +35,20 @@ import {
   buildSchedulesRoute,
   buildSessionsRoute,
   buildSettingsRoute,
+  parseHostWorkspaceRouteFromPathname,
 } from "@/utils/host-routes";
 import { getShortcutOs } from "@/utils/shortcut-platform";
 import type { CommandCenterContribution, CommandCenterIconProps } from "./contributions";
 import { useCommandCenterActions } from "./provider";
 import { buildGroupingContribution } from "./root-contributions";
 
+const ThemedSearch = withUnistyles(Search, (theme) => ({ color: theme.colors.foregroundMuted }));
+const ThemedSquarePen = withUnistyles(SquarePen, (theme) => ({
+  color: theme.colors.foregroundMuted,
+}));
+const ThemedFolderOpen = withUnistyles(FolderOpen, (theme) => ({
+  color: theme.colors.foregroundMuted,
+}));
 const ThemedPlus = withUnistyles(Plus, (theme) => ({ color: theme.colors.foregroundMuted }));
 const ThemedFolderPlus = withUnistyles(FolderPlus, (theme) => ({
   color: theme.colors.foregroundMuted,
@@ -64,10 +76,16 @@ const ThemedPanelLeft = withUnistyles(PanelLeft, (theme) => ({
 }));
 
 function PlusIcon({ size }: CommandCenterIconProps) {
+  if (getIsElectronMac()) return <ThemedSquarePen size={size} strokeWidth={2.2} />;
   return <ThemedPlus size={size} strokeWidth={2.4} />;
 }
 
+function SearchIcon({ size }: CommandCenterIconProps) {
+  return <ThemedSearch size={size} strokeWidth={2.2} />;
+}
+
 function AddProjectIcon({ size }: CommandCenterIconProps) {
+  if (getIsElectronMac()) return <ThemedFolderOpen size={size} strokeWidth={2.2} />;
   return <ThemedFolderPlus size={size} strokeWidth={2.2} />;
 }
 
@@ -109,6 +127,9 @@ function PanelLeftIcon({ size }: CommandCenterIconProps) {
 
 export function CommandCenterRootActions() {
   const keyboardActionDispatcher = useKeyboardActionDispatcher();
+  const macChat = getIsElectronMac();
+  const pathname = usePathname();
+  const setCommandCenterOpen = useKeyboardShortcutsStore((state) => state.setCommandCenterOpen);
   const { t } = useTranslation();
   const { overrides } = useKeyboardShortcutOverrides();
   const shortcutsAvailable = useKeyboardShortcutsAvailable();
@@ -132,6 +153,9 @@ export function CommandCenterRootActions() {
     [],
   );
   const actions = useMemo<CommandCenterContribution[]>(() => {
+    const sectionTitle = t(
+      macChat ? "shell.commandCenter.quickActions" : "shell.commandCenter.actions",
+    );
     const availableActions: CommandCenterContribution[] = [
       {
         id: "add-project",
@@ -139,15 +163,15 @@ export function CommandCenterRootActions() {
         groupRank: 0,
         rank: 0,
         keywords: ["open", "project", "folder", "workspace", "repo"],
-        visibility: "query",
+        visibility: macChat ? "always" : "query",
         run: () => {
           clearCommandCenterFocusRestoreElement();
           openAddProject();
         },
         presentation: {
           kind: "action",
-          title: t("shell.commandCenter.addProject"),
-          sectionTitle: t("shell.commandCenter.actions"),
+          title: t(macChat ? "shell.commandCenter.openFolder" : "shell.commandCenter.addProject"),
+          sectionTitle,
           icon: AddProjectIcon,
           // The help id remains "new-agent" because user overrides are keyed by its binding id.
           shortcutKeys:
@@ -166,8 +190,8 @@ export function CommandCenterRootActions() {
         },
         presentation: {
           kind: "action",
-          title: t("sidebar.actions.newWorkspace"),
-          sectionTitle: t("shell.commandCenter.actions"),
+          title: t(macChat ? "desktopChat.newChat" : "sidebar.actions.newWorkspace"),
+          sectionTitle,
           icon: PlusIcon,
           shortcutKeys:
             resolveShortcutKeysForAction("new-workspace", overrides, shortcutPlatform) ?? undefined,
@@ -187,7 +211,7 @@ export function CommandCenterRootActions() {
         presentation: {
           kind: "action",
           title: t("importSession.title"),
-          sectionTitle: t("shell.commandCenter.actions"),
+          sectionTitle,
           icon: ImportIcon,
         },
       },
@@ -205,7 +229,7 @@ export function CommandCenterRootActions() {
         presentation: {
           kind: "action",
           title: t("shell.commandCenter.home"),
-          sectionTitle: t("shell.commandCenter.actions"),
+          sectionTitle,
           icon: HomeIcon,
         },
       },
@@ -223,7 +247,7 @@ export function CommandCenterRootActions() {
         presentation: {
           kind: "action",
           title: t("sidebar.sections.sessions"),
-          sectionTitle: t("shell.commandCenter.actions"),
+          sectionTitle,
           icon: HistoryIcon,
         },
       },
@@ -241,7 +265,7 @@ export function CommandCenterRootActions() {
         presentation: {
           kind: "action",
           title: t("sidebar.sections.schedules"),
-          sectionTitle: t("shell.commandCenter.actions"),
+          sectionTitle,
           icon: SchedulesIcon,
         },
       },
@@ -259,7 +283,7 @@ export function CommandCenterRootActions() {
         presentation: {
           kind: "action",
           title: t("sidebar.actions.settings"),
-          sectionTitle: t("shell.commandCenter.actions"),
+          sectionTitle,
           icon: SettingsIcon,
           shortcutKeys:
             resolveShortcutKeysForAction("toggle-settings", overrides, shortcutPlatform) ??
@@ -286,7 +310,7 @@ export function CommandCenterRootActions() {
         presentation: {
           kind: "action",
           title: t("settings.shortcuts.help.toggleLeftSidebar"),
-          sectionTitle: t("shell.commandCenter.actions"),
+          sectionTitle,
           icon: PanelLeftIcon,
           shortcutKeys:
             resolveShortcutKeysForAction("toggle-left-sidebar", overrides, shortcutPlatform) ??
@@ -294,6 +318,32 @@ export function CommandCenterRootActions() {
         },
       },
     ];
+
+    if (macChat) {
+      availableActions.push({
+        id: "search-files",
+        group: "actions",
+        groupRank: 0,
+        rank: 1.5,
+        keywords: ["search", "files", "find"],
+        visibility: "always",
+        run: () => {
+          if (parseHostWorkspaceRouteFromPathname(pathname)) {
+            setCommandCenterOpen(true, "files");
+          } else {
+            keyboardActionDispatcher.dispatch({ id: "workspace.project.pick", scope: "workspace" });
+          }
+        },
+        presentation: {
+          kind: "action",
+          title: t("settings.shortcuts.help.searchFiles"),
+          sectionTitle: t("shell.commandCenter.quickActions"),
+          icon: SearchIcon,
+          shortcutKeys:
+            resolveShortcutKeysForAction("search-files", overrides, shortcutPlatform) ?? undefined,
+        },
+      });
+    }
 
     if (shortcutsAvailable) {
       availableActions.push({
@@ -307,7 +357,7 @@ export function CommandCenterRootActions() {
         presentation: {
           kind: "action",
           title: t("sidebar.help.shortcuts"),
-          sectionTitle: t("shell.commandCenter.actions"),
+          sectionTitle,
           icon: KeyboardIcon,
           shortcutKeys:
             resolveShortcutKeysForAction("show-shortcuts", overrides, shortcutPlatform) ??
@@ -331,6 +381,9 @@ export function CommandCenterRootActions() {
 
     return availableActions;
   }, [
+    macChat,
+    pathname,
+    setCommandCenterOpen,
     groupMode,
     homeRoute,
     keyboardActionDispatcher,

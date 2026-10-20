@@ -117,7 +117,11 @@ export interface DesktopWindowBridge {
 }
 
 export interface DesktopWindowModuleBridge {
-  openNew?: (options?: { pendingOpenProjectPath?: string | null }) => Promise<void>;
+  /** `agentLink` is a `paseo://h/…/agent/…` link; the new window opens on that chat. */
+  openNew?: (options?: {
+    pendingOpenProjectPath?: string | null;
+    agentLink?: string;
+  }) => Promise<void>;
   getCurrentWindow?: () => DesktopWindowBridge;
 }
 

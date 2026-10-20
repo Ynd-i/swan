@@ -2,7 +2,7 @@ import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   PROVIDER_CAPABILITIES,
   ProviderEventSchema,
@@ -13,7 +13,7 @@ import {
   type ProviderLaunch,
   type ProviderPersistence,
 } from "@getpaseo/plugin/server/provider";
-import { signalPlan } from "./internal/signals.js";
+import { signalPlan, signalProcess } from "./internal/signals.js";
 import { createAntigravityProvider } from "./provider.js";
 
 const temporary: string[] = [];
@@ -528,16 +528,25 @@ it("resumes after connection close without replay or another system prefix", asy
 it.each(["auth", "exit", "stderr"])(
   "reports startup %s without waiting for init forever",
   async (startup) => {
-    const h = await harness({ AGY_TEST_STARTUP: startup });
-    await h.open();
-    expect(h.events.filter((event) => event.type === "session.ready")).toEqual([]);
-    const failure = h.events.find((event) => event.type === "request.failed");
-    expect(failure).toMatchObject({
-      type: "request.failed",
-      error: {
-        message: expect.stringMatching(startup === "exit" ? /exited/ : /Run `agy` and sign in/),
-      },
-    });
+    for (let attempt = 0; attempt < (startup === "auth" ? 10 : 1); attempt++) {
+      const h = await harness({ AGY_TEST_STARTUP: startup });
+      await h.open();
+      expect(h.events.filter((event) => event.type === "session.ready")).toEqual([]);
+      const failure = h.events.find((event) => event.type === "request.failed");
+      expect(failure).toMatchObject({
+        type: "request.failed",
+        error: {
+          message: expect.stringMatching(startup === "exit" ? /exited/ : /Run `agy` and sign in/),
+        },
+      });
+      const drivers = (await h.records()).filter((record) =>
+        record.args?.includes("--input-format"),
+      );
+      expect(drivers).toHaveLength(1);
+      expect(() => process.kill(drivers[0].pid, 0)).toThrowError(
+        expect.objectContaining({ code: "ESRCH" }),
+      );
+    }
   },
 );
 
@@ -772,6 +781,54 @@ describe("image prompts", () => {
     });
     expect((await h.records()).filter((entry) => entry.input)).toHaveLength(0);
   });
+});
+
+it("does not suppress a genuine process-group permission failure", () => {
+  const denied = Object.assign(new Error("permission denied"), { code: "EPERM" });
+  const kill = vi.spyOn(process, "kill").mockImplementation(() => {
+    throw denied;
+  });
+  try {
+    expect(() =>
+      signalProcess({ platform: "darwin", pid: process.pid, signal: "SIGKILL" }),
+    ).toThrow(denied);
+    expect(kill).toHaveBeenCalledWith(-process.pid, "SIGKILL");
+  } finally {
+    kill.mockRestore();
+  }
+});
+
+it("keeps the startup authentication error when process-group cleanup is denied", async () => {
+  const originalKill = process.kill.bind(process);
+  const denied = Object.assign(new Error("test group permission denied"), { code: "EPERM" });
+  const kill = vi.spyOn(process, "kill").mockImplementation((pid, signal) => {
+    if (pid < 0 && signal === "SIGKILL") throw denied;
+    return originalKill(pid, signal);
+  });
+  try {
+    const h = await harness({ AGY_TEST_STARTUP: "auth" });
+    await h.open();
+    const failure = h.events.find((event) => event.type === "request.failed");
+    expect(failure).toMatchObject({
+      type: "request.failed",
+      error: {
+        code: "STARTUP_ERROR",
+        message:
+          "Antigravity authentication failed. Run `agy` and sign in, then retry. (Antigravity cleanup failed: test group permission denied)",
+      },
+    });
+    const drivers = (await h.records()).filter((record) => record.args?.includes("--input-format"));
+    expect(drivers).toHaveLength(1);
+    expect(() => originalKill(drivers[0].pid, 0)).toThrowError(
+      expect.objectContaining({ code: "ESRCH" }),
+    );
+    expect(kill.mock.calls.filter(([pid, signal]) => pid < 0 && signal === "SIGKILL")).toEqual([
+      [-drivers[0].pid, "SIGKILL"],
+      [-drivers[0].pid, "SIGKILL"],
+    ]);
+  } finally {
+    kill.mockRestore();
+  }
 });
 
 it.runIf(process.platform === "win32")(

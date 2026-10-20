@@ -18,6 +18,7 @@ import {
 import { flushSync } from "react-dom";
 import { withUnistyles } from "react-native-unistyles";
 import { useRetainedPanelActive } from "@/components/retained-panel";
+import { getIsElectronMac } from "@/constants/platform";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { useStableEvent } from "@/hooks/use-stable-event";
 import type { StreamItem } from "@/types/stream";
@@ -696,10 +697,13 @@ function WebStreamViewport(props: StreamRenderInput & { isMobileBreakpoint: bool
     const scrollContainer = scrollContainerRef.current;
     const contentNode = contentRef.current;
     if (!scrollContainer || !contentNode) {
-      onReadingPositionChange(null);
+      onReadingPositionChange(null, false);
       return;
     }
-    onReadingPositionChange(readingAnchor.getReadingRowId(scrollContainer.scrollTop));
+    onReadingPositionChange(
+      readingAnchor.getReadingRowId(scrollContainer.scrollTop),
+      isScrollContainerAtBottom(scrollContainer),
+    );
   });
 
   const updateScrollMetrics = useCallback(() => {
@@ -1175,6 +1179,7 @@ function WebStreamViewport(props: StreamRenderInput & { isMobileBreakpoint: bool
         scheduleStickToBottom();
       },
       scrollToMessage,
+      pauseFollowingOutput: stopFollowingOutputFromUserIntent,
     };
     viewportRef.current = handle;
     return () => {
@@ -1188,18 +1193,20 @@ function WebStreamViewport(props: StreamRenderInput & { isMobileBreakpoint: bool
     forceStickToBottom,
     scheduleStickToBottom,
     scrollToMessage,
+    stopFollowingOutputFromUserIntent,
     viewportRef,
   ]);
 
   const contentContainerStyle = useMemo((): CSSProperties => {
+    const horizontalPadding = isMobileBreakpoint && !getIsElectronMac() ? 8 : 16;
     return {
       display: "flex",
       flexDirection: "column",
       minHeight: "100%",
       paddingTop: CONTENT_PADDING_TOP_PX,
       paddingBottom: 16,
-      paddingLeft: isMobileBreakpoint ? 8 : 16,
-      paddingRight: isMobileBreakpoint ? 8 : 16,
+      paddingLeft: horizontalPadding,
+      paddingRight: horizontalPadding,
       boxSizing: "border-box",
     };
   }, [isMobileBreakpoint]);

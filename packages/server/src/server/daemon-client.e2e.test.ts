@@ -180,6 +180,31 @@ test("DaemonClient uploads file bytes to daemon temp storage", async () => {
   }
 });
 
+test("streams a provider's background tasks to clients on the agent snapshot", async () => {
+  const daemon = await createTestPaseoDaemon({ mcpEnabled: false });
+  const client = new DaemonClient({ url: `ws://127.0.0.1:${daemon.port}/ws` });
+
+  try {
+    await client.connect();
+    await client.fetchAgents({ subscribe: {} });
+    const agent = await client.createAgent({ provider: "codex", cwd: tmpCwd() });
+    expect(agent.backgroundTasks).toEqual([]);
+
+    await client.sendMessage(agent.id, "Emit a background task");
+    const updated = await client.waitForAgentUpsert(
+      agent.id,
+      (snapshot) => snapshot.backgroundTasks?.length === 1,
+      15000,
+    );
+    expect(updated.backgroundTasks).toEqual([
+      { id: "fixture-shell", description: "Fixture background shell" },
+    ]);
+  } finally {
+    await client.close();
+    await daemon.close();
+  }
+});
+
 test("createAgent with background initialPrompt returns a running snapshot before turn completion", async () => {
   const daemon = await createTestPaseoDaemon();
   const client = new DaemonClient({

@@ -1,14 +1,16 @@
+import { useTranslation } from "react-i18next";
 import { Pin } from "lucide-react-native";
 import { useMemo } from "react";
 import { Pressable, Text, View, type StyleProp, type ViewStyle } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { usageCopy } from "./copy";
-import { formatDisplayPct, formatResetLabel } from "./format";
-import { UsageMeter } from "./meter";
+import { clampPct, formatDisplayPct, formatPct, formatUsageDeadline } from "./format";
 import { displayPercent, usageWindowRowLabel } from "./model";
 import type { UsageDisplayAs } from "./preferences";
+import { UsageDeadline } from "./deadline";
 import { windowTone } from "./tone";
+import { UsageMeter } from "./meter";
 import type { UsageTone, UsageWindow } from "./types";
 
 // Pinned rows carry the pinned surface; hovering an unpinned row previews it at half strength,
@@ -20,6 +22,7 @@ function highlightStyle(pinned: boolean, hovered: boolean) {
 
 export function UsageWindowBar({
   window,
+  overview = false,
   displayAs,
   pinnable,
   pinned,
@@ -30,6 +33,7 @@ export function UsageWindowBar({
 }: {
   retained?: boolean;
   window: UsageWindow;
+  overview?: boolean;
   displayAs: UsageDisplayAs;
   /** Whether the row pins the window to the sidebar. When false the row is a plain bar. */
   pinnable: boolean;
@@ -39,33 +43,60 @@ export function UsageWindowBar({
   pinLabel: string;
   pinTestID: string;
 }) {
+  const { t } = useTranslation();
   const shownPct = displayPercent(window, displayAs);
   const tone = windowTone(window);
 
+  const fillWidth = clampPct(shownPct ?? 0);
+  // A retained report is an old snapshot; a run-out time it names may already have passed.
   const isAtRisk =
     window.runsOutAt != null &&
     window.shortfallPct != null &&
     (!retained || Date.parse(window.runsOutAt) > Date.now());
-  const trailing = isAtRisk
-    ? `runs out ${formatResetLabel(window.runsOutAt)?.replace("resets ", "") ?? ""}`.trim()
-    : formatResetLabel(window.resetsAt, retained);
-
-  const value = shownPct != null ? formatDisplayPct(shownPct, displayAs) : "—";
+  const deadline = isAtRisk ? window.runsOutAt : window.resetsAt;
+  const deadlineKind = isAtRisk ? "runOut" : "reset";
+  const trailing = formatUsageDeadline(deadline, deadlineKind, t, retained);
+  let value = "—";
+  let complement: string | null = null;
+  if (shownPct != null) {
+    value = overview
+      ? t(displayAs === "used" ? "usage.usedPercent" : "usage.remainingPercent", {
+          percent: formatPct(shownPct),
+        })
+      : formatDisplayPct(shownPct, displayAs, t);
+    if (overview) {
+      const otherDisplay = displayAs === "used" ? "remaining" : "used";
+      const otherPct = displayPercent(window, otherDisplay);
+      if (otherPct != null)
+        complement = t(otherDisplay === "used" ? "usage.usedPercent" : "usage.remainingPercent", {
+          percent: formatPct(otherPct),
+        });
+    }
+  }
+  const accessibilityValue = useMemo(
+    () => ({ min: 0, max: 100, now: fillWidth, text: value }),
+    [fillWidth, value],
+  );
   const accessibilityState = useMemo(() => ({ checked: pinned }), [pinned]);
   const content = {
     label: window.label,
     value,
-    trailing,
+    deadline,
+    deadlineKind,
+    retained,
     isAtRisk,
-    percent: shownPct ?? 0,
     tone,
+    overview,
+    complement,
+    shownPct,
+    accessibilityValue,
     pinned,
-  };
+  } as const;
 
   // Same padding as the pinnable row, so bars line up in both modes.
   if (!pinnable) {
     return (
-      <View style={styles.row}>
+      <View style={styles.row(overview)}>
         <WindowRowContent {...content} highlight={styles.highlightNone} pinnable={false} />
       </View>
     );
@@ -80,7 +111,7 @@ export function UsageWindowBar({
       accessibilityLabel={usageWindowRowLabel({ pinLabel, value, trailing })}
       accessibilityState={accessibilityState}
       aria-checked={pinned}
-      style={styles.row}
+      style={styles.row(overview)}
       testID={pinTestID}
     >
       {({ hovered }: { hovered?: boolean }) => (
@@ -98,40 +129,78 @@ function WindowRowContent({
   highlight,
   label,
   value,
-  trailing,
+  deadline,
+  deadlineKind,
+  retained,
   isAtRisk,
-  percent,
   tone,
+  overview,
+  complement,
+  shownPct,
+  accessibilityValue,
   pinnable,
   pinned,
 }: {
   highlight: StyleProp<ViewStyle>;
   label: string;
   value: string;
-  trailing: string | null | undefined;
+  deadline: string | null | undefined;
+  deadlineKind: "reset" | "runOut";
+  retained: boolean;
   isAtRisk: boolean;
-  percent: number;
   tone: UsageTone;
+  overview: boolean;
+  complement: string | null;
+  shownPct: number | null;
+  accessibilityValue: { min: number; max: number; now: number; text: string };
   pinnable: boolean;
   pinned: boolean;
 }) {
+  const deadlineStyle = isAtRisk ? styles.atRisk : styles.reset;
   return (
     <>
       <View style={highlight} pointerEvents="none" />
       <View style={styles.contentRow}>
-        <View style={styles.windowContent}>
+        <View style={styles.windowContent(overview)}>
           <View style={styles.labelRow}>
-            <Text style={styles.label} numberOfLines={1}>
+            <Text style={styles.label(overview)} numberOfLines={1}>
               {label}
             </Text>
             <Text style={styles.value}>
               {value}
-              {trailing ? (
-                <Text style={isAtRisk ? styles.atRisk : styles.reset}>{` · ${trailing}`}</Text>
+              {!overview ? (
+                <UsageDeadline
+                  at={deadline}
+                  kind={deadlineKind}
+                  retained={retained}
+                  prefix=" · "
+                  style={deadlineStyle}
+                />
               ) : null}
             </Text>
           </View>
-          <UsageMeter percent={percent} tone={tone} />
+          {overview && (complement || deadline) ? (
+            <View style={styles.labelRow}>
+              <View style={styles.deadlineSlot}>
+                <UsageDeadline
+                  at={deadline}
+                  kind={deadlineKind}
+                  retained={retained}
+                  style={deadlineStyle}
+                />
+              </View>
+              {complement ? <Text style={styles.value}>{complement}</Text> : null}
+            </View>
+          ) : null}
+          {shownPct != null ? (
+            <UsageMeter
+              percent={shownPct}
+              tone={tone}
+              style={styles.meter(overview)}
+              accessibilityLabel={label}
+              accessibilityValue={accessibilityValue}
+            />
+          ) : null}
         </View>
         {pinnable ? <UsagePinGlyph pinned={pinned} /> : null}
       </View>
@@ -168,18 +237,18 @@ function UsagePinGlyph({ pinned }: { pinned: boolean }) {
 
 const styles = StyleSheet.create((theme) => ({
   contentRow: { flexDirection: "row", alignItems: "center", gap: theme.spacing[2] },
-  windowContent: { flex: 1, gap: 3 },
+  windowContent: (overview: boolean) => ({ flex: 1, gap: overview ? 8 : 3 }),
   pin: { width: 12, alignItems: "center" },
   tooltipText: { color: theme.colors.popoverForeground, fontSize: theme.fontSize.sm },
-  row: {
-    gap: 3,
+  row: (overview: boolean) => ({
+    gap: overview ? 8 : 3,
     // The highlight bleeds into the card padding so the label and bar stay on the card's rail.
     marginHorizontal: -theme.spacing[2],
     paddingHorizontal: theme.spacing[2],
     paddingVertical: theme.spacing[1.5],
     // Its own stacking context, so the highlight layer paints above the card and below the text.
     zIndex: 0,
-  },
+  }),
   highlightNone: {
     display: "none",
   },
@@ -203,11 +272,12 @@ const styles = StyleSheet.create((theme) => ({
     alignItems: "center",
     gap: theme.spacing[2],
   },
-  label: {
+  label: (overview: boolean) => ({
     flex: 1,
-    color: theme.colors.foregroundMuted,
-    fontSize: theme.fontSize.sm,
-  },
+    color: overview ? theme.colors.foreground : theme.colors.foregroundMuted,
+    fontSize: overview ? theme.fontSize.base : theme.fontSize.sm,
+  }),
+  deadlineSlot: { flex: 1, minWidth: 0 },
   value: {
     color: theme.colors.foreground,
     fontSize: theme.fontSize.sm,
@@ -221,4 +291,5 @@ const styles = StyleSheet.create((theme) => ({
     color: theme.colors.statusDanger,
     fontWeight: theme.fontWeight.normal,
   },
+  meter: (overview: boolean) => ({ height: overview ? 6 : 4 }),
 }));

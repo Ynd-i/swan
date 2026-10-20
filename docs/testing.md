@@ -148,6 +148,75 @@ Run it locally with the same command owned by the Ubuntu `desktop-tests` require
 npm run test:e2e:browser-tabs --workspace=@getpaseo/desktop
 ```
 
+On macOS, run only actual local-page navigation in the single-chat/right-dock UI:
+
+```bash
+PASEO_DESKTOP_BROWSER_NAVIGATION_ONLY=1 \
+PASEO_DESKTOP_BROWSER_E2E_ARTIFACT_DIR=/tmp/paseo-browser-navigation \
+node packages/desktop/e2e/browser-tabs.e2e.mjs
+```
+
+This starts an isolated Mock host, Metro and real Electron with a temporary home.
+It checks address submission, Back/Forward, guest identity, closing through the
+right titlebar, registry cleanup, retained draft and absence of main tabs. The
+target is a local HTTP fixture; no external website or real-provider turn is used.
+
+The same runner has a macOS-only agent-link mode for an already-built **Swan**
+bundle. It starts a private Mock host and its own Electron instances, without rebuilding
+the bundle or running the browser suite:
+
+```bash
+PASEO_DESKTOP_AGENT_LINKS_ONLY=1 \
+PASEO_DESKTOP_AGENT_LINKS_EXECUTABLE="$PWD/packages/desktop/release-custom/mac-arm64/Swan.app/Contents/MacOS/Swan" \
+PASEO_DESKTOP_BROWSER_E2E_ARTIFACT_DIR=/tmp/paseo-custom-agent-links \
+node packages/desktop/e2e/browser-tabs.e2e.mjs
+```
+
+This verifies custom-link cold argv, a real secondary process handing its URL to the
+existing window, the Electron `open-url` handler, preservation of another chat's
+unsent draft, and rejection of invalid URLs. It also opens the packaged chat-search
+panel and Files dock, asserting that the main tab strip and main plus stay absent
+while the dock and draft survive chat switching. It then uses the packaged Appearance
+controls to select Dark and save the maximum code size of 22px, checks 33px Shell
+line spacing and verifies that scrolling to the last line removes the fade.
+The flow checks the motion option and Copy submenu, then opens and cancels the
+actual project editor and verifies return to the original chat and draft.
+The runner then resets typography and verifies styled quotes, code wrap/scroll
+and a question submission in the packaged renderer, including draft retention
+across reload and chat changes. These chats use the local Mock provider. The native
+check leaves the system clipboard intact; exact copied text is checked by
+`rich-text-reference.spec.ts` in the browser suite.
+These preference changes apply only to the temporary test user data. The runner
+keeps the single-instance lock enabled inside private user data and does not
+invoke OS handler registration. The `open-url` event is
+injected through the test process's own debugger; OS dispatch and coexistence with the
+official app remain separate acceptance checks. Screenshots and logs stay in the
+specified private artifact directory.
+
+### Local relay recovery
+
+The `relay-deployment` project uses the sibling `paseo-relay` checkout, or
+`PASEO_RELAY_CHECKOUT`. Install that checkout's pinned Erlang/Elixir versions and
+its production Mix dependencies first. Put their `mix` and `erl` on PATH; mise
+install paths and asdf shims both work. The test owns a temporary daemon home and
+restarts only its local relay. It excludes 6767/6768 and blocks browser sockets
+that could bypass the relay through the test daemon's direct port.
+
+After building server dependencies, run the current browser export and one case:
+
+```sh
+npm run build:daemon-web-ui
+E2E_FORK_PASEO_HOME_FROM= PASEO_RELAY_CHECKOUT=/path/to/paseo-relay \
+npm exec --workspace=@getpaseo/app -- playwright test \
+  --project=relay-deployment --workers=1 \
+  e2e/browser/relay-deployment-reconnect.real.spec.ts
+```
+
+This uses the daemon-served browser client and Mock stream, not a real provider,
+external relay, TLS deployment or mobile device. Its browser export is not an
+Electron export; rebuild with the custom desktop command before making a new
+custom package from the same checkout.
+
 ## Test organization
 
 - Collocate tests with implementation: `thing.ts` + `thing.test.ts`
@@ -196,7 +265,7 @@ Test suites in this repo are heavy. Running them in bulk freezes the machine, es
 - Global setup accepts Metro as ready only when `/status` returns `packager-status:running`, then fetches the document's scripts so the cold bundle compilation finishes before Playwright's per-test timeout starts. A generic TCP listener is not sufficient readiness evidence. The browser suite uses direct local daemon connections and does not start a relay.
 - The app Playwright harness boots on Windows as well as POSIX. Spawn Node entrypoints through `process.execPath`, not `npx` or `node_modules/.bin` shims: Node refuses to spawn `.cmd` or `.bat` without `shell: true`, and shell mode concatenates argv without escaping and sends kill signals to `cmd.exe` instead of the real child.
 - Teardown kills the process tree, because a Windows signal reaches only the direct child and leaves forked workers holding the listening port.
-- The `asdf`-backed local Elixir relay stays POSIX-only, so the `relay-deployment` Playwright project is unavailable on Windows.
+- The PATH-managed local Elixir relay stays POSIX-only, so the `relay-deployment` Playwright project is unavailable on Windows.
 
 ## Pull-request test routing
 

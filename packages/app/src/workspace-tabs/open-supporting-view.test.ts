@@ -1,5 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+const desktop = vi.hoisted(() => ({ mac: false }));
+vi.mock("@/constants/platform", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/constants/platform")>()),
+  getIsElectronMac: () => desktop.mac,
+}));
+
 vi.mock("@react-native-async-storage/async-storage", () => ({
   default: {
     getItem: vi.fn(async () => null),
@@ -21,11 +27,18 @@ import {
   openWorkspaceChanges,
   openWorkspacePullRequest,
 } from "@/workspace-tabs/open-supporting-view";
+import {
+  openPreferredWorkspaceTarget,
+  openWorkspaceTargetBeside,
+  openPreferredWorkspacePreview,
+} from "@/workspace-tabs/open-beside";
+import { setPanelInstanceAttributes } from "@/panels/panel-instance-attributes";
 
 const WORKSPACE_KEY = "server-1:workspace-1";
 const CHECKOUT = { serverId: "server-1", cwd: "/tmp/repo", isGit: true };
 
 beforeEach(() => {
+  desktop.mac = false;
   usePanelStore.setState({
     mobilePanel: { target: "agent", revision: 0 },
     explorerTab: "files",
@@ -37,6 +50,115 @@ beforeEach(() => {
     explorerSidebarPaneIdByWorkspace: {},
     sidePaneIdByWorkspace: {},
     splitSizesByWorkspace: {},
+  });
+});
+
+describe("macOS supporting views", () => {
+  beforeEach(() => {
+    desktop.mac = true;
+  });
+
+  it.each(["main", "side", "explorer"] as const)(
+    "keeps a PR in Explorer with the saved %s preference",
+    (destination) => {
+      const store = useWorkspaceLayoutStore.getState();
+      const chat = store.openTab({
+        workspaceKey: WORKSPACE_KEY,
+        target: { kind: "agent", agentId: "chat" },
+        intent: "reveal",
+      });
+      openWorkspacePullRequest({
+        workspaceKey: WORKSPACE_KEY,
+        checkout: CHECKOUT,
+        isCompact: false,
+        supportsPaneSplits: true,
+        destination,
+      });
+      const layout = useWorkspaceLayoutStore.getState().layoutByWorkspace[WORKSPACE_KEY];
+      const pr = collectAllTabs(layout.root).find((tab) => tab.target.kind === "pull_request")!;
+      expect(findPaneById(layout.root, "explorer")?.tabIds).toContain(pr.tabId);
+      expect(findPaneById(layout.root, "main")?.focusedTabId).toBe(chat);
+    },
+  );
+
+  it("keeps background PR discovery hidden and puts explicit file opens on the right", () => {
+    const store = useWorkspaceLayoutStore.getState();
+    const chat = store.openTab({
+      workspaceKey: WORKSPACE_KEY,
+      target: { kind: "agent", agentId: "chat" },
+      intent: "reveal",
+    });
+    autoOpenWorkspacePullRequest({ workspaceKey: WORKSPACE_KEY, destination: "side" });
+    expect(
+      findPaneById(
+        useWorkspaceLayoutStore.getState().layoutByWorkspace[WORKSPACE_KEY].root,
+        "explorer",
+      )?.hidden,
+    ).toBe(true);
+    const file = openPreferredWorkspaceTarget({
+      workspaceKey: WORKSPACE_KEY,
+      target: { kind: "file", path: "/repo/a.ts" },
+      source: "chatFiles",
+      preferences: DEFAULT_APP_SETTINGS.openInSidePane,
+      parentTabId: chat,
+    });
+    const second = openWorkspaceTargetBeside({
+      workspaceKey: WORKSPACE_KEY,
+      target: { kind: "working_diff" },
+    });
+    const layout = useWorkspaceLayoutStore.getState().layoutByWorkspace[WORKSPACE_KEY];
+    expect(findPaneById(layout.root, "explorer")?.tabIds).toEqual(
+      expect.arrayContaining([file, second]),
+    );
+    expect(findPaneById(layout.root, "main")?.focusedTabId).toBe(chat);
+    expect(useWorkspaceLayoutStore.getState().sidePaneIdByWorkspace[WORKSPACE_KEY]).toBeUndefined();
+  });
+
+  it("reuses only unmodified file previews in Explorer and never replaces the chat", () => {
+    const chat = useWorkspaceLayoutStore.getState().openTab({
+      workspaceKey: WORKSPACE_KEY,
+      target: { kind: "agent", agentId: "chat" },
+      intent: "reveal",
+    });
+    const input = {
+      workspaceKey: WORKSPACE_KEY,
+      serverId: CHECKOUT.serverId,
+      workspaceId: "workspace-1",
+      isCompact: false,
+      source: "explorerFiles" as const,
+      preferences: DEFAULT_APP_SETTINGS.openInSidePane,
+      explorerSidebarPaneId: "explorer",
+      lastMainPaneId: "main",
+    };
+    const first = openPreferredWorkspacePreview({
+      ...input,
+      target: { kind: "file", path: "/repo/edited.ts" },
+    })!;
+    const identity = { serverId: input.serverId, workspaceId: input.workspaceId, tabId: first };
+    setPanelInstanceAttributes(identity, { modified: true });
+    try {
+      const second = openPreferredWorkspacePreview({
+        ...input,
+        target: { kind: "file", path: "/repo/preview.ts" },
+      })!;
+      const third = openPreferredWorkspacePreview({
+        ...input,
+        target: { kind: "file", path: "/repo/next.ts" },
+      });
+      const layout = useWorkspaceLayoutStore.getState().layoutByWorkspace[WORKSPACE_KEY];
+      expect(second).not.toBe(first);
+      expect(third).toBe(second);
+      expect(collectAllTabs(layout.root).find((tab) => tab.tabId === first)?.target).toEqual({
+        kind: "file",
+        path: "/repo/edited.ts",
+      });
+      expect(findPaneById(layout.root, "explorer")?.tabIds).toEqual(
+        expect.arrayContaining([first, third]),
+      );
+      expect(findPaneById(layout.root, "main")?.focusedTabId).toBe(chat);
+    } finally {
+      setPanelInstanceAttributes(identity, { modified: false });
+    }
   });
 });
 

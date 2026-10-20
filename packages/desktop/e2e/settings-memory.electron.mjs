@@ -62,7 +62,7 @@ async function rotateSettings(page) {
     await openSettingsDestination(page, title);
   }
 
-  await page.locator('[data-testid="settings-back-to-workspace"]:visible').click();
+  await page.getByTestId("desktop-shell-back").click();
   await page.waitForFunction(() => !location.pathname.startsWith("/settings"));
 }
 

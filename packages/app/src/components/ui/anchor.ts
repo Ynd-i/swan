@@ -36,34 +36,35 @@ export function measureElement(element: View): Promise<Rect> {
  * there is more room above. Both conditions matter: flipping into a side that is equally
  * cramped just moves the clipping, so a surface taller than the whole viewport stays put.
  *
- * Horizontal flipping is opt-in for hover cards. Submenus choose their direction up front so
- * they do not move out from under the pointer travelling toward them.
+ * Horizontal surfaces flip only when the requested side cannot fit the width and the other
+ * side can, including the offset and display-edge padding. Otherwise retain the requested
+ * side and let the clamp handle displays too narrow for either placement.
  */
 function flipPlacement(input: {
   placement: Placement;
   triggerRect: Rect;
-  contentHeight: number;
-  contentWidth: number;
-  flipHorizontal: boolean;
+  contentSize: Size;
   displayArea: Rect;
+  offset: number;
 }): Placement {
-  const { placement, triggerRect, contentHeight, displayArea } = input;
+  const { placement, triggerRect, contentSize, displayArea, offset } = input;
+  const spaceLeft = triggerRect.x - displayArea.x - EDGE_PADDING - offset;
+  const spaceRight =
+    displayArea.x + displayArea.width - EDGE_PADDING - (triggerRect.x + triggerRect.width) - offset;
+  if (placement === "right" && spaceRight < contentSize.width && spaceLeft >= contentSize.width) {
+    return "left";
+  }
+  if (placement === "left" && spaceLeft < contentSize.width && spaceRight >= contentSize.width) {
+    return "right";
+  }
   const spaceTop = triggerRect.y - displayArea.y;
   const spaceBottom = displayArea.y + displayArea.height - (triggerRect.y + triggerRect.height);
 
-  if (placement === "bottom" && spaceBottom < contentHeight && spaceTop > spaceBottom) {
+  if (placement === "bottom" && spaceBottom < contentSize.height && spaceTop > spaceBottom) {
     return "top";
   }
-  if (placement === "top" && spaceTop < contentHeight && spaceBottom > spaceTop) {
+  if (placement === "top" && spaceTop < contentSize.height && spaceBottom > spaceTop) {
     return "bottom";
-  }
-  if (input.flipHorizontal) {
-    const spaceLeft = triggerRect.x - displayArea.x;
-    const spaceRight = displayArea.x + displayArea.width - (triggerRect.x + triggerRect.width);
-    if (placement === "right" && spaceRight < input.contentWidth && spaceLeft > spaceRight)
-      return "left";
-    if (placement === "left" && spaceLeft < input.contentWidth && spaceRight > spaceLeft)
-      return "right";
   }
   return placement;
 }
@@ -127,7 +128,6 @@ export function computePosition({
   placement,
   alignment,
   offset,
-  flipHorizontal = false,
 }: {
   triggerRect: Rect;
   contentSize: Size;
@@ -135,16 +135,13 @@ export function computePosition({
   placement: Placement;
   alignment: Alignment;
   offset: number;
-  /** Hover cards can choose either side; submenu direction is owned by the menu. */
-  flipHorizontal?: boolean;
 }): { x: number; y: number; actualPlacement: Placement } {
   const actualPlacement = flipPlacement({
     placement,
     triggerRect,
-    contentHeight: contentSize.height,
-    contentWidth: contentSize.width,
-    flipHorizontal,
+    contentSize,
     displayArea,
+    offset,
   });
   const anchored = anchorToPlacement({
     placement: actualPlacement,

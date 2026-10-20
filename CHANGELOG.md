@@ -1,5 +1,173 @@
 # Changelog
 
+## Unreleased — custom desktop
+
+These changes are available on `main` of `Ynd-i/swan` in local development. Packaged
+distribution and full migration acceptance remain pending; see the
+[migration plan](docs/refactors/codex-desktop-ui-plan.md).
+
+### Added
+
+- Added auto handoff: when a chat's context passes 350k tokens or 75% of the model's window, whichever is smaller, the agent writes a handoff briefing and a new chat with the same provider and model continues the work. The new chat replaces the old one in the macOS sidebar, and earlier chats of the chain nest greyed under its chevron, keeping its pin and section. See [auto handoff](docs/auto-handoff.md).
+
+- Added drag and drop to the macOS chat sidebar: drag a section header to reorder the sections below Pinned, such as Recent, a custom section and Projects, and drag a project header onto another section to move the project there. The order is saved on this machine.
+
+- Added a context window card on the composer meter: a used/window header, a segmented bar and one row per category, then the compaction buffer and free space. Claude chats list what fills the window; other providers show Used and Free space. The breakdown loads when the card opens on an idle chat, because each one is a Claude API request. Hosts need the new `agentContextUsage` feature.
+
+- Added chats without a project: hovering the New chat project chip shows a remove button, and the chat then runs in its own folder, `~/Documents/Paseo/<date>/<name>`, with global settings and rules instead of a project's. Chat folders stay out of Projects and the project picker; their chats show in Recent. Hosts need the new `projectCreateDirectoryParents` feature.
+
+- Added native forks for Codex and Claude: Fork in a new tab on a completed turn or an idle chat copies the provider conversation itself into a new chat in the same workspace, with its own session and no chat-history attachment. Other providers, running chats and new workspaces keep the history attachment.
+
+- Added independent macOS interface font weight with safe default/Advanced reset, preserving authored emphasis, content/code weights, drafts and sidebar sizing.
+
+- Added a fixed macOS question card above the editable composer, with numbered choices and provider-defined answering/dismiss behavior, plus code-block language headers and working wrap/copy controls.
+
+- Added independent macOS content font weight controls, live preview and Advanced reset, preserving chat drafts, stronger emphasis and separate code/UI typography.
+
+- Added a macOS tool-approval card at the composer position, retaining drafts, provider-defined permission choices, scoped keyboard shortcuts and manual retry after connection failure; plans keep their existing inline flow.
+
+- Added grapheme-safe intraline highlights to macOS default-dark diffs, preserving original source/selection data and deferring computation outside the visible materialization window.
+- Added a query-only comparison-base picker to macOS Diff tabs, distinguishing local and origin refs while preserving checkout state, review drafts and fixed worktree bases.
+- Added a searchable file tree to macOS Diff tabs, with comparison totals and retained diff content when the tree is toggled.
+- Added macOS code font weight choices for chat code, file editors and diffs, including preview, persistence and Advanced reset; Default retains each surface's existing style.
+- Grouped macOS typography, motion, content width and syntax controls under a collapsible Advanced section with a scoped reset; theme and interface font selections remain separate.
+- Added a saved macOS Reduce motion preference with live System behavior and consistent sidebar, outline, streaming-loader and decorative shimmer handling.
+- Restored Copy agent id and supported provider resume commands in the current-chat titlebar; unavailable resume commands stay disabled.
+- Added macOS Appearance previews for System, Light and Dark using the existing theme preference; full built-in and plugin theme choices remain available.
+- Added a compact macOS chat-search panel with recent chats, project labels, Control+1–9 selection and working quick actions; existing workspace, file and plugin search remains available.
+- Added shortcut search in Settings using action names and current bindings, retaining editing, unassign and reset controls.
+- Added a macOS Files initial view with an empty editor, shared workspace toolbar and searchable right-hand tree; narrow panels prioritize the tree.
+- Added independent `paseo-custom://` agent links for Paseo Custom, using the existing route validation and leaving official links and internal app routes unchanged.
+- Added a macOS browser start page with working Review, Terminal, Files and More tools actions, plus pages actually open in the current workspace. Ordinary blank documents and browser automation retain their existing behavior.
+- Added an independent Codex syntax-color preset for macOS defaults, preserving explicitly saved themes and custom font choices. Other platforms retain their existing default.
+- Added a Codex-style macOS titlebar, rounded content frame, and dark palette while retaining the existing themes and providers.
+- Added rename, archive, pinning, and unread actions in the current-chat titlebar.
+- Added Back/Forward chat navigation and the current-chat title, preserving independent drafts when switching between sibling chats.
+- Added a combined model and reasoning popover on macOS, with keyboard and pointer control, provider-defined defaults, and the existing searchable model browser.
+- Added a centered, project-aware new-chat welcome on macOS, with project controls above the bottom composer and drafts retained across compact layouts.
+- Added elapsed headers and collapsible activity for completed macOS chat turns. Replies stay visible, search reveals hidden matches, and copying or forking retains the full turn. Expanding keeps the reader's position.
+- Added a local macOS custom-package profile with its own identity, isolated GUI daemon defaults, and disabled automatic updates. The packaged smoke checks the custom identity and rejected update installation.
+- Added macOS usage overview cards with explicit used/remaining allowances, live reset countdowns and localized labels across all supported languages. Existing provider data and refresh behavior are retained.
+- Added an independent content font in Appearance for conversation text, Markdown and the composer. Leaving it empty follows the interface font; code retains its monospace font.
+
+### Changed
+
+- Renamed the custom desktop to Swan and the repository to `Ynd-i/swan`. Installed Paseo Custom builds keep updating in-app and keep their chats, projects and settings.
+- Each custom release deletes the prereleases and tags of older upstream releases; stable releases and the current upstream release's betas stay.
+- Measured the context window meter of Claude chats against the window Claude compacts at, such as its `autoCompactWindow` setting, as Claude Desktop does, instead of the model's full window. The daemon asks Claude once per model, after the first completed turn.
+- The macOS project picker shows a project's favicon or a folder with only its name.
+- The macOS composer offers three permission modes, Ask for approval, Auto-review and Full access, and plan mode is a toggle beside them, as in Codex. Claude's Accept edits is no longer offered. Plan keeps the chosen permission mode: turning it off, or Claude's switch after Implement, returns to that mode. Other providers keep their own non-plan modes.
+- The macOS model popover turns Fast on and off from its ⚡, which is filled when on and then also shows in the model pill; the effort slider marks each step with a dot, and the pill reads "Select model" while models load instead of changing size.
+- Settings › About shows a published Paseo Custom build's release tag, such as `v0.11.0-beta.3-v1-beta8`, instead of the upstream version it is built on.
+- macOS queued messages work like Codex's: Steer sends one into the running turn, the trash button deletes it, and its menu edits it or turns queueing off. Enter queues while a chat runs only when Settings › General › Sending is set to Queue; the default, Steer, sends into the turn.
+- macOS chat rows show Pin and Archive on hover and open their full menu on right-click. Pinned hides when nothing is pinned.
+- The sidebar usage entry shows one summary however many providers are pinned: the most used window with its source icon, then "+N" for the other sources. The full breakdown opens on press.
+- macOS settings have no back arrow in their header; the titlebar Back leaves settings in one step. The new-chat page drops its Chat/Terminal choice, and image attachments show larger previews.
+- Grouped tool calls on macOS read like Codex: "Read files, ran commands" with an icon for the kind of work, and finished steps say "Read History.swift" or "Ran pwd". Turn grouping on in Settings › Chat.
+- Native forks are titled like Codex, "Chat (2)" then "Chat (3)", and end their inherited history with a "Continued from chat" divider that opens the original chat. The macOS composer starts its first line 4pt lower, keeping its height.
+
+- Added a notification bell beside macOS sidebar search: Priority lists chats waiting on a permission or an error, then finished chats follow by day across every section, with reply previews for chats this window has loaded.
+
+- Added custom macOS sidebar sections: create them from the Recent right-click menu or a chat or project's Section menu, rename, mark read, archive or remove them, and hide Projects. Removing a section returns its chats and projects; sections are stored on this Mac.
+
+- macOS chat sidebar sections collapse from their titles and reveal a sort menu on hover: recently updated, or a manual order you drag, with new chats still arriving on top. Projects add a project from their header.
+
+- The macOS rail's Usage button opens the usage summary beside the rail instead of leaving the current chat; without a connected host it still opens the Usage screen.
+
+- The macOS navigation rail now holds Usage, Hosts, Help and Settings instead of the sidebar footer; add projects from the Projects header or Cmd+K, and project chats show a folder before their titlebar title.
+
+- macOS no longer shows the worktree-script setup prompt or the Import session button below the new-chat composer; import stays in History and Cmd+K, and scripts in project settings.
+
+- Restored the Codex-style macOS chat sidebar with Pinned, Recent and project chat groups; Cmd+Shift+P pins the current chat. Other platforms keep the workspace sidebar.
+
+- Matched Mac list markers to the reference's larger full-contrast dots and 26px text indent, and widened inline code chips; other platforms are unchanged.
+
+- New macOS appearance defaults use the reference's 13px interface and conversation text, with a 1.6 prose line height that keeps the 21px reading rhythm; saved font sizes are unchanged until Advanced reset.
+
+- Kept Mac inline code chips from enlarging their line of prose and matched the reference's 16px chip height; other platforms keep their existing chip.
+
+- Matched Mac spacing between paragraphs, lists and code blocks within one reply to the reference, using the existing Markdown parse; other boundaries and platforms keep their spacing.
+
+- Matched Mac code-card padding, line height and wrap-action icons to the reference, and removed extra spacing between tight Markdown list rows.
+
+- Removed empty activity headers from plain Mac replies and restored completion timestamps beside reply actions; hovering reveals elapsed time without shifting the controls.
+
+- Aligned macOS chat text and code blocks with the composer at wide and compact widths, keeping measured Markdown height-cache keys consistent with the rendered column.
+
+- Removed duplicated paragraph and quote margins from macOS chat Markdown blocks, retaining spacing within multi-paragraph quotes and other-platform presentation.
+
+- Extended the real Custom package regression to cover styled text, code wrapping, question submission and retained drafts across reload and chat navigation.
+
+- Matched Mac font-family fields to compact reference capsules and replaced raw default font stacks with the existing localized System default hint; custom font input and other platforms retain their behavior.
+
+- Integrated upstream through `e10f6d2` (0.11.0-beta.1), retaining the custom Mac layout and usage overview while adopting usage options, stacked-sheet behavior, session import entry, provider fixes and skill deduplication.
+
+- Matched macOS Markdown quotes to the supplied transparent, narrow-bar reference while retaining paragraph spacing inside multi-paragraph quotes and preserving other platforms.
+
+- Matched macOS default-dark Diff row/gutter colors and empty-side hatching to the supplied reference; default Diff code weight now follows the Mac editor's semibold style while explicit weights remain authoritative.
+- Centered the macOS browser's empty address hint while retaining left-aligned URL editing and caret behavior.
+- Matched the default macOS dark reasoning control to the reference's coral accent, preserving other theme palettes and provider choices.
+- Matched macOS Appearance size fields to the compact reference shape while retaining larger-font sizing and other theme palettes.
+- Matched macOS right-tool tab height to the reference while preserving resizing, close controls and retained sessions.
+- Matched the macOS chat menu's Archive text to the neutral reference color while retaining running-agent confirmation.
+- Matched macOS project editing with a combined name/icon input, real source-folder information and compact actions while retaining existing validation and save behavior.
+- Refined wide macOS modal titles, corners, separators and backdrop to follow the supplied dialog references.
+- Matched macOS Settings card width, corner radius and appearance-mode spacing to the reference; theme previews now use the actual platform palette. Other platforms keep their layout defaults.
+- Matched macOS inline Shell output's bottom fade while more output remains below; reaching the end or showing short output leaves the final line unobscured.
+- Local relay checks now use PATH-managed Elixir, avoid protected daemon ports, and block direct WebSocket fallbacks.
+- Matched the macOS chat placeholder text and default dark color to the reference, preserving explicit caller and terminal prompts, other themes and custom fonts.
+- Matched the macOS terminal content background and inset to the reference while retaining live terminal sessions, resizing and custom fonts.
+- Integrated upstream through `4893629`, retaining runtime model/thinking reporting, provider options and approvals, and configurable sidebar usage alongside the custom desktop presentation.
+- Matched the macOS browser address field's focused surface to the reference. Escape restores the committed URL without navigating; clicking or using the address shortcut selects the full URL.
+- Kept one current conversation in the macOS main area and moved supporting tools into the right sidebar. Saved chats, terminal IDs, panel state and drafts survive the layout change; tool tabs share the window titlebar.
+- Removed Terminal profiles and Edit profiles from macOS tool launchers. The right-sidebar plus menu retains ordinary tools; providers remain available through New chat.
+- Added an internal file tree to macOS file tools, preserving unsaved editor content while toggling the tree. New right sidebars default to 576px; saved widths remain unchanged.
+- Added a shared path capsule, folder-tree toggle and file-specific editor action above macOS file tools. File metadata stays in a compact bottom status row.
+- Soft-wrapped editable and read-only source files in the macOS right dock without changing saved file contents or other platforms' wrapping defaults.
+- Matched macOS source text to the reference's heavier weight, taller visual rows and tighter top spacing, and added consistent line numbers to read-only source views.
+- Replaced the macOS file tree's toolbar with a workspace menu and file filter. Search reveals matching files and their ancestors, preserves saved expansion state, and keeps create, sort, hidden-file and refresh actions available.
+- Matched the macOS Settings navigation frame with a narrower category sidebar, compact rows, a Settings heading and a category search field. Existing setting values and host navigation remain available.
+- Restored Paseo's default workspace sidebar, navigation and footer; deferred the custom chat sidebar. New sidebar preferences use the default 320px width, while saved widths remain unchanged.
+- Animated macOS workspace-sidebar expansion and collapse while retaining rows during the transition. Reduced-motion mode remains immediate, and quick reversals keep the sidebar open.
+- Restored the separate macOS icon navigation rail after the sidebar clarification. It remains available when the workspace list is collapsed and after returning from Settings, with visible and accessible current-page selection.
+- Moved macOS workspace actions into the window titlebar, freeing one header row for chat content. Project/branch details stay in the workspace menu, and editor, scripts, Git and file-panel actions follow the active workspace.
+- Refined macOS panel tabs with rounded selected outlines, more room for titles, and a visible close button on the active tab. Tab measurements reserve that button's space, preserving the existing overflow and resize behavior.
+- Added macOS Explorer tab close controls that appear on selection, hover or keyboard focus, with stable title spacing and the existing close confirmations.
+- Aligned the macOS browser toolbar with rounded navigation, address and tool groups. Narrow tool panels move secondary controls into More; existing browser actions and other desktop platforms are preserved.
+- Aligned the macOS chat column and composer frame with the reference: a narrower default column, larger corners, tighter padding, and a neutral stop control. Saved content-width preferences still take priority.
+- Moved the macOS composer mode beside attachments and aligned model/reasoning controls to the right, retaining provider-backed selections.
+- Updated macOS selector surfaces to the rounded, raised style used by the reference.
+- Matched macOS user-message bubbles to the reference with a 70% width limit, darker fill, and even rounded corners.
+- Made macOS tool rows more compact, kept their tool icons visible, and placed expanded output in a separate rounded card with a heading and bounded scroll area.
+- Matched the macOS attachment menu to the composer width, placed file upload first, and grouped available plugin sources. The menu follows composer/window resizing and preserves keyboard focus and drafts when selection is canceled.
+- Removed voice mode, dictation, their shortcut entries, and audio diagnostics from the custom macOS desktop, in line with the agreed scope. Other platforms and the voice backend remain available.
+
+### Fixed
+
+- Stopped the macOS chat sidebar from leaving an empty workspace row under a project after its last chat is archived. Worktrees without chats are still listed.
+- Drew the context window meter's unused track on the macOS composer, where it matched the composer surface and only the used arc showed.
+- Fixed in-app updates on macOS needing a second Update click: the first click now installs and relaunches. The fix applies to updates from this release onward.
+- Kept a macOS project row's actions visible while the pointer stays on it after New chat, and stopped menus opened with the pointer from highlighting their first item; keyboard navigation still highlights the focused item.
+
+- Kept responsive sidebar defaults from becoming permanent visibility overrides when reordering or hiding unrelated items.
+
+- Fixed submenu keyboard entry and return, delayed focus during entering animations, and hover timers reopening a submenu after keyboard dismissal.
+- Preserve the selected chat when returning from Settings instead of jumping to an unread sibling in the same workspace. Explicit workspace opens still prioritize pending attention.
+- Flip horizontal submenus to the side with sufficient room instead of clamping them over their parent menu.
+- Scaled tool-output and diagnostic code line spacing with the saved code font size, preventing overlapping lines at larger sizes while keeping the default spacing unchanged.
+- Removed the floating focus hint from the macOS composer so it cannot overlap the empty placeholder in narrow chat columns. The focus shortcut and other platforms remain unchanged.
+- Prevented custom packaging from inheriting the official operating-system URL scheme through concatenated configuration arrays. The package smoke now checks the final scheme declaration.
+- Kept Antigravity's authentication error visible when macOS has not yet reaped its failed CLI process. Cleanup waits for the owned child and still reports genuine permission failures.
+- Removed inactive macOS panel-placement selectors from General settings while retaining service URL behavior and other platforms' saved placement choices.
+- Anchored the titlebar's top resize edge to its container, preventing horizontal overflow that could clip Settings navigation after menu interactions.
+- Kept missing quota readings and credit balances unavailable instead of treating them as zero. Known usage meters now expose their values to assistive technology.
+- Corrected Codex quota labels using the API's reported window duration and retained credit balances in credits, including accounts whose primary limit spans a week.
+- Localized the file-upload label in Chinese, Spanish, French and Arabic.
+- Separated tool expansion from the file-open button, removing nested buttons and making file navigation reachable by keyboard without changing expansion state. Expandable tool rows now expose their expanded state on web.
+- Fixed chat metadata changes remaining paused indefinitely while offline; connection errors and timeouts now return control to the user without discarding a rename draft.
+- Fixed the model popover intercepting the reasoning slider's native arrow keys.
+- Fixed new-chat history dropping its target host query parameter, and removed the redundant macOS model tooltip that could cover the reasoning slider.
+
 ## 0.12.0 - 2026-10-19
 
 Background workspaces, a new Markdown renderer with selection across paragraphs on phones, a reworked phone layout, and more than 120 fixes.

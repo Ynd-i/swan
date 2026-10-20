@@ -267,3 +267,46 @@ describe("Claude rewind after a turn whose last assistant message came from a su
     expect(rewindSdk.recordedForks).toEqual([{ upToMessageId: "assistant-1" }]);
   });
 });
+
+describe("Claude native fork", () => {
+  test("forks through the selected turn's reply and keeps the source session", async () => {
+    const conversation = createConversation([
+      { assistantMessageId: "assistant-1" },
+      { assistantMessageId: "assistant-2", subagentMessageId: "subagent-2" },
+      { assistantMessageId: "assistant-3" },
+    ]);
+    const rewindSdk = new FakeClaudeSdk();
+    const session = await createSession(conversation, rewindSdk);
+
+    try {
+      await runTurns(session, 3);
+      const handle = await session.forkConversation?.({
+        messageId: conversation.userMessageIds[1],
+      });
+
+      expect(handle).toMatchObject({ provider: "claude", sessionId: "forked-session-1" });
+      expect(session.describePersistence()?.sessionId).toBe(SESSION_ID);
+    } finally {
+      await session.close();
+    }
+
+    expect(rewindSdk.recordedForks).toEqual([{ upToMessageId: "assistant-2" }]);
+  });
+
+  test("rejects a turn that produced no response", async () => {
+    const conversation = createConversation([{ assistantMessageId: "assistant-1" }, "no-response"]);
+    const rewindSdk = new FakeClaudeSdk();
+    const session = await createSession(conversation, rewindSdk);
+
+    try {
+      await runTurns(session, 2);
+      await expect(
+        session.forkConversation?.({ messageId: conversation.userMessageIds[1] }),
+      ).rejects.toThrow("has no completed reply");
+    } finally {
+      await session.close();
+    }
+
+    expect(rewindSdk.recordedForks).toEqual([]);
+  });
+});

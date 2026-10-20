@@ -1,11 +1,20 @@
-import React, { memo, useCallback, useMemo, useRef, type ReactNode } from "react";
+import React, {
+  memo,
+  useCallback,
+  useMemo,
+  useRef,
+  type ComponentType,
+  type ReactNode,
+} from "react";
 import { ScrollView } from "react-native";
 import { useTranslation } from "react-i18next";
-import { Wrench } from "lucide-react-native";
+import { BookOpen, Pencil, Search, Sparkles, SquareTerminal, Wrench } from "lucide-react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { ExpandableBadge } from "@/components/message";
 import { useIsCompactFormFactor } from "@/constants/layout";
-import { type OverviewSummary, type OverviewToolCallGroup } from "./model";
+import { getIsElectronMac } from "@/constants/platform";
+import { PaseoLogo } from "@/components/icons/paseo-logo";
+import { type OverviewCategory, type OverviewToolCallGroup } from "./model";
 import { OverviewToolCallGroupSheet } from "./sheet";
 
 interface OverviewGroupProps {
@@ -32,9 +41,29 @@ function joinSummaryParts(parts: string[], conjunction: string): string {
   return firstCharacter ? `${firstCharacter.toLocaleUpperCase()}${joined.slice(1)}` : joined;
 }
 
-function useOverviewSummary(summary: OverviewSummary): string {
+const CATEGORY_ICONS: Record<OverviewCategory, ComponentType<{ size?: number; color?: string }>> = {
+  loadTools: Wrench,
+  skill: Sparkles,
+  read: BookOpen,
+  search: Search,
+  edit: Pencil,
+  command: SquareTerminal,
+  paseo: PaseoLogo,
+  other: Wrench,
+};
+
+function useOverviewSummary(group: OverviewToolCallGroup, codexStyle: boolean): string {
   const { t } = useTranslation();
+  const { summary, categories } = group;
   return useMemo(() => {
+    // Codex style on Mac desktop: verb-only parts, no counts, joined per locale.
+    if (codexStyle) {
+      const joined = categories
+        .map((category) => t(`toolCallGroup.verbs.${category}`))
+        .join(t("toolCallGroup.verbSeparator"));
+      const first = joined[0];
+      return first ? `${first.toLocaleUpperCase()}${joined.slice(1)}` : joined;
+    }
     const parts: string[] = [];
     const entries = [
       [summary.editedFileCount, "toolCallGroup.editedFiles"],
@@ -50,7 +79,7 @@ function useOverviewSummary(summary: OverviewSummary): string {
       }
     }
     return joinSummaryParts(parts, t("toolCallGroup.and"));
-  }, [summary, t]);
+  }, [summary, categories, codexStyle, t]);
 }
 
 export const OverviewToolCallGroupView = memo(function OverviewToolCallGroupView({
@@ -62,7 +91,9 @@ export const OverviewToolCallGroupView = memo(function OverviewToolCallGroupView
 }: OverviewGroupProps) {
   const scrollRef = useRef<ScrollView>(null);
   const isCompact = useIsCompactFormFactor();
-  const aggregateSummary = useOverviewSummary(group.summary);
+  const codexStyle = getIsElectronMac() && !isCompact;
+  const aggregateSummary = useOverviewSummary(group, codexStyle);
+  const icon = codexStyle ? CATEGORY_ICONS[group.categories[0] ?? "other"] : Wrench;
   const scrollToLatest = useCallback(() => {
     scrollRef.current?.scrollToEnd({ animated: false });
   }, []);
@@ -94,7 +125,7 @@ export const OverviewToolCallGroupView = memo(function OverviewToolCallGroupView
         <ExpandableBadge
           testID="tool-call-group"
           label={aggregateSummary}
-          icon={Wrench}
+          icon={icon}
           isLoading={group.isLoading}
           isExpanded={false}
           isLastInSequence={isLastInSequence}
@@ -111,7 +142,7 @@ export const OverviewToolCallGroupView = memo(function OverviewToolCallGroupView
     <ExpandableBadge
       testID="tool-call-group"
       label={aggregateSummary}
-      icon={Wrench}
+      icon={icon}
       isLoading={group.isLoading}
       isExpanded={expanded}
       isLastInSequence={isLastInSequence}

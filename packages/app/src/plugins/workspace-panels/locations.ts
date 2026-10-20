@@ -7,6 +7,7 @@ import { panelSupportsHost } from "@/panels/panel-manifest";
 import type { PluginWorkspaceTabTarget, WorkspaceTabTarget } from "@/workspace-tabs/model";
 import { pluginRegistry } from "../registry";
 import { resolvePluginWorkspacePanel } from "./resolution";
+import { getIsElectronMac } from "@/constants/platform";
 
 const DEFAULT_LOCATIONS: readonly PluginPanelLocation[] = ["workspace"];
 
@@ -54,6 +55,9 @@ export function panelTargetSupportsHost(
   const panel = findPluginPanel(serverId, target);
   // Preserve a persisted unavailable panel where the user left it until its plugin loads again.
   if (!panel) return true;
+  // The macOS dock hosts workspace tools visually; plugins retain their declared location contract.
+  if (getIsElectronMac() && host === "explorer" && pluginPanelSupportsLocation(panel, "workspace"))
+    return true;
   const location: PluginPanelLocation = host === "explorer" ? "explorer" : "workspace";
   return pluginPanelSupportsLocation(panel, location);
 }

@@ -100,7 +100,11 @@ import {
   registerExternalQuitSignals,
   stopDesktopManagedDaemonOnQuitIfNeeded,
 } from "./daemon/quit-lifecycle.js";
-import { runDesktopStartup } from "./desktop-startup.js";
+import {
+  configureDesktopDaemonEnvironment,
+  resolveCustomUserDataPath,
+  runDesktopStartup,
+} from "./desktop-startup.js";
 import { registerBrowserAutomationIpc } from "./features/browser-automation/ipc.js";
 import { BrowserKeyboard } from "./features/browser-keyboard/index.js";
 import { installAppUpdateOnQuit } from "./features/auto-updater.js";
@@ -109,13 +113,19 @@ import {
   parseAgentDeepLink,
   type AgentDeepLinkTarget,
 } from "@getpaseo/protocol/agent-deep-link";
-import { AgentNavigationInbox, parseAgentDeepLinkFromArgv } from "./agent-navigation.js";
+import {
+  AgentNavigationInbox,
+  parseAgentDeepLinkFromArgv,
+  parseDesktopAgentDeepLink,
+} from "./agent-navigation.js";
 
 const DEV_SERVER_URL = process.env.EXPO_DEV_URL ?? "http://localhost:8081";
 const APP_SCHEME = "paseo";
 const PASEO_DEBUG = process.env.PASEO_DEBUG === "1";
 const DISABLE_SINGLE_INSTANCE_LOCK = process.env.PASEO_DISABLE_SINGLE_INSTANCE_LOCK === "1";
-const APP_NAME = process.env.PASEO_TEST_APP_NAME?.trim() || "Paseo";
+const APP_NAME = app.isPackaged
+  ? app.getName()
+  : process.env.PASEO_TEST_APP_NAME?.trim() || "Paseo";
 const DESKTOP_WINDOW_CHROME_MODE = resolveDesktopWindowChromeMode({
   platform: process.platform,
   override: process.env.PASEO_DESKTOP_WINDOW_CONTROLS,
@@ -301,9 +311,16 @@ function installBrowserWindowOpenHandler(input: {
 // Electron windows can run side-by-side (separate userData = separate lock).
 let devWorktreeName: string | null = null;
 const forcedUserDataDir = process.env.PASEO_ELECTRON_USER_DATA_DIR?.trim();
+const customUserDataPath = resolveCustomUserDataPath({
+  isPackaged: app.isPackaged,
+  appName: APP_NAME,
+  appDataPath: app.getPath("appData"),
+});
 if (forcedUserDataDir) {
   app.setPath("userData", forcedUserDataDir);
   log.info("[dev-user-data] forced userData dir:", forcedUserDataDir);
+} else if (customUserDataPath) {
+  app.setPath("userData", customUserDataPath);
 } else if (!app.isPackaged) {
   try {
     const topLevel = execFileSync("git", ["rev-parse", "--show-toplevel"], {
@@ -360,7 +377,7 @@ let pendingOpenProjectPath = parseOpenProjectPathFromArgv({
   argv: process.argv,
   isDefaultApp: process.defaultApp,
 });
-let pendingAgentNavigation = parseAgentDeepLinkFromArgv(process.argv);
+let pendingAgentNavigation = parseAgentDeepLinkFromArgv(process.argv, APP_NAME);
 
 // Each window pulls its own pending open-project path on mount, keyed by
 // webContents id, so deep-linked windows (second-instance launches, the
@@ -834,7 +851,7 @@ desktopWindowOwner = createDesktopWindowOwner<AgentDeepLinkTarget>({
 // ---------------------------------------------------------------------------
 
 function receiveAgentDeepLink(input: string): void {
-  const target = parseAgentDeepLink(input);
+  const target = parseDesktopAgentDeepLink(input, APP_NAME);
   if (!target) {
     return;
   }
@@ -877,7 +894,7 @@ function setupSingleInstanceLock(): boolean {
   }
 
   app.on("second-instance", (_event, commandLine) => {
-    const agentTarget = parseAgentDeepLinkFromArgv(commandLine);
+    const agentTarget = parseAgentDeepLinkFromArgv(commandLine, APP_NAME);
     if (agentTarget) {
       void bootstrapComplete
         .then(() => desktopWindowOwner.openOrFocusAgent(agentTarget))
@@ -923,6 +940,12 @@ async function runCliPassthroughIfRequested(): Promise<boolean> {
 }
 
 async function bootstrap(): Promise<void> {
+  configureDesktopDaemonEnvironment({
+    isPackaged: app.isPackaged,
+    appName: APP_NAME,
+    userDataPath: app.getPath("userData"),
+    env: process.env,
+  });
   if (!setupSingleInstanceLock()) {
     return;
   }
@@ -977,12 +1000,14 @@ async function bootstrap(): Promise<void> {
   // In-app "Open in new window": opens a window that lands on the given project
   // via the same open-project flow as a CLI launch (no move, no ownership).
   ipcMain.handle("paseo:window:openNew", async (_event, options?: unknown) => {
-    const pendingPath =
-      options && typeof options === "object" && "pendingOpenProjectPath" in options
-        ? (options as { pendingOpenProjectPath?: unknown }).pendingOpenProjectPath
-        : null;
+    const input = (options && typeof options === "object" ? options : {}) as {
+      pendingOpenProjectPath?: unknown;
+      agentLink?: unknown;
+    };
+    const pendingPath = input.pendingOpenProjectPath;
     await desktopWindowOwner.openAdditional({
       pendingProjectPath: typeof pendingPath === "string" ? pendingPath : null,
+      agent: typeof input.agentLink === "string" ? parseAgentDeepLink(input.agentLink) : null,
     });
   });
 

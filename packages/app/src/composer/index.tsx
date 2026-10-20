@@ -27,6 +27,7 @@ import {
   useImperativeHandle,
   memo,
   type ReactElement,
+  type ReactNode,
 } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
@@ -45,6 +46,7 @@ import {
   Image as ImageIcon,
   ClipboardPaste,
   Paperclip,
+  Target,
 } from "lucide-react-native";
 import * as Clipboard from "expo-clipboard";
 import { FOOTER_HEIGHT } from "@/constants/layout";
@@ -114,16 +116,23 @@ import {
 import { resolveAgentControlsMode } from "@/composer/agent-controls/mode";
 import { resolveComposerInputMode, type ComposerInputMode } from "@/composer/input-mode";
 import { resolveActiveSendBehavior } from "./input/state";
+import { DesktopQueuedMessageRow } from "./desktop-queued-message-row";
 import { useKeyboardActionHandler } from "@/hooks/use-keyboard-action-handler";
 import type { KeyboardActionDefinition } from "@/keyboard/keyboard-action-dispatcher";
 import type { MessageInputKeyboardActionKind } from "@/keyboard/actions";
 import { submitAgentInput } from "@/composer/submit";
 import { createMessageSubmissionWriter } from "@/composer/submission/writer";
 import { ComposerKeyboardScopeProvider, useComposerKeyboardScope } from "@/composer/keyboard-scope";
+import {
+  ComposerModesContext,
+  type ComposerModesMenuState,
+} from "@/composer/agent-controls/plan-mode";
+import type { PlanToggle } from "@/agent-controls/policy";
+import { PlanModeIcon } from "@/agent-controls/icons";
 import { useAppSettings } from "@/hooks/use-settings";
 import { RenderProfile } from "@/utils/render-profiler";
 import { AfterPaintPublication } from "@/composer/after-paint-publication";
-import { isWeb, isNative } from "@/constants/platform";
+import { getIsElectronMac, isWeb, isNative } from "@/constants/platform";
 import type { ForgeSearchItem } from "@getpaseo/protocol/messages";
 import type {
   AttachmentMetadata,
@@ -234,6 +243,9 @@ function resolveMessagePlaceholder(
   if (inputMode === "terminal") {
     return t("composer.placeholders.terminal");
   }
+  if (getIsElectronMac()) {
+    return t("composer.placeholders.chat");
+  }
   return isDesktopWebBreakpoint
     ? t("composer.placeholders.desktop")
     : t("composer.placeholders.mobile");
@@ -282,6 +294,41 @@ function buildAgentStateSelector(serverId: string, agentId: string) {
       model: agent?.model ?? null,
     };
   };
+}
+
+function renderContextWindowMeter(
+  serverId: string,
+  agentId: string,
+  contextWindowMaxTokens: number | null,
+  contextWindowUsedTokens: number | null,
+  totalCostUsd: number | null,
+  showPercentage: boolean,
+  pending: boolean,
+  glyphSize: number,
+): ReactElement | null {
+  const hasData = contextWindowMaxTokens !== null && contextWindowUsedTokens !== null;
+  if (!hasData && !pending) {
+    return null;
+  }
+  return (
+    <ContextWindowMeter
+      serverId={serverId}
+      agentId={agentId}
+      maxTokens={contextWindowMaxTokens}
+      usedTokens={contextWindowUsedTokens}
+      totalCostUsd={totalCostUsd}
+      showPercentage={showPercentage}
+      pending={pending}
+      glyphSize={glyphSize}
+    />
+  );
+}
+
+function resolveContextWindowPlacement(
+  meter: ReactElement | null,
+  reserveSlot: boolean,
+): ReactNode {
+  return reserveSlot ? <View style={styles.contextWindowMeterSlot}>{meter}</View> : null;
 }
 
 interface RenderLeftContentArgs {
@@ -368,6 +415,8 @@ interface RenderQueueTrackArgs {
   queuedMessages: readonly QueuedMessage[];
   handleEditQueuedMessage: (id: string) => void;
   handleSendQueuedNow: (id: string) => Promise<void>;
+  handleDeleteQueuedMessage: (id: string) => void;
+  handleTurnOffQueue: () => void;
   editLabel: string;
   sendNowLabel: string;
 }
@@ -378,16 +427,28 @@ function renderQueueTrack(args: RenderQueueTrackArgs): ReactElement | null {
   if (queuedMessages.length === 0) return null;
   return (
     <View style={styles.queueTrack}>
-      {queuedMessages.map((item) => (
-        <QueuedMessageRow
-          key={item.id}
-          item={item}
-          onEdit={handleEditQueuedMessage}
-          onSendNow={handleSendQueuedNow}
-          editLabel={editLabel}
-          sendNowLabel={sendNowLabel}
-        />
-      ))}
+      {queuedMessages.map((item) =>
+        getIsElectronMac() ? (
+          <DesktopQueuedMessageRow
+            key={item.id}
+            id={item.id}
+            text={item.text}
+            onSteer={args.handleSendQueuedNow}
+            onDelete={args.handleDeleteQueuedMessage}
+            onEdit={handleEditQueuedMessage}
+            onTurnOffQueue={args.handleTurnOffQueue}
+          />
+        ) : (
+          <QueuedMessageRow
+            key={item.id}
+            item={item}
+            onEdit={handleEditQueuedMessage}
+            onSendNow={handleSendQueuedNow}
+            editLabel={editLabel}
+            sendNowLabel={sendNowLabel}
+          />
+        ),
+      )}
     </View>
   );
 }
@@ -980,6 +1041,16 @@ interface ComposerProps {
   editingSession?: ComposerEditingSession;
 }
 
+function resolveContextWindowValues(
+  rawMax: number | null,
+  rawUsed: number | null,
+): { contextWindowMaxTokens: number | null; contextWindowUsedTokens: number | null } {
+  if (typeof rawMax === "number" && typeof rawUsed === "number") {
+    return { contextWindowMaxTokens: rawMax, contextWindowUsedTokens: rawUsed };
+  }
+  return { contextWindowMaxTokens: null, contextWindowUsedTokens: null };
+}
+
 const EMPTY_ARRAY: readonly QueuedMessage[] = [];
 const StableMessageInput = memo(MessageInput);
 
@@ -1084,9 +1155,12 @@ function ComposerCancelButton({
     ? t("composer.cancel.cancelingAgent")
     : t("composer.cancel.stopAgent");
   const icon = isCancellingAgent ? (
-    <LoadingSpinner size="small" color="white" />
+    <ThemedLoadingSpinner size="small" uniProps={cancelSpinnerColorMapping} />
   ) : (
-    <Square size={buttonIconSize} color="white" fill="white" />
+    <ThemedSquare
+      size={getIsElectronMac() ? 10 : buttonIconSize}
+      uniProps={cancelIconColorMapping}
+    />
   );
   const shortcutNode = agentInterruptKeys ? <Shortcut chord={agentInterruptKeys} /> : null;
   return (
@@ -1279,7 +1353,7 @@ function ComposerContentImpl({
     agentDirectoryStatus,
   });
 
-  const { settings: appSettings } = useAppSettings();
+  const { settings: appSettings, updateSettings: updateAppSettings } = useAppSettings();
 
   const agentState = useSessionStore(useShallow(buildAgentStateSelector(serverId, agentId)));
 
@@ -1367,6 +1441,14 @@ function ComposerContentImpl({
   const [sendError, setSendError] = useState<string | null>(null);
   const [isMessageInputFocused, setIsMessageInputFocused] = useState(false);
   const [isGithubPickerOpen, setIsGithubPickerOpen] = useState(false);
+  const planToggleRef = useRef<PlanToggle | null>(null);
+  const [modesMenu, setModesMenu] = useState<ComposerModesMenuState>(NO_COMPOSER_MODES);
+  const [goalOn, setGoalOn] = useState(false);
+  const goalModeOn = goalOn && modesMenu.goalAvailable;
+  const modesBridge = useMemo(
+    () => ({ planToggleRef, setMenuState: setModesMenu, goalOn, setGoalOn }),
+    [goalOn],
+  );
   const [githubSearchQuery, setGithubSearchQuery] = useState("");
   const [lightboxMetadata, setLightboxMetadata] = useState<AttachmentMetadata | null>(null);
   const attachButtonRef = useRef<View | null>(null);
@@ -1518,7 +1600,11 @@ function ComposerContentImpl({
   }, [focusInput, onFocusInput]);
 
   const submitMessage = useCallback(
-    async (text: string, submitAttachments: ComposerAttachment[]) => {
+    async (
+      text: string,
+      submitAttachments: ComposerAttachment[],
+      activeTurnBehavior?: "interrupt" | "steer",
+    ) => {
       onMessageSent?.();
       if (onSubmitMessageRef.current) {
         await onSubmitMessageRef.current({ text, attachments: submitAttachments, cwd });
@@ -1531,7 +1617,7 @@ function ComposerContentImpl({
         agentIdRef.current,
         text,
         submitAttachments,
-        appSettings.sendBehavior === "steer" ? "steer" : "interrupt",
+        activeTurnBehavior ?? (appSettings.sendBehavior === "steer" ? "steer" : "interrupt"),
       );
     },
     [appSettings.sendBehavior, cwd, onMessageSent, t],
@@ -1710,12 +1796,23 @@ function ComposerContentImpl({
       });
       if (pluginSlashCommand && runPluginClientSlashCommand(pluginSlashCommand)) return;
 
+      // Goal mode sends the message as the agent's goal, then turns itself off. A typed slash
+      // command is sent as is.
+      const trimmedText = payload.text.trim();
+      const goalText = goalModeOn && !trimmedText.startsWith("/") ? trimmedText : "";
+      if (goalText) setGoalOn(false);
+
       if (blurOnSubmit) {
         messageInputRef.current?.blur();
       }
-      void sendMessageWithContent(payload.text, outgoingAttachments, payload.forceSend);
+      void sendMessageWithContent(
+        goalText ? `/goal ${goalText}` : payload.text,
+        outgoingAttachments,
+        payload.forceSend,
+      );
     },
     [
+      goalModeOn,
       attachments,
       blurOnSubmit,
       buildOutgoingAttachments,
@@ -1930,13 +2027,14 @@ function ComposerContentImpl({
   const handleSendQueuedNow = useCallback(
     async (id: string) => {
       if (!sendAgentMessageRef.current && !onSubmitMessageRef.current) return;
-      // Reuse the regular send path; server-side send atomically interrupts any active run.
+      // Reuse the regular send path. The Mac row's Steer sends into the running turn like
+      // Codex; elsewhere the server-side send atomically interrupts any active run.
       const result = await sendQueuedComposerMessageNow({
         agentId,
         messageId: id,
         queue: queueWriter,
         submitMessage: ({ text, attachments: queuedAttachments }) =>
-          submitMessage(text, queuedAttachments),
+          submitMessage(text, queuedAttachments, getIsElectronMac() ? "steer" : undefined),
         failedToSendMessage: t("composer.errors.failedToSend"),
       });
       if (result.status === "failed") {
@@ -1945,6 +2043,24 @@ function ComposerContentImpl({
     },
     [agentId, queueWriter, submitMessage, t],
   );
+
+  const handleDeleteQueuedMessage = useCallback(
+    (id: string) => {
+      queueWriter.write((prev) => {
+        const next = new Map(prev);
+        next.set(
+          agentId,
+          (prev.get(agentId) ?? []).filter((item) => item.id !== id),
+        );
+        return next;
+      });
+    },
+    [agentId, queueWriter],
+  );
+
+  const handleTurnOffQueue = useCallback(() => {
+    void updateAppSettings({ sendBehavior: "steer" });
+  }, [updateAppSettings]);
 
   const handleQueue = useCallback(
     (payload: MessagePayload) => {
@@ -2053,30 +2169,42 @@ function ComposerContentImpl({
     ],
   );
 
-  const contextWindowMeterGlyphSize = isCompactLayout ? ICON_SIZE.md : buttonIconSize;
-  const beforeVoiceContent = useMemo(
+  const { contextWindowMaxTokens, contextWindowUsedTokens } = resolveContextWindowValues(
+    agentState.contextWindowMaxTokens,
+    agentState.contextWindowUsedTokens,
+  );
+
+  const contextWindowPending = agentState.status === "initializing" || isAgentRunning;
+  // The Mac meter is a small ring inside a box (context-window-meter.tsx).
+  const desktopMeterGlyphSize = getIsElectronMac() ? MAC_CONTEXT_METER_SIZE : buttonIconSize;
+  const contextWindowMeterGlyphSize = isCompactLayout ? ICON_SIZE.md : desktopMeterGlyphSize;
+
+  const contextWindowMeter = useMemo(
     () =>
-      hasAgent ? (
-        <View style={styles.contextWindowMeterSlot}>
-          <ContextWindowMeter
-            serverId={serverId}
-            agentId={agentId}
-            maxTokens={agentState.contextWindowMaxTokens}
-            usedTokens={agentState.contextWindowUsedTokens}
-            totalCostUsd={agentState.totalCostUsd}
-            glyphSize={contextWindowMeterGlyphSize}
-          />
-        </View>
-      ) : null,
+      renderContextWindowMeter(
+        serverId,
+        agentId,
+        contextWindowMaxTokens,
+        contextWindowUsedTokens,
+        agentState.totalCostUsd,
+        false,
+        contextWindowPending,
+        contextWindowMeterGlyphSize,
+      ),
     [
-      hasAgent,
       serverId,
       agentId,
-      agentState.contextWindowMaxTokens,
-      agentState.contextWindowUsedTokens,
+      contextWindowMaxTokens,
+      contextWindowUsedTokens,
       agentState.totalCostUsd,
+      contextWindowPending,
       contextWindowMeterGlyphSize,
     ],
+  );
+
+  const beforeVoiceContent = useMemo(
+    () => <>{resolveContextWindowPlacement(contextWindowMeter, hasAgent)}</>,
+    [contextWindowMeter, hasAgent],
   );
 
   const hasGithubAttachment = useMemo(
@@ -2129,6 +2257,15 @@ function ComposerContentImpl({
   );
 
   const attachmentMenuItems = useMemo<AttachmentMenuItem[]>(() => {
+    const desktopMenu = getIsElectronMac() && !isCompactFormFactor;
+    const file: AttachmentMenuItem = {
+      id: "file",
+      label: t("composer.attachments.addFile"),
+      icon: <ThemedPaperclip size={ICON_SIZE.md} uniProps={iconForegroundMutedMapping} />,
+      onSelect: () => {
+        void handlePickFile();
+      },
+    };
     const items: AttachmentMenuItem[] = [
       {
         id: "image",
@@ -2161,21 +2298,41 @@ function ComposerContentImpl({
         },
       },
       ...pluginAttachments.menuItems,
-      {
-        id: "file",
-        label: t("composer.attachments.addFile"),
-        icon: <ThemedPaperclip size={ICON_SIZE.md} uniProps={iconForegroundMutedMapping} />,
-        onSelect: () => {
-          void handlePickFile();
-        },
-      },
     );
-    return items;
+    if (!desktopMenu) return [...items, file];
+    const modes: AttachmentMenuItem[] = [];
+    if (modesMenu.planOn !== null) {
+      modes.push({
+        id: "plan-mode",
+        label: t("shell.commandCenter.planModeGroupLabel"),
+        icon: <ThemedPlanModeIcon size={ICON_SIZE.md} uniProps={iconForegroundMutedMapping} />,
+        section: "modes",
+        selected: modesMenu.planOn,
+        onSelect: () => {
+          const toggle = planToggleRef.current;
+          if (toggle) void (toggle.isOn ? toggle.turnOff() : toggle.turnOn());
+        },
+      });
+    }
+    if (modesMenu.goalAvailable) {
+      modes.push({
+        id: "goal-mode",
+        label: t("composer.goalMode.label"),
+        icon: <ThemedTarget size={ICON_SIZE.md} uniProps={iconForegroundMutedMapping} />,
+        section: "modes",
+        selected: goalModeOn,
+        onSelect: () => setGoalOn((on) => !on),
+      });
+    }
+    return [file, ...items, ...modes];
   }, [
+    goalModeOn,
+    modesMenu,
     forgePresentation,
     handlePasteImage,
     handlePickFile,
     handlePickImage,
+    isCompactFormFactor,
     pluginAttachments.menuItems,
     t,
   ]);
@@ -2326,10 +2483,19 @@ function ComposerContentImpl({
         queuedMessages,
         handleEditQueuedMessage,
         handleSendQueuedNow,
+        handleDeleteQueuedMessage,
+        handleTurnOffQueue,
         editLabel: t("composer.attachments.editQueuedMessage"),
         sendNowLabel: t("composer.attachments.sendQueuedMessageNow"),
       }),
-    [handleEditQueuedMessage, handleSendQueuedNow, queuedMessages, t],
+    [
+      handleDeleteQueuedMessage,
+      handleEditQueuedMessage,
+      handleSendQueuedNow,
+      handleTurnOffQueue,
+      queuedMessages,
+      t,
+    ],
   );
 
   const autocompleteConfiguration = useMemo(
@@ -2389,7 +2555,7 @@ function ComposerContentImpl({
     : t("composer.github.noResults");
 
   return (
-    <>
+    <ComposerModesContext.Provider value={modesBridge}>
       <ComposerKeyboardRegistration
         handlerId={keyboardHandlerIdRef.current}
         messageInputRef={messageInputRef}
@@ -2454,7 +2620,7 @@ function ComposerContentImpl({
                   onPasteImages={handleNativePasteImages}
                   client={client}
                   isReadyForDictation={isDictationReady}
-                  placeholder={messagePlaceholder}
+                  placeholder={goalModeOn ? t("composer.goalMode.placeholder") : messagePlaceholder}
                   autoFocus={messageInputAutoFocus}
                   autoFocusKey={`${serverId}:${agentId}:${autoFocusKey ?? ""}`}
                   disabled={isSubmitLoading}
@@ -2505,7 +2671,7 @@ function ComposerContentImpl({
           </View>
         </View>
       </View>
-    </>
+    </ComposerModesContext.Provider>
   );
 }
 
@@ -2571,7 +2737,7 @@ const styles = StyleSheet.create((theme: Theme) => ({
     width: 28,
     height: 28,
     borderRadius: theme.borderRadius.full,
-    backgroundColor: theme.colors.palette.red[600],
+    backgroundColor: getIsElectronMac() ? theme.colors.accent : theme.colors.palette.red[600],
     alignItems: "center",
     justifyContent: "center",
     marginLeft: theme.spacing[1],
@@ -2665,7 +2831,8 @@ const styles = StyleSheet.create((theme: Theme) => ({
   },
 })) as unknown as Record<string, object>;
 
-const ThemedAttachmentSpinner = withUnistyles(LoadingSpinner);
+const ThemedLoadingSpinner = withUnistyles(LoadingSpinner);
+const ThemedSquare = withUnistyles(Square);
 const ThemedPencil = withUnistyles(Pencil);
 const ThemedArrowUp = withUnistyles(ArrowUp);
 const ThemedGitPullRequest = withUnistyles(GitPullRequest);
@@ -2673,11 +2840,22 @@ const ThemedCircleDot = withUnistyles(CircleDot);
 const ThemedAudioLines = withUnistyles(AudioLines);
 const ThemedPaperclip = withUnistyles(Paperclip);
 const ThemedImageIcon = withUnistyles(ImageIcon);
+const ThemedPlanModeIcon = withUnistyles(PlanModeIcon);
+const ThemedTarget = withUnistyles(Target);
+const MAC_CONTEXT_METER_SIZE = 14;
+const NO_COMPOSER_MODES: ComposerModesMenuState = { planOn: null, goalAvailable: false };
 const ThemedClipboardPaste = withUnistyles(ClipboardPaste);
 const ThemedFileText = withUnistyles(FileText);
 const iconForegroundMapping = (theme: Theme) => ({ color: theme.colors.foreground });
 const iconForegroundMutedMapping = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
 const iconAccentForegroundMapping = (theme: Theme) => ({ color: theme.colors.accentForeground });
+const cancelSpinnerColorMapping = (theme: Theme) => ({
+  color: getIsElectronMac() ? theme.colors.accentForeground : "white",
+});
+const cancelIconColorMapping = (theme: Theme) => ({
+  ...cancelSpinnerColorMapping(theme),
+  fill: getIsElectronMac() ? theme.colors.accentForeground : "white",
+});
 
 function renderForgeAttachmentIcon(icon: string): ReactElement {
   return (
@@ -2694,5 +2872,5 @@ const githubIssuePillIcon = (
 const filePillIcon = <ThemedFileText size={ICON_SIZE.sm} uniProps={iconForegroundMutedMapping} />;
 
 const pendingFilePillIcon = (
-  <ThemedAttachmentSpinner size={18} uniProps={iconForegroundMutedMapping} />
+  <ThemedLoadingSpinner size={18} uniProps={iconForegroundMutedMapping} />
 );

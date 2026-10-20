@@ -16,10 +16,10 @@ export type BuiltinSidebarItemId<Section extends SidebarSection = SidebarSection
   (typeof BUILTIN_SIDEBAR_ITEM_IDS)[Section][number];
 export type BuiltinSidebarNavId = BuiltinSidebarItemId<"header">;
 
-/** Persisted shape. Array order is the display order. */
+/** Persisted order and explicit visibility overrides; omitted visibility follows layout defaults. */
 export interface SidebarNavPreference {
   key: string;
-  visible: boolean;
+  visible?: boolean;
 }
 
 export interface BuiltinSidebarNavItem<Section extends SidebarSection = SidebarSection> {
@@ -108,14 +108,19 @@ export function resolveSidebarNavItems<Section extends SidebarSection>(input: {
     const group = groupsByKey.get(preference.key);
     if (group) {
       placed.add(preference.key);
-      items.push({ kind: "plugin", key: preference.key, group, visible: preference.visible });
+      items.push({
+        kind: "plugin",
+        key: preference.key,
+        group,
+        visible: preference.visible ?? true,
+      });
     } else if (isBuiltinSidebarItemId(input.section, preference.key)) {
       placed.add(preference.key);
       items.push({
         kind: "builtin",
         key: preference.key,
         id: preference.key,
-        visible: preference.visible,
+        visible: preference.visible ?? builtinVisibleByDefault(preference.key),
       });
     }
   }
@@ -144,7 +149,11 @@ function toPreferences(
   items: readonly SidebarNavItem[],
   previous: readonly SidebarNavPreference[],
 ): SidebarNavPreference[] {
-  const remaining = items.map(({ key, visible }) => ({ key, visible }));
+  // Saving order must not turn the current layout's defaults into explicit choices.
+  const remaining = items.map(({ key }) => {
+    const preference = previous.find((entry) => entry.key === key);
+    return preference ? { ...preference } : { key };
+  });
   const availableKeys = new Set(remaining.map((preference) => preference.key));
   const preferences: SidebarNavPreference[] = [];
   const seenPrevious = new Set<string>();
@@ -159,7 +168,7 @@ function toPreferences(
       continue;
     }
 
-    preferences.push({ key: preference.key, visible: preference.visible });
+    preferences.push({ ...preference });
   }
 
   preferences.push(...remaining);
@@ -172,10 +181,11 @@ export function setSidebarNavItemVisible(input: {
   visible: boolean;
   previous: readonly SidebarNavPreference[];
 }): SidebarNavPreference[] {
-  const items = input.items.map((item) =>
-    item.key === input.key ? { ...item, visible: input.visible } : item,
-  );
-  return toPreferences(items, input.previous);
+  const preferences = toPreferences(input.items, input.previous);
+  if (!input.items.some((item) => item.key === input.key)) return preferences;
+  const target = preferences.find((preference) => preference.key === input.key);
+  if (target) target.visible = input.visible;
+  return preferences;
 }
 
 export function moveSidebarNavItem(input: {

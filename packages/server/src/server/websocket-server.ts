@@ -1827,6 +1827,8 @@ export class VoiceAssistantWebSocketServer {
         // and legacy fallback after 2027-01-17 once the supported daemon floor
         // is >= v0.2.0.
         forgeSearch: true,
+        // COMPAT(forgeChangeRequestGet): added in v0.11.4 (fork), remove gate after 2027-04-16.
+        forgeChangeRequestGet: true,
         // COMPAT(daemonStatusRpc): added in v0.1.76, remove gate after 2026-11-18.
         ...(this.advertiseDaemonStatusRpc ? { daemonStatusRpc: true } : {}),
         // COMPAT(daemonConfigReload): added in v0.4.0, remove gate after 2027-02-14.
@@ -1891,6 +1893,8 @@ export class VoiceAssistantWebSocketServer {
         agentForkContext: true,
         // COMPAT(agentForkContextCursor): added in v0.1.108, remove gate after 2027-01-14.
         agentForkContextCursor: true,
+        // COMPAT(agentNativeFork): added in v0.11.0, remove gate after 2027-04-03.
+        agentNativeFork: true,
         // COMPAT(providerSubagents): added in v0.1.107, remove gate after 2027-01-12.
         providerSubagents: true,
         // COMPAT(projectedSubagentTimeline): added after v0.8.0, remove gates after 2027-03-14; retain advertisement.
@@ -1909,6 +1913,10 @@ export class VoiceAssistantWebSocketServer {
         workspaceGithubRepositorySearch: true,
         // COMPAT(projectCreateDirectory): added in v0.1.108, remove gate after 2027-01-15.
         projectCreateDirectory: true,
+        // COMPAT(projectCreateDirectoryParents): added in Paseo Custom v0.11.0-beta.3-v1-beta4, remove gate after 2027-04-01.
+        projectCreateDirectoryParents: true,
+        // COMPAT(agentContextUsage): added in Paseo Custom v0.11.0-beta.3-v1-beta6, remove gate after 2027-04-04.
+        agentContextUsage: true,
         // COMPAT(commitsList): added in v0.1.110, remove gate after 2027-01-16.
         commitsList: true,
         // COMPAT(commitBaseClassification): added in v0.2.0, remove gate after 2027-01-23.

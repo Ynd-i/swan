@@ -232,7 +232,16 @@ export class Session {
         });
     } catch (error) {
       this.state = { type: "dormant" };
-      await driver.stop("interrupt");
+      try {
+        await driver.stop("interrupt");
+      } catch (cleanupError) {
+        const message = error instanceof Error ? error.message : String(error);
+        const detail = cleanupError instanceof Error ? cleanupError.message : String(cleanupError);
+        throw new AntigravityError(
+          `${message} (Antigravity cleanup failed: ${detail})`,
+          error instanceof AntigravityError ? error.code : "ANTIGRAVITY_ERROR",
+        );
+      }
       throw error;
     }
   }

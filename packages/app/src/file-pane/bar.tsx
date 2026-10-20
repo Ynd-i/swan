@@ -7,6 +7,7 @@ import { SegmentedControl } from "@/components/ui/segmented-control";
 import type { Theme } from "@/styles/theme";
 import { FileConflictAlert, type FileConflictAlertState } from "./conflict-alert";
 import type { FileEditorStatus } from "./editor/model";
+import { getIsElectronMac } from "@/constants/platform";
 
 const ThemedSpinner = withUnistyles(LoadingSpinner);
 const spinnerMapping = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
@@ -41,7 +42,7 @@ export function FilePanelBar({
   ];
   return (
     <View style={styles.chrome}>
-      <PaneContentToolbar testID="file-panel-bar">
+      <PaneContentToolbar testID="file-panel-bar" style={getIsElectronMac() && styles.macStatusBar}>
         <View style={styles.row}>
           <View style={styles.metadata}>
             <Text
@@ -122,6 +123,12 @@ function formatFileSize(size: number): string {
 }
 
 const styles = StyleSheet.create((theme) => ({
+  macStatusBar: {
+    height: 28,
+    borderBottomWidth: 0,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.border,
+  },
   chrome: {
     flexShrink: 0,
   },

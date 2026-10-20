@@ -4,6 +4,7 @@ import {
   collectDirPaths,
   compressSingleChildChains,
   flattenDiffTree,
+  searchDiffTree,
   type DiffTreeRow,
 } from "./diff-tree";
 import type { ParsedDiffFile } from "@/git/use-diff-query";
@@ -35,6 +36,25 @@ function rowLabels(rows: DiffTreeRow[]): string[] {
       : `${"  ".repeat(row.depth)}${row.file.path.split("/").pop()}`,
   );
 }
+
+describe("searchDiffTree", () => {
+  it("finds full paths case-insensitively without changing file identities or the original tree", () => {
+    const files = [createFile("src/other.ts"), createFile("test/deep/Example.ts", 4, 2)];
+    const root = compressSingleChildChains(buildDiffTree(files));
+    const before = structuredClone(root);
+    const collapsed = new Set(["test/deep"]);
+    const collapsedRows = flattenDiffTree(root, collapsed);
+    const result = searchDiffTree(root, "  TEST/deep/exam  ");
+    expect(result).toEqual([{ kind: "file", file: files[1], fileIndex: 1, depth: 0 }]);
+    expect(result[0].file).toBe(files[1]);
+    expect(searchDiffTree(root, "no match")).toEqual([]);
+    expect(root).toEqual(before);
+    expect(flattenDiffTree(root, collapsed)).toEqual(collapsedRows);
+    expect(collapsedRows.filter((row) => row.kind === "file").map((row) => row.file.path)).toEqual([
+      "src/other.ts",
+    ]);
+  });
+});
 
 describe("buildDiffTree", () => {
   it("returns an empty root for no files", () => {

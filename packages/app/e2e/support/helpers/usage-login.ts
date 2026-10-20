@@ -120,7 +120,7 @@ export default function contribute(server) {
 }
 
 export async function expectCodexReportedWindows(page: Page, shape: "seven-day-only" | "Spark") {
-  await expectPinnedUsage(page, ["11% wk"]);
+  await expectPinnedUsage(page, "11% wk");
   await expect(pinRow(page.locator("body"), "Codex", "Weekly")).toBeChecked();
   await expect(page.getByText("Session", { exact: true })).toHaveCount(0);
   if (shape === "Spark") {

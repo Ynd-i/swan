@@ -23,6 +23,7 @@ import {
 import {
   checkForAppUpdate,
   downloadAndInstallUpdate,
+  getCustomReleaseTag,
   type AppUpdateCheckIntent,
   type AppReleaseChannel,
 } from "../features/auto-updater.js";
@@ -403,6 +404,7 @@ export function createDaemonCommandHandlers(): Record<string, DesktopCommandHand
     ...createDesktopSettingsCommandHandlers({ settingsStore: getDesktopSettingsStore() }),
     desktop_get_runtime_info: () => ({
       appVersion: resolveDesktopAppVersion(),
+      releaseTag: getCustomReleaseTag(),
       runningUnderARM64Translation: isRunningUnderARM64Translation(),
     }),
     desktop_daemon_status: () => resolveDesktopDaemonStatus(),

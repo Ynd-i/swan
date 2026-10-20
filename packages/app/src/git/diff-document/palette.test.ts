@@ -22,6 +22,18 @@ describe("diff text color", () => {
 });
 
 describe("diff palette retention", () => {
+  it("refreshes when only changed-line gutters or empty-row hatching changes", () => {
+    for (const key of [
+      "additionGutterBackground",
+      "deletionGutterBackground",
+      "emptyStripe",
+      "additionInlineBackground",
+      "deletionInlineBackground",
+    ] as const) {
+      const changed = { ...palette, [key]: "changed" };
+      expect(retainDiffPalette(palette, changed)).toBe(changed);
+    }
+  });
   it("retains the previous value when a theme wrapper recreates equal colors", () => {
     const recreated = { ...palette, syntax: { keyword: "purple" } };
     const previous = { ...recreated, syntax: { keyword: "purple" } };
@@ -34,6 +46,21 @@ describe("diff palette retention", () => {
 
     expect(retainDiffPalette(palette, changed)).toBe(changed);
   });
+});
+
+it("uses the measured Codex dark diff colors only when explicitly selected", () => {
+  const created = createDiffPalette(darkTheme, true);
+  expect(created).toMatchObject({
+    addition: "#00c853",
+    deletion: "#ff5f38",
+    additionBackground: "#334a34",
+    deletionBackground: "#55392e",
+    additionGutterBackground: "#122013",
+    deletionGutterBackground: "#28150e",
+    emptyStripe: "#3c3c3a",
+  });
+  expect(createDiffPalette(darkTheme)).not.toHaveProperty("emptyStripe");
+  expect(createDiffPalette(lightTheme)).not.toHaveProperty("additionGutterBackground");
 });
 
 describe.each([lightTheme, darkTheme])("semantic diff colors", (theme) => {

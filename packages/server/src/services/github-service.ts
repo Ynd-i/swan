@@ -11,6 +11,11 @@ import {
   buildPullHeadCheckoutRefs,
 } from "../utils/change-request-checkout.js";
 import { execCommand } from "../utils/spawn.js";
+import {
+  buildGitHubChangeRequestPreviewArgs,
+  GitHubChangeRequestPreviewSchema,
+  toGitHubChangeRequestPreview,
+} from "./github-change-request-preview.js";
 import { resolveSshHostname } from "../utils/ssh-hostname.js";
 import {
   CLI_AUTH_PROBE_TIMEOUT_MS,
@@ -2098,6 +2103,24 @@ export function createGitHubService(options: CreateGitHubServiceOptions = {}): G
             "{}",
           );
           return toPullRequestSummary(item);
+        },
+      });
+    },
+
+    getChangeRequestPreview(input) {
+      return cached({
+        cwd: input.cwd,
+        method: "getChangeRequestPreview",
+        args: { url: input.url },
+        readOptions: input,
+        load: async () => {
+          const item = await runGhJson(
+            buildGitHubChangeRequestPreviewArgs(input.url),
+            { cwd: input.cwd },
+            GitHubChangeRequestPreviewSchema,
+            "{}",
+          );
+          return toGitHubChangeRequestPreview(item);
         },
       });
     },

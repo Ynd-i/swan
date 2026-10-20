@@ -1,3 +1,5 @@
+import { useAppReducedMotion } from "@/appearance/reduced-motion";
+import { SIDEBAR_TOGGLE_TIMING } from "@/components/use-animated-dock";
 import { router } from "expo-router";
 import {
   CircleGauge,
@@ -9,7 +11,16 @@ import {
   type LucideIcon,
 } from "lucide-react-native";
 import { useTranslation } from "react-i18next";
-import { memo, useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type RefObject,
+} from "react";
 import {
   Pressable,
   StyleSheet as RNStyleSheet,
@@ -18,7 +29,12 @@ import {
   View,
 } from "react-native";
 import { Gesture } from "react-native-gesture-handler";
-import Animated, { runOnJS, useAnimatedStyle, useSharedValue } from "react-native-reanimated";
+import Animated, {
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StyleSheet, useUnistyles, withUnistyles } from "react-native-unistyles";
@@ -29,6 +45,11 @@ import {
   iconButtonChromeGlyphSize,
   mutedIconColorMapping,
 } from "@/components/ui/icon-button-chrome";
+import { desktopShellInset, usesDesktopShell } from "@/components/desktop/desktop-shell";
+import {
+  DesktopChatSidebar,
+  DesktopChatSidebarHeader,
+} from "@/components/desktop/desktop-chat-sidebar";
 import { resolveDesktopSidebarWidth } from "@/components/desktop-sidebar-layout";
 import {
   SIDEBAR_RESIZE_ACTIVATION_OFFSET,
@@ -438,36 +459,40 @@ function SidebarFooter({
 }) {
   const newAgentKeys = useShortcutKeys("new-agent");
   const settingsKeys = useShortcutKeys("toggle-settings");
+  const isCompact = useIsCompactFormFactor();
 
   // One line of icons: Add project, Usage, Hosts, then Help and Settings at the end.
+  // The Mac navigation rail carries these actions whenever it is visible.
   return (
     <UsageSidebarRoot>
       <View style={styles.footerContainer} testID="sidebar-footer">
         <SidebarFooterRows onBeforeNavigate={onBeforeNavigate} />
-        <View style={styles.sidebarFooter} testID="sidebar-footer-bottom-line">
-          <FooterIconButton
-            onPress={handleOpenProject}
-            testID="sidebar-add-project"
-            label={labels.addProject}
-            icon={FolderPlus}
-            shortcutKeys={newAgentKeys}
-          />
-          <SidebarUsageIcon label={labels.usage} />
-          <SidebarHostPicker
-            label={labels.hosts}
-            onAddHost={handleAddHost}
-            onOpenHostSettings={handleOpenHostSettings}
-          />
-          <View style={styles.footerSpacer} />
-          <SidebarHelpMenu />
-          <FooterIconButton
-            onPress={handleSettings}
-            testID="sidebar-settings"
-            label={labels.settings}
-            icon={Settings}
-            shortcutKeys={settingsKeys}
-          />
-        </View>
+        {usesDesktopShell && !isCompact ? null : (
+          <View style={styles.sidebarFooter} testID="sidebar-footer-bottom-line">
+            <FooterIconButton
+              onPress={handleOpenProject}
+              testID="sidebar-add-project"
+              label={labels.addProject}
+              icon={FolderPlus}
+              shortcutKeys={newAgentKeys}
+            />
+            <SidebarUsageIcon label={labels.usage} />
+            <SidebarHostPicker
+              label={labels.hosts}
+              onAddHost={handleAddHost}
+              onOpenHostSettings={handleOpenHostSettings}
+            />
+            <View style={styles.footerSpacer} />
+            <SidebarHelpMenu />
+            <FooterIconButton
+              onPress={handleSettings}
+              testID="sidebar-settings"
+              label={labels.settings}
+              icon={Settings}
+              shortcutKeys={settingsKeys}
+            />
+          </View>
+        )}
       </View>
     </UsageSidebarRoot>
   );
@@ -679,7 +704,8 @@ function DesktopSidebar({
   const hasActiveHostFilter = useSidebarViewStore((state) => state.hostFilters.length > 0);
   const sidebarWidth = usePanelStore((state) => state.sidebarWidth);
   const setSidebarWidth = usePanelStore((state) => state.setSidebarWidth);
-  const { width: viewportWidth } = useWindowDimensions();
+  const { width: windowWidth } = useWindowDimensions();
+  const viewportWidth = windowWidth - desktopShellInset;
   const visibleSidebarWidth = resolveDesktopSidebarWidth({
     requestedWidth: sidebarWidth,
     viewportWidth,
@@ -687,6 +713,10 @@ function DesktopSidebar({
 
   const startWidthRef = useRef(visibleSidebarWidth);
   const resizeWidth = useSharedValue(visibleSidebarWidth);
+  const sidebarVisibility = useSharedValue(active ? 1 : 0);
+  const prefersReducedMotion = useAppReducedMotion();
+  const animateSidebarToggle = usesDesktopShell && !prefersReducedMotion;
+  const [keepSidebarRendered, setKeepSidebarRendered] = useState(active);
   const [resizePressed, setResizePressed] = useState(false);
   const showResizeGrip = useCallback(() => setResizePressed(true), []);
   const hideResizeGrip = useCallback(() => setResizePressed(false), []);
@@ -694,6 +724,24 @@ function DesktopSidebar({
   useEffect(() => {
     resizeWidth.value = visibleSidebarWidth;
   }, [resizeWidth, visibleSidebarWidth]);
+
+  useLayoutEffect(() => {
+    if (active) {
+      setKeepSidebarRendered(true);
+      sidebarVisibility.value = animateSidebarToggle ? withTiming(1, SIDEBAR_TOGGLE_TIMING) : 1;
+      return;
+    }
+
+    if (!animateSidebarToggle) {
+      sidebarVisibility.value = 0;
+      setKeepSidebarRendered(false);
+      return;
+    }
+
+    sidebarVisibility.value = withTiming(0, SIDEBAR_TOGGLE_TIMING, (finished) => {
+      if (finished) runOnJS(setKeepSidebarRendered)(false);
+    });
+  }, [active, animateSidebarToggle, sidebarVisibility]);
 
   const resizeGesture = useMemo(
     () =>
@@ -735,28 +783,33 @@ function DesktopSidebar({
     ],
   );
 
-  const resizeAnimatedStyle = useAnimatedStyle(() => ({
-    width: resizeWidth.value,
+  const desktopSidebarAnimatedStyle = useAnimatedStyle(() => ({
+    width: resizeWidth.value * sidebarVisibility.value,
   }));
 
   const desktopSidebarStyle = useMemo(
     () => [
       staticStyles.desktopSidebar,
-      !active && staticStyles.desktopSidebarHidden,
-      resizeAnimatedStyle,
+      !active && !keepSidebarRendered && staticStyles.desktopSidebarHidden,
+      desktopSidebarAnimatedStyle,
     ],
-    [active, resizeAnimatedStyle],
+    [active, desktopSidebarAnimatedStyle, keepSidebarRendered],
   );
   const desktopSidebarBorderStyle = useMemo(
     () => [styles.desktopSidebarBorder, { flex: 1, paddingTop: insetsTop }],
     [insetsTop],
   );
   const sidebarHeaderGroupStyle = useMemo(
-    () => [styles.sidebarHeaderGroup, ownsTopLeft && styles.sidebarHeaderGroupBelowChrome],
+    () => [
+      styles.sidebarHeaderGroup,
+      ownsTopLeft ? styles.sidebarHeaderGroupBelowChrome : null,
+      usesDesktopShell ? styles.desktopChatNav : null,
+    ],
     [ownsTopLeft],
   );
   return (
     <Animated.View
+      testID="desktop-workspace-sidebar"
       accessibilityElementsHidden={!active}
       importantForAccessibility={active ? "auto" : "no-hide-descendants"}
       pointerEvents={active ? "auto" : "none"}
@@ -764,7 +817,8 @@ function DesktopSidebar({
     >
       <View style={desktopSidebarBorderStyle}>
         <View style={styles.sidebarDragArea}>
-          {ownsTopLeft || DEV_BUILD_LABEL ? (
+          <DesktopChatSidebarHeader />
+          {!usesDesktopShell && (ownsTopLeft || DEV_BUILD_LABEL) ? (
             <View style={styles.desktopChromeRow}>
               <TitlebarDragRegion />
               {DEV_BUILD_LABEL ? (
@@ -781,34 +835,35 @@ function DesktopSidebar({
                 </View>
               ) : null}
             </View>
-          ) : (
-            <TitlebarDragRegion />
-          )}
-          <SidebarNavRows style={sidebarHeaderGroupStyle} />
+          ) : null}
+          {!usesDesktopShell && !ownsTopLeft && !DEV_BUILD_LABEL ? <TitlebarDragRegion /> : null}
+          <SidebarNavRows style={sidebarHeaderGroupStyle} chatMode={usesDesktopShell} />
         </View>
 
-        {isInitialLoad && !hasActiveHostFilter ? (
-          <SidebarAgentListSkeleton />
-        ) : (
-          <SidebarWorkspaceList
-            collapsedProjectKeys={collapsedProjectKeys}
-            onToggleProjectCollapsed={toggleProjectCollapsed}
-            shortcutIndexByWorkspaceKey={shortcutIndexByWorkspaceKey}
-            groupMode={groupMode}
-            workspaceGroups={workspaceGroups}
-            projectIconTargets={projectIconTargets}
-            pinnedGroups={pinnedGroups}
-            projects={projects}
-            hasProjectsBeforeFilter={hasProjectsBeforeFilter}
-            hasActiveProjectFilter={hasActiveProjectFilter}
-            workspaceEntriesByKey={workspaceEntriesByKey}
-            isRefreshing={isManualRefresh && isRevalidating}
-            onRefresh={handleRefresh}
-            onAddProject={handleOpenProject}
-            onImportSession={handleImportSession}
-            listHeaderComponent={workspacesSectionHeaderElement}
-          />
-        )}
+        <DesktopChatSidebar onAddProject={handleOpenProject} />
+        {!usesDesktopShell &&
+          (isInitialLoad && !hasActiveHostFilter ? (
+            <SidebarAgentListSkeleton />
+          ) : (
+            <SidebarWorkspaceList
+              collapsedProjectKeys={collapsedProjectKeys}
+              onToggleProjectCollapsed={toggleProjectCollapsed}
+              shortcutIndexByWorkspaceKey={shortcutIndexByWorkspaceKey}
+              groupMode={groupMode}
+              workspaceGroups={workspaceGroups}
+              projectIconTargets={projectIconTargets}
+              pinnedGroups={pinnedGroups}
+              projects={projects}
+              hasProjectsBeforeFilter={hasProjectsBeforeFilter}
+              hasActiveProjectFilter={hasActiveProjectFilter}
+              workspaceEntriesByKey={workspaceEntriesByKey}
+              isRefreshing={isManualRefresh && isRevalidating}
+              onRefresh={handleRefresh}
+              onAddProject={handleOpenProject}
+              onImportSession={handleImportSession}
+              listHeaderComponent={workspacesSectionHeaderElement}
+            />
+          ))}
 
         <SidebarCalloutSlot />
 
@@ -887,6 +942,7 @@ const styles = StyleSheet.create((theme) => ({
     borderRightColor: theme.colors.border,
     backgroundColor: theme.colors.surfaceSidebar,
   },
+  desktopChatNav: { borderBottomWidth: 0, paddingBottom: 4 },
   sidebarDragArea: {
     position: "relative",
   },

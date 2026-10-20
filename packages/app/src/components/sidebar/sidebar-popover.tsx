@@ -65,7 +65,9 @@ export function useSidebarPopoverAnchor(name: string): {
 const PLACEMENT = {
   header: { side: "right", align: "start" },
   footer: { side: "top", align: "start" },
-} as const satisfies Record<SidebarSection, { side: string; align: string }>;
+  // The Mac navigation rail's bottom buttons open beside the rail, growing upward.
+  rail: { side: "right", align: "end" },
+} as const satisfies Record<SidebarSection | "rail", { side: string; align: string }>;
 
 export function SidebarPopoverSurface({
   section,
@@ -74,7 +76,7 @@ export function SidebarPopoverSurface({
   testID,
   children,
 }: {
-  section: SidebarSection;
+  section: SidebarSection | "rail";
   /** The bottom sheet's title. */
   title: string;
   /** Controls on the right of the bottom sheet's title. */

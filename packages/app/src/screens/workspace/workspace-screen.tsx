@@ -45,6 +45,7 @@ import {
 } from "@/screens/workspace/compact-workspace-header";
 import { WorkspaceHeaderProjectRow } from "@/screens/workspace/workspace-header-project-row";
 import { ScreenTitle } from "@/components/headers/screen-title";
+import { DesktopWorkspaceToolbar, usesDesktopShell } from "@/components/desktop/desktop-shell";
 import {
   FloatingPanelPortalHost,
   FloatingPanelPortalHostNameProvider,
@@ -124,7 +125,15 @@ import type { CheckoutStatusPayload } from "@/git/use-status-query";
 import { confirmDialog } from "@/utils/confirm-dialog";
 import { useArchiveAgent } from "@/hooks/use-archive-agent";
 import { useStableEvent } from "@/hooks/use-stable-event";
+import {
+  RUNNER_TERMINAL_NAME,
+  resolveRunnerTerminalId,
+  setRunnerTerminalId,
+  toTerminalCommandInput,
+  whenShellReady,
+} from "@/screens/workspace/terminals/command-runner";
 import { removeResidentBrowserWebview } from "@/desktop/browser/resident-webviews";
+import { BROWSER_NEW_TAB_URL } from "@/desktop/browser/new-tab-url";
 import { createWorkspaceBrowser, useBrowserStore } from "@/desktop/browser/store";
 import { getDesktopHost } from "@/desktop/host";
 import { buildProviderCommand } from "@/utils/provider-command-templates";
@@ -196,7 +205,7 @@ import {
 } from "@/panels/panel-instance-attributes";
 import { findAdjacentPane } from "@/utils/split-navigation";
 import { supportsDesktopPaneSplits, useIsCompactFormFactor } from "@/constants/layout";
-import { getIsElectron, isNative, isWeb } from "@/constants/platform";
+import { getIsElectron, getIsElectronMac, isNative, isWeb } from "@/constants/platform";
 import { buildHostRootRoute, buildSettingsHostRoute } from "@/utils/host-routes";
 import { useWorkspaceTerminals } from "@/screens/workspace/terminals/use-workspace-terminals";
 import type { TerminalProfile } from "@getpaseo/protocol/messages";
@@ -457,6 +466,7 @@ function useCloseTabs(): UseCloseTabsResult {
 }
 
 interface WorkspaceHeaderTitleBarProps {
+  desktopTitlebar: boolean;
   isLoading: boolean;
   title: string;
   subtitle: string;
@@ -473,6 +483,7 @@ interface WorkspaceHeaderTitleBarProps {
 }
 
 function WorkspaceHeaderTitleBar({
+  desktopTitlebar,
   isLoading,
   title,
   subtitle,
@@ -488,23 +499,29 @@ function WorkspaceHeaderTitleBar({
   onOpenSetupTab,
 }: WorkspaceHeaderTitleBarProps) {
   return (
-    <View style={styles.headerTitleContainer}>
-      {isLoading ? (
-        <View style={styles.headerTitleTextGroup}>
-          <View style={styles.headerTitleSkeleton} />
-        </View>
-      ) : (
-        <View style={styles.headerTitleTextGroup}>
-          <ScreenTitle testID="workspace-header-title">{title}</ScreenTitle>
-          <WorkspaceHeaderProjectRow
-            subtitle={subtitle}
-            isSubtitleDistinct={isSubtitleDistinct}
-            serverId={normalizedServerId}
-          />
-        </View>
-      )}
+    <View style={desktopTitlebar ? styles.compactHeaderMenuCluster : styles.headerTitleContainer}>
+      {!desktopTitlebar &&
+        (isLoading ? (
+          <View style={styles.headerTitleTextGroup}>
+            <View style={styles.headerTitleSkeleton} />
+          </View>
+        ) : (
+          <View style={styles.headerTitleTextGroup}>
+            <ScreenTitle testID="workspace-header-title">{title}</ScreenTitle>
+            <WorkspaceHeaderProjectRow
+              subtitle={subtitle}
+              isSubtitleDistinct={isSubtitleDistinct}
+              serverId={normalizedServerId}
+            />
+          </View>
+        ))}
       <View style={styles.compactHeaderMenuCluster}>
         <WorkspaceHeaderMenuDesktop
+          title={
+            desktopTitlebar
+              ? [title, isSubtitleDistinct ? subtitle : null].filter(Boolean).join(" · ")
+              : undefined
+          }
           currentBranchName={currentBranchName}
           showWorkspaceSetup={showWorkspaceSetup}
           importAgentDisabled={importAgentDisabled}
@@ -1002,6 +1019,12 @@ function useLastMainPane(input: {
   return lastMainPaneRef;
 }
 
+function useIsMobileWorkspace(): boolean {
+  const isCompact = useIsCompactFormFactor();
+  // Mac tools remain in the dock when the window narrows; the mobile view only renders one tab.
+  return isCompact && !getIsElectronMac();
+}
+
 function WorkspaceScreenContent({
   serverId,
   workspaceId,
@@ -1011,11 +1034,12 @@ function WorkspaceScreenContent({
   const { t } = useTranslation();
   const _insets = useSafeAreaInsets();
   const toast = useToast();
-  const isMobile = useIsCompactFormFactor();
+  const isMobile = useIsMobileWorkspace();
   const hasMacTrafficLights = useHasWindowChromeObstruction("top-left");
   const explorerToggleOwner = resolveWorkspaceExplorerToggleOwner({
     isMobile,
     hasMacTrafficLights,
+    hasDesktopTitlebar: usesDesktopShell,
   });
   const isFocusModeEnabled = usePanelStore((state) => state.desktop.focusModeEnabled);
   const toggleFocusMode = usePanelStore((state) => state.toggleFocusMode);
@@ -1178,6 +1202,52 @@ function WorkspaceScreenContent({
     },
     toast,
   });
+  const runnerKey = `${normalizedServerId}:${normalizedWorkspaceId}`;
+  // Commands clicked while the runner shell is being created or is still starting up.
+  const pendingRunnerRef = useRef<{ commands: string[]; terminalId: string | null } | null>(null);
+  const sendRunnerCommands = useStableEvent((terminalId: string, commands: string[]) => {
+    for (const command of commands) {
+      client?.sendTerminalInput(terminalId, {
+        type: "input",
+        data: toTerminalCommandInput(command),
+      });
+    }
+  });
+  const handleRunnerOrTerminalCreated = useStableEvent(
+    (input: { terminalId: string; destination: TerminalTabDestination }) => {
+      handleTerminalCreated(input);
+      const pending = pendingRunnerRef.current;
+      if (!pending || pending.terminalId) {
+        return;
+      }
+      pending.terminalId = input.terminalId;
+      setRunnerTerminalId(runnerKey, input.terminalId);
+      const sendPending = () => {
+        pendingRunnerRef.current = null;
+        sendRunnerCommands(input.terminalId, pending.commands);
+      };
+      if (client) {
+        whenShellReady(client, input.terminalId, sendPending);
+      } else {
+        sendPending();
+      }
+    },
+  );
+  // Only one terminal create runs at a time, so a create that never produces a terminal
+  // is the runner's. Drop its commands, or every later Run click would queue behind it.
+  const dropUncreatedRunner = () => {
+    if (pendingRunnerRef.current?.terminalId === null) {
+      pendingRunnerRef.current = null;
+    }
+  };
+  const handleRunnerOrWorkspacePathUnavailable = useStableEvent(() => {
+    dropUncreatedRunner();
+    handleWorkspacePathUnavailable();
+  });
+  const handleRunnerOrTerminalCreateFailed = useStableEvent((reason: string) => {
+    dropUncreatedRunner();
+    handleTerminalCreateFailed(reason);
+  });
   const queryClient = useQueryClient();
   const {
     createMutation: createTerminalMutation,
@@ -1203,11 +1273,11 @@ function WorkspaceScreenContent({
     workspaceScripts,
     hasHydratedWorkspaces,
     isMissingWorkspaceDirectory,
-    onTerminalCreated: handleTerminalCreated,
+    onTerminalCreated: handleRunnerOrTerminalCreated,
     onScriptTerminalSelected: handleScriptTerminalSelected,
-    onWorkspacePathUnavailable: handleWorkspacePathUnavailable,
+    onWorkspacePathUnavailable: handleRunnerOrWorkspacePathUnavailable,
     onTerminalCreateQueued: handleTerminalCreateQueued,
-    onTerminalCreateFailed: handleTerminalCreateFailed,
+    onTerminalCreateFailed: handleRunnerOrTerminalCreateFailed,
   });
   const { archiveAgent } = useArchiveAgent();
 
@@ -1412,6 +1482,18 @@ function WorkspaceScreenContent({
         paneId: workspaceLayout?.focusedPaneId ?? unfocusedPaneId,
       }),
     [uiTabs, workspaceLayout, unfocusedPaneId],
+  );
+  // The macOS layout keeps one chat in the main area, so Cmd+W closes only the selected Explorer tool.
+  const explorerCloseTabId = useMemo(
+    () =>
+      isExplorerSidebarShowing && explorerSidebarPaneId
+        ? deriveWorkspacePaneState({
+            layout: workspaceLayout,
+            tabs: uiTabs,
+            paneId: explorerSidebarPaneId,
+          }).activeTabId
+        : null,
+    [explorerSidebarPaneId, isExplorerSidebarShowing, uiTabs, workspaceLayout],
   );
   const viewedTimelineSync = useSessionStore(
     (state) => state.sessions[normalizedServerId]?.viewedTimelineSync ?? null,
@@ -1852,6 +1934,21 @@ function WorkspaceScreenContent({
     });
   });
 
+  const handleRunInTerminal = useStableEvent((command: string) => {
+    if (pendingRunnerRef.current) {
+      pendingRunnerRef.current.commands.push(command);
+      return;
+    }
+    const runnerId = resolveRunnerTerminalId(runnerKey, liveTerminalIds);
+    if (runnerId) {
+      handleScriptTerminalSelected(runnerId);
+      sendRunnerCommands(runnerId, [command]);
+      return;
+    }
+    pendingRunnerRef.current = { commands: [command], terminalId: null };
+    createTerminal({ destination: { kind: "open" }, name: RUNNER_TERMINAL_NAME });
+  });
+
   const handleCreateTerminalWithProfile = useCallback(
     (profile: TerminalProfile) => {
       createTerminal({ profile, destination: { kind: "open" } });
@@ -1864,7 +1961,9 @@ function WorkspaceScreenContent({
       if (!persistenceKey || !getIsElectron()) {
         return;
       }
-      const { browserId } = createWorkspaceBrowser();
+      const { browserId } = createWorkspaceBrowser(
+        getIsElectronMac() ? { initialUrl: BROWSER_NEW_TAB_URL } : undefined,
+      );
       openWorkspaceTabFocused(
         persistenceKey,
         { kind: "browser", browserId },
@@ -1914,7 +2013,9 @@ function WorkspaceScreenContent({
         });
         return;
       }
-      const { browserId } = createWorkspaceBrowser();
+      const { browserId } = createWorkspaceBrowser(
+        getIsElectronMac() ? { initialUrl: BROWSER_NEW_TAB_URL } : undefined,
+      );
       openTarget({ kind: "browser", browserId });
     },
     [createTerminal, createWorkspaceTab, persistenceKey, replaceWorkspaceTabTarget],
@@ -1966,17 +2067,6 @@ function WorkspaceScreenContent({
     async (input: { tabId: string; terminalId: string }) => {
       const { tabId, terminalId } = input;
       await closeTab(tabId, async () => {
-        const confirmed = await confirmDialog({
-          title: t("workspace.tabs.confirmations.closeTerminalTitle"),
-          message: t("workspace.tabs.confirmations.closeTerminalMessage"),
-          confirmLabel: t("workspace.tabs.confirmations.close"),
-          cancelLabel: t("workspace.tabs.confirmations.cancel"),
-          destructive: true,
-        });
-        if (!confirmed) {
-          return;
-        }
-
         removeTerminalFromCache(terminalId);
         setHoveredCloseTabKey((current) => (current === tabId ? null : current));
         if (persistenceKey) {
@@ -1996,7 +2086,6 @@ function WorkspaceScreenContent({
       killTerminalAsync,
       persistenceKey,
       removeTerminalFromCache,
-      t,
     ],
   );
 
@@ -2603,11 +2692,13 @@ function WorkspaceScreenContent({
         case "workspace.tab.menu.open":
           handleCreateNewTab({ paneId: focusedPaneTabState.pane?.id });
           return true;
-        case "workspace.tab.close-current":
-          if (activeTabId) {
-            void handleCloseTabById(activeTabId);
+        case "workspace.tab.close-current": {
+          const closeTabId = getIsElectronMac() ? explorerCloseTabId : activeTabId;
+          if (closeTabId) {
+            void handleCloseTabById(closeTabId);
           }
           return true;
+        }
         case "workspace.tab.navigate-index": {
           const next = tabs[action.index - 1] ?? null;
           if (next?.tabId) {
@@ -2633,6 +2724,7 @@ function WorkspaceScreenContent({
     },
     [
       activeTabId,
+      explorerCloseTabId,
       handleCloseTabById,
       handleCreateDraftTab,
       handleCreateBrowserTab,
@@ -2795,6 +2887,7 @@ function WorkspaceScreenContent({
     ],
   );
 
+  // These route-level launch shortcuts stay active without the desktop tab strip.
   // Shared by every handler below: these actions only exist on a focused workspace route.
   const workspaceActionsEnabled = Boolean(
     isRouteFocused && normalizedServerId && normalizedWorkspaceId,
@@ -2959,7 +3052,7 @@ function WorkspaceScreenContent({
   );
   const canRenderDesktopPaneSplits = supportsDesktopPaneSplits();
   const shouldRenderDesktopPaneFallback = useMemo(
-    () => !isMobile && !canRenderDesktopPaneSplits,
+    () => !isMobile && !canRenderDesktopPaneSplits && !getIsElectronMac(),
     [isMobile, canRenderDesktopPaneSplits],
   );
   useEffect(() => {
@@ -3054,6 +3147,7 @@ function WorkspaceScreenContent({
           });
         },
         onOpenImportSheet: openImportSheet,
+        onRunInTerminal: handleRunInTerminal,
       }),
     [
       handleCloseTabById,
@@ -3063,6 +3157,7 @@ function WorkspaceScreenContent({
       normalizedServerId,
       normalizedWorkspaceId,
       canRenderDesktopPaneSplits,
+      handleRunInTerminal,
       openImportSheet,
       openInSidePane,
       requestFileNavigation,
@@ -3268,7 +3363,7 @@ function WorkspaceScreenContent({
               label={explorerSidebarToggleLabel}
               tooltipLabel={t("workspace.tabs.explorerSidebar.toggle")}
               tooltipKeys={EXPLORER_TOGGLE_KEYS}
-              style={styles.compactHeaderActionButton}
+              style={usesDesktopShell ? undefined : styles.compactHeaderActionButton}
               accessibilityState={explorerSidebarToggleAccessibilityState}
             />
           </>
@@ -3347,51 +3442,67 @@ function WorkspaceScreenContent({
       `${WORKSPACE_FLOATING_PANEL_PORTAL_HOST_PREFIX}:${normalizedServerId}:${normalizedWorkspaceId}`,
     [normalizedServerId, normalizedWorkspaceId],
   );
-  const renderWorkspaceScreenHeader = useCallback(
-    () =>
-      showScreenHeader ? (
-        <ScreenHeader
-          left={
-            <>
-              <SidebarMenuToggle />
-              <WorkspaceHeaderTitleBar
-                isLoading={isWorkspaceHeaderLoading}
-                title={workspaceHeaderTitle}
-                subtitle={workspaceHeaderSubtitle}
-                isSubtitleDistinct={isWorkspaceHeaderSubtitleDistinct}
-                currentBranchName={currentBranchName}
-                normalizedServerId={normalizedServerId}
-                showWorkspaceSetup={showWorkspaceSetup}
-                importAgentDisabled={!canOpenImportSheet}
-                copyPathDisabled={!workspaceDirectory}
-                onOpenImportSheet={openImportSheet}
-                onCopyWorkspacePath={handleCopyWorkspacePath}
-                onCopyBranchName={handleCopyBranchName}
-                onOpenSetupTab={handleOpenSetupTab}
-              />
-            </>
-          }
-          right={headerRight}
-        />
-      ) : null,
-    [
-      canOpenImportSheet,
-      currentBranchName,
-      handleCopyBranchName,
-      handleCopyWorkspacePath,
-      handleOpenSetupTab,
-      headerRight,
-      isWorkspaceHeaderLoading,
-      normalizedServerId,
-      openImportSheet,
-      showScreenHeader,
-      showWorkspaceSetup,
-      workspaceDirectory,
-      workspaceHeaderSubtitle,
-      workspaceHeaderTitle,
-      isWorkspaceHeaderSubtitleDistinct,
-    ],
-  );
+  const renderWorkspaceScreenHeader = useCallback(() => {
+    if (!showScreenHeader) return null;
+    const desktopTitlebar = usesDesktopShell && !isMobile;
+    const title = (
+      <WorkspaceHeaderTitleBar
+        desktopTitlebar={desktopTitlebar}
+        isLoading={isWorkspaceHeaderLoading}
+        title={workspaceHeaderTitle}
+        subtitle={workspaceHeaderSubtitle}
+        isSubtitleDistinct={isWorkspaceHeaderSubtitleDistinct}
+        currentBranchName={currentBranchName}
+        normalizedServerId={normalizedServerId}
+        showWorkspaceSetup={showWorkspaceSetup}
+        importAgentDisabled={!canOpenImportSheet}
+        copyPathDisabled={!workspaceDirectory}
+        onOpenImportSheet={openImportSheet}
+        onCopyWorkspacePath={handleCopyWorkspacePath}
+        onCopyBranchName={handleCopyBranchName}
+        onOpenSetupTab={handleOpenSetupTab}
+      />
+    );
+    if (desktopTitlebar) {
+      return isRouteFocused ? (
+        <DesktopWorkspaceToolbar>
+          <View style={styles.headerRight}>
+            {title}
+            {headerRight}
+          </View>
+        </DesktopWorkspaceToolbar>
+      ) : null;
+    }
+    return (
+      <ScreenHeader
+        left={
+          <>
+            <SidebarMenuToggle />
+            {title}
+          </>
+        }
+        right={headerRight}
+      />
+    );
+  }, [
+    canOpenImportSheet,
+    currentBranchName,
+    handleCopyBranchName,
+    handleCopyWorkspacePath,
+    handleOpenSetupTab,
+    headerRight,
+    isMobile,
+    isRouteFocused,
+    isWorkspaceHeaderLoading,
+    normalizedServerId,
+    openImportSheet,
+    showScreenHeader,
+    showWorkspaceSetup,
+    workspaceDirectory,
+    workspaceHeaderSubtitle,
+    workspaceHeaderTitle,
+    isWorkspaceHeaderSubtitleDistinct,
+  ]);
   const compactHeaderScripts = useMemo(
     () => ({
       serverId: normalizedServerId,

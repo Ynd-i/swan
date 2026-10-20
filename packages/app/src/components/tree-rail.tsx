@@ -23,9 +23,10 @@ export interface TreeRailProps {
    * Slots are children rather than `content` / `tree` props because `react-perf/jsx-no-jsx-as-prop`
    * rejects JSX in a prop, including via a local variable. Pass both unconditionally — a `{cond &&
    * …}` slot collapses out of the array and silently promotes the tree into the content position.
-   * Branch around the whole rail instead, the way `diff-panel.tsx` does.
+   * Use `visible` to hide the tree without remounting the content.
    */
   children: ReactNode;
+  visible?: boolean;
   testID?: string;
   width?: number;
   onWidthChange?: (width: number) => void;
@@ -33,7 +34,14 @@ export interface TreeRailProps {
 }
 
 /** Content-left/tree-right master-detail geometry with one app-wide tree width. */
-export function TreeRail({ children, testID, width, onWidthChange, minimumWidth }: TreeRailProps) {
+export function TreeRail({
+  children,
+  visible = true,
+  testID,
+  width,
+  onWidthChange,
+  minimumWidth,
+}: TreeRailProps) {
   const [content, tree] = Children.toArray(children);
   const sharedWidth = usePanelStore((state) => state.treeRailWidth);
   const setSharedWidth = usePanelStore((state) => state.setTreeRailWidth);
@@ -96,18 +104,20 @@ export function TreeRail({ children, testID, width, onWidthChange, minimumWidth 
       <View style={styles.content} testID={testID ? `${testID}-content` : undefined}>
         {content}
       </View>
-      <Animated.View
-        style={[styles.rail, railWidthStyle]}
-        testID={testID ? `${testID}-tree` : undefined}
-      >
-        <SidebarResizeHandle
-          edge="left"
-          gesture={resizeGesture}
-          pressed={resizePressed}
-          testID={testID ? `${testID}-resize-handle` : "tree-rail-resize-handle"}
-        />
-        {tree}
-      </Animated.View>
+      {visible ? (
+        <Animated.View
+          style={[styles.rail, railWidthStyle]}
+          testID={testID ? `${testID}-tree` : undefined}
+        >
+          <SidebarResizeHandle
+            edge="left"
+            gesture={resizeGesture}
+            pressed={resizePressed}
+            testID={testID ? `${testID}-resize-handle` : "tree-rail-resize-handle"}
+          />
+          {tree}
+        </Animated.View>
+      ) : null}
     </View>
   );
 }

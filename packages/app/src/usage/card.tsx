@@ -1,3 +1,5 @@
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import { RotateCw } from "lucide-react-native";
 import { useCallback, useMemo } from "react";
 import { Text, View, type StyleProp, type TextStyle } from "react-native";
@@ -11,10 +13,9 @@ import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { ToolbarButton, paneContentToolbarIconSize } from "@/components/ui/pane-content-toolbar";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { useIsCompactFormFactor } from "@/constants/layout";
-import { isNative } from "@/constants/platform";
+import { getIsElectronMac, isNative } from "@/constants/platform";
 import { useCompactTimeAgo } from "@/hooks/use-time-ago";
 import { UsageBalanceBar } from "./balance-bar";
-import { usageCopy } from "./copy";
 import type { UsageDisplay } from "./display";
 import { formatUsageFreshness, resolveUsageReport, type UsageRefresh } from "./model";
 import { useReportRefresh } from "./queries";
@@ -22,9 +23,9 @@ import { UsageSourceIcon } from "./source-icon";
 import type { UsageReport, UsageReportEntry, UsageWindow } from "./types";
 import { UsageWindowBar } from "./window-bar";
 
-function statusText(report: UsageReport): string | null {
+function statusText(report: UsageReport, t: TFunction): string | null {
   if (report.status === "available") return null;
-  return report.status === "error" ? "Error" : "Unavailable";
+  return report.status === "error" ? t("common.errors.error") : t("usage.unavailable");
 }
 
 const ThemedRotateCw = withUnistyles(RotateCw);
@@ -49,19 +50,25 @@ export function UsageCard({
   refreshable: boolean;
   compact?: boolean;
 }) {
+  const { t } = useTranslation();
   const isCompact = useIsCompactFormFactor();
+  const overview = getIsElectronMac() && !isCompact && !compact;
   const { refresh, refreshState } = useReportRefresh(serverId, entry.id, agentId);
   // Where there is no hover the freshness is printed on the card; elsewhere the Refresh tooltip.
   const showsFreshnessInline = isNative || isCompact || !refreshable;
   const usage = entry.report;
-  const status = statusText(usage);
+  const status = statusText(usage, t);
   const footer = entry.account.label ?? null;
   const { windows, balances, details, planLabel, successfulAt, retained, messages } =
     resolveUsageReport(entry);
 
   const containerStyle = useMemo(
-    () => [styles.container, compact ? styles.containerCompact : styles.containerPadded],
-    [compact],
+    () => [
+      styles.container,
+      compact ? styles.containerCompact : styles.containerPadded,
+      overview && styles.overview,
+    ],
+    [compact, overview],
   );
   const dotStyle = useMemo(
     () => [
@@ -76,7 +83,7 @@ export function UsageCard({
     <View style={containerStyle} testID={`usage-report-${entry.id}`}>
       <View style={styles.header}>
         <UsageSourceIcon svg={entry.icon ?? null} size={14} />
-        <Text style={styles.name} numberOfLines={1}>
+        <Text style={styles.name(overview)} numberOfLines={1}>
           {entry.sourceLabel}
         </Text>
         {planLabel ? <StatusBadge label={planLabel} variant="muted" size="xs" /> : null}
@@ -114,6 +121,7 @@ export function UsageCard({
               window={window}
               retained={retained}
               display={display}
+              overview={overview}
               pinnable={pinnable}
             />
           ))}
@@ -156,7 +164,7 @@ export function UsageCard({
 
       {refreshState === "failed" ? (
         <Text style={styles.error} testID="usage-refresh-error">
-          {usageCopy.refreshFailed}
+          {t("usage.refreshFailed")}
         </Text>
       ) : null}
     </View>
@@ -167,6 +175,7 @@ function CardWindowBar({
   entry,
   window,
   display,
+  overview,
   pinnable,
   retained,
 }: {
@@ -174,8 +183,10 @@ function CardWindowBar({
   entry: UsageReportEntry;
   window: UsageWindow;
   display: UsageDisplay;
+  overview: boolean;
   pinnable: boolean;
 }) {
+  const { t } = useTranslation();
   const pin = useMemo(
     () => ({ sourceId: entry.sourceId, windowId: window.id }),
     [entry.sourceId, window.id],
@@ -186,11 +197,12 @@ function CardWindowBar({
     <UsageWindowBar
       window={window}
       retained={retained}
+      overview={overview}
       displayAs={display.displayAs}
       pinnable={pinnable}
       pinned={display.isPinned(pin)}
       onTogglePin={toggle}
-      pinLabel={`${usageCopy.pin} ${entry.sourceLabel} ${window.label}`}
+      pinLabel={`${t("usage.pin")} ${entry.sourceLabel} ${window.label}`}
       pinTestID={`usage-pin-${entry.sourceId}-${window.id}`}
     />
   );
@@ -212,6 +224,7 @@ function UsageRefreshButton({
   onRefresh: () => void;
   compact: boolean;
 }) {
+  const { t } = useTranslation();
   const isPending = refreshState === "pending";
   const iconSize = paneContentToolbarIconSize(compact);
   const freshness = useMemo(
@@ -227,7 +240,7 @@ function UsageRefreshButton({
   );
   return (
     <ToolbarButton
-      label={`${usageCopy.refresh} ${sourceLabel}`}
+      label={`${t("usage.refresh")} ${sourceLabel}`}
       tooltip={freshness}
       tooltipSide="top"
       compact={compact}
@@ -257,10 +270,13 @@ function UsageFreshness({
   style: StyleProp<TextStyle>;
   testID: string;
 }) {
+  const { t } = useTranslation();
   const elapsed = useCompactTimeAgo(successfulAt ? new Date(successfulAt) : null);
   return (
     <Text style={style} numberOfLines={1} testID={testID}>
-      {successfulAt ? formatUsageFreshness(elapsed, retained) : "No successful update"}
+      {successfulAt
+        ? formatUsageFreshness(elapsed, t, successfulAt, retained)
+        : t("usage.noSuccessfulUpdate")}
     </Text>
   );
 }
@@ -286,16 +302,23 @@ const styles = StyleSheet.create((theme) => ({
   containerCompact: {
     gap: theme.spacing[3],
   },
+  overview: {
+    borderWidth: 1,
+    borderColor: theme.colors.borderAccent,
+    borderRadius: 16,
+    backgroundColor: theme.colors.surface1,
+  },
   header: {
     flexDirection: "row",
     alignItems: "center",
     gap: theme.spacing[2],
   },
-  name: {
+  name: (overview: boolean) => ({
     flexShrink: 1,
     color: theme.colors.foreground,
-    fontSize: theme.fontSize.base,
-  },
+    fontSize: overview ? theme.fontSize.lg : theme.fontSize.base,
+    fontWeight: overview ? theme.fontWeight.medium : theme.fontWeight.normal,
+  }),
   headerSpacer: {
     flex: 1,
   },

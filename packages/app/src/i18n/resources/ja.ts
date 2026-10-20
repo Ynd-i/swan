@@ -2,6 +2,116 @@ import { en, type TranslationResources } from "./en";
 import { pluginSettings } from "./plugin-settings";
 
 export const ja: TranslationResources = {
+  usage: {
+    options: "使用状況のオプション",
+    displayAs: "表示",
+    showInSidebar: "サイドバーに表示",
+    showInSidebarHint: "固定したウィンドウはサイドバーのフッターに表示されます",
+    hostUnavailableNamed: "使用量を確認するには {{host}} に接続してください",
+    hostUpgradeRequiredNamed: "使用量を確認するには {{host}} を更新してください",
+    pin: "固定",
+    unpin: "固定を解除",
+    displayUsed: "使用済み",
+    displayRemaining: "残り",
+    title: "使用状況",
+    planUsage: "プランの使用量",
+    refresh: "更新",
+    refreshing: "更新中…",
+    refreshFailed: "使用量を更新できません",
+    refreshAll: "すべて更新",
+    agentError: "使用量を読み込めません: {{reason}}",
+    updated: "{{time}}に更新",
+    updatedNow: "たった今更新",
+    lastUpdated: "最終更新: {{time}}",
+    lastUpdatedNow: "最終更新: たった今",
+    noSuccessfulUpdate: "まだ更新に成功していません",
+    loading: "使用量を読み込み中…",
+    empty: "使用量データがありません",
+    noHosts: "接続済みホストがありません",
+    errorTitle: "使用量を読み込めません",
+    hostUnavailable: "使用量を表示するにはこのホストに接続してください",
+    hostUpgradeRequired: "使用量を表示するにはホストを更新してください",
+    clientUnavailable: "ホストへの接続が準備できていません",
+    unavailable: "利用不可",
+    remainingPercent: "残り {{percent}}",
+    usedPercent: "使用済み {{percent}}",
+    remainingBalance: "残り {{amount}}",
+    resetsIn: "{{duration}}後にリセット",
+    resetDue: "リセット予定時刻を経過",
+    resetPassed: "リセット時刻を過ぎています",
+    runsOutIn: "{{duration}}後に使い切る見込み",
+    runsOutNow: "まもなく使い切る見込み",
+    durationMinutes: "{{count}}分",
+    durationHours: "{{count}}時間",
+    durationDays: "{{count}}日",
+    ago: "{{duration}}前",
+    lessThanMinute: "1分未満",
+    problemExpired: "ログインは{{ago}}に期限切れになりました。{{remedy}}",
+    problemRejected: "ログインが拒否されました（HTTP {{status}}）。{{remedy}}",
+    problemRunToRefresh: "{{command}} を実行して更新してください。",
+    problemSignInAgain: "もう一度サインインしてください。",
+  },
+  chatProposals: {
+    suggested: "提案されたチャット",
+    start: "開始",
+    startFailed: "開始できません: {{error}}",
+    unknownModel: "不明なモデル: {{model}}",
+    unknownThinking: "不明な思考レベル: {{thinking}}",
+    open: "{{title}} を開く",
+    archived: "アーカイブ済み",
+    task: "タスク",
+    context: "コンテキスト",
+    startedFrom: "開始元",
+    reportFrom: "報告元",
+    reportFailed: "失敗したチャット",
+    reply: "返信",
+  },
+  desktopChat: {
+    handoffs: { toggle: "以前の引き継ぎ（{{count}}）" },
+    activity: "アクティビティ",
+    workedFor: "所要時間: {{duration}}",
+    failedCount: "{{count}} 件失敗",
+    thinking: "考え中",
+    startWork: "何をしましょうか？",
+    startInProject: "{{project}} で何をしましょうか？",
+    resetReasoning: "推論の強度をリセット",
+    newChat: "新しいチャット",
+    actions: "チャットの操作",
+    markRead: "既読にする",
+    markUnread: "未読にする",
+    fork: "フォーク",
+    forkNewChat: "新しいチャットにフォーク",
+    sections: {
+      actions: "セクションの操作",
+      sortLatest: "最近の更新",
+      sortManual: "手動で並べ替え",
+      chatSort: "チャットの並べ替え",
+      show: "表示",
+      projects: "プロジェクト",
+      newSection: "新しいセクション",
+      newSectionMenu: "新しいセクション…",
+      section: "セクション",
+      edit: "編集",
+      markAllRead: "すべて既読にする",
+      archiveChats: "チャットをアーカイブ",
+      archiveConfirm: "このセクションの {{count}} 件のチャットをアーカイブしますか？",
+      archiveProjectConfirm: "このプロジェクトの {{count}} 件のチャットをアーカイブしますか？",
+      removeSection: "セクションを削除",
+      createDescription: "チャットとプロジェクトを自由に整理",
+      namePlaceholder: "セクション名",
+      create: "セクションを作成",
+      editTitle: "セクションを編集",
+      save: "保存",
+      notifications: "通知",
+      priority: "優先",
+      priorityEmpty: "対応が必要なタスクはありません",
+      organize: "サイドバーを整理",
+      byProject: "プロジェクト別に表示",
+      merged: "まとめて表示",
+      revealInFinder: "Finder に表示",
+      removeProject: "プロジェクトを削除",
+    },
+  },
   paneFind: {
     connectionFailure:
       "このチャットを検索できませんでした。ホストへの接続を確認して再試行してください。",
@@ -85,6 +195,10 @@ export const ja: TranslationResources = {
       close: "メニューを閉じる",
     },
     commandCenter: {
+      chatPlaceholder: "チャットを検索",
+      chats: "チャット",
+      quickActions: "クイックアクション",
+      openFolder: "フォルダーを開く",
       placeholder: "コマンド、ファイル、ワークスペース、エージェントを検索...",
       filePlaceholder: "ファイルを検索...",
       searchingFiles: "ファイルを検索中...",
@@ -116,7 +230,19 @@ export const ja: TranslationResources = {
     },
   },
   composer: {
+    queue: {
+      steer: "ステア",
+      delete: "削除",
+      more: "その他",
+      edit: "メッセージを編集",
+      turnOff: "キューをオフにする",
+    },
+    goalMode: {
+      label: "目標",
+      placeholder: "最適な結果を得るには、目標と測定可能な成果を記述してください",
+    },
     placeholders: {
+      chat: "なんでも聞いてください",
       desktop: "エージェントにメッセージ、@ファイル、/コマンドや/スキルを入力",
       mobile: "メッセージ、@ファイル、/コマンド",
       fallback: "メッセージ...",
@@ -225,6 +351,11 @@ export const ja: TranslationResources = {
       title: "モード",
       searchPlaceholder: "モードを検索...",
       selectWithValue: "エージェントモードを選択（{{value}}）",
+      desktop: {
+        askForReview: "承認を求める",
+        autoReview: "自動レビュー",
+        fullAccess: "フルアクセス",
+      },
     },
     hints: {
       thinking: "思考モード",
@@ -249,6 +380,8 @@ export const ja: TranslationResources = {
       implement: "実装",
       question: "どのように続けますか？",
       proposedPlan: "提案されたプラン",
+      waiting: "承認待ち",
+      responseFailed: "応答できませんでした: {{message}}",
     },
   },
   agentPanel: {
@@ -333,6 +466,8 @@ export const ja: TranslationResources = {
     },
     actions: {
       copyCode: "コードをコピー",
+      runInTerminal: "ターミナルで実行",
+      plainText: "プレーンテキスト",
       copyTurn: "ターンをコピー",
       copyMessage: "メッセージをコピー",
       forkMenu: "メッセージをフォーク",
@@ -341,6 +476,7 @@ export const ja: TranslationResources = {
       forkUnavailable: "これを使用するにはホストを更新してください。",
       forkMissingWorkspace: "このエージェントはワークスペース内にありません。",
       forkFailed: "チャットのフォークに失敗しました",
+      forkOrigin: "チャットから続行",
       openFile: "ファイルを開く",
       copied: "コピーしました",
     },
@@ -376,6 +512,9 @@ export const ja: TranslationResources = {
     },
     question: {
       responseFailed: "回答を送信できませんでした。もう一度お試しください。",
+      title: "質問",
+      skip: "スキップ",
+      send: "送信",
       submit: "送信",
       next: "次へ",
       answerPlaceholder: "回答を入力...",
@@ -522,6 +661,10 @@ export const ja: TranslationResources = {
         hideHiddenFiles: "隠しファイルを非表示",
         showHiddenFiles: "隠しファイルを表示",
       },
+      filter: {
+        placeholder: "ファイルを絞り込む...",
+        noResults: "一致するファイルはありません",
+      },
       empty: {
         noFiles: "ファイルなし",
         noVisibleFiles: "表示可能なファイルなし",
@@ -578,6 +721,11 @@ export const ja: TranslationResources = {
       },
     },
     browser: {
+      newTab: {
+        tools: "ツール",
+        moreTools: "その他のツール",
+        openPages: "開いているページ",
+      },
       unavailable: {
         title: "ブラウザはデスクトップ専用です",
         subtitle: "組み込みブラウザを使用するには、このワークスペースをElectronで開いてください。",
@@ -710,8 +858,6 @@ export const ja: TranslationResources = {
         close: "閉じる",
         cancel: "キャンセル",
         archive: "アーカイブ",
-        closeTerminalTitle: "ターミナルを閉じますか？",
-        closeTerminalMessage: "このターミナルで実行中のプロセスはすぐに停止されます。",
         archiveRunningAgentTitle: "実行中のエージェントをアーカイブしますか？",
         archiveRunningAgentMessage:
           "このエージェントはまだ実行中です。アーカイブするとエージェントが停止してタブが閉じられます。",
@@ -893,7 +1039,7 @@ export const ja: TranslationResources = {
           updateCurrent: "このブランチはすでに{{baseRef}}と最新の状態のため、更新は利用できません",
           mergePrNoGithub: "GitHubが接続されていないため、PRのマージは現在利用できません",
           archiveNotWorktree:
-            "このワークスペースはPaseoワークツリーとして作成されていないため、アーカイブはここでは利用できません",
+            "このワークスペースはSwanワークツリーとして作成されていないため、アーカイブはここでは利用できません",
           mergePrNoForge: "{{brand}}が接続されていないため、{{noun}}のマージは現在利用できません",
           mergePrMissing: "プルリクエストがまだないため、PRのマージは利用できません",
           mergePrDraft: "プルリクエストがまだドラフトのため、PRのマージは利用できません",
@@ -977,6 +1123,7 @@ export const ja: TranslationResources = {
         modifiedFile: "変更済み",
         commits: {
           title: "コミット",
+          baseHint: "履歴では {{baseRef}} を使用",
           countLabel: "ワークスペースのコミット数: {{count}}",
           noneAhead: "{{baseRef}} より先のコミットはまだありません",
           fileDiffEmpty: "表示する変更はありません",
@@ -1077,6 +1224,8 @@ export const ja: TranslationResources = {
             cancelled: "キャンセル済み",
           },
         },
+        previewFiles_one: "{{count}} ファイル",
+        previewFiles_other: "{{count}} ファイル",
         states: {
           draft: "ドラフト",
           merged: "マージ済み",
@@ -1244,7 +1393,7 @@ export const ja: TranslationResources = {
       discord: "Discord",
       github: "GitHub Issueを作成",
       whatsNew: "新着情報",
-      appName: "Paseo",
+      appName: "Swan",
     },
     sections: {
       sessions: "履歴",
@@ -1349,6 +1498,9 @@ export const ja: TranslationResources = {
     fields: {
       project: "プロジェクト",
       branch: "ブランチ",
+      noProject: "プロジェクトなし",
+      clearProject: "プロジェクトを外す",
+      base: "ベース",
       baseNotApplicable: "該当なし",
       host: "ホスト",
     },
@@ -1392,7 +1544,7 @@ export const ja: TranslationResources = {
       close: "ウィンドウを閉じる",
     },
     quitting: {
-      title: "Paseoを終了中...",
+      title: "Swanを終了中...",
       detail: "ローカルデーモンを停止中。",
     },
     daemon: {
@@ -1407,20 +1559,20 @@ export const ja: TranslationResources = {
       },
       management: {
         title: "組み込みデーモンを管理",
-        hint: "Paseoが組み込みデーモンを起動・停止できるようにする",
+        hint: "Swanが組み込みデーモンを起動・停止できるようにする",
         pauseTitle: "組み込みデーモンを一時停止",
         pauseMessage:
           "これにより組み込みデーモンが即座に停止します。組み込みデーモンに接続されている実行中のエージェントとターミナルが停止されます。",
         pauseAndStop: "一時停止して停止",
         registrationFailed:
-          "組み込みデーモンは起動しましたが、Paseoがlocalhostの接続を保存できませんでした。デーモン管理をオフにしてから再度オンにするか、localhostを手動で追加してください。",
+          "組み込みデーモンは起動しましたが、Swanがlocalhostの接続を保存できませんでした。デーモン管理をオフにしてから再度オンにするか、localhostを手動で追加してください。",
         pausedStopFailed:
-          "組み込みデーモン管理は一時停止されましたが、Paseoがデーモンを停止できませんでした。",
+          "組み込みデーモン管理は一時停止されましたが、Swanがデーモンを停止できませんでした。",
         updateFailed: "組み込みデーモン管理を更新できません。",
       },
       keepRunning: {
         title: "終了後もデーモンを実行し続ける",
-        hint: "Paseoを終了してもデーモンは実行し続けます",
+        hint: "Swanを終了してもデーモンは実行し続けます",
       },
       logs: {
         title: "ログファイル",
@@ -1488,7 +1640,7 @@ export const ja: TranslationResources = {
     },
     rosetta: {
       title: "Apple Siliconビルドをダウンロード",
-      runningIntel: "Apple Silicon上のRosettaでPaseoのIntelビルドを実行しています。",
+      runningIntel: "Apple Silicon上のRosettaでSwanのIntelビルドを実行しています。",
       highCpu:
         "これにより高いCPU使用率が発生します。修正するにはApple Siliconビルドをダウンロードしてください。",
       download: "ダウンロード",
@@ -1531,7 +1683,7 @@ export const ja: TranslationResources = {
         microphone: "マイクのステータスはまだ確認されていません。",
       },
       testNotification: {
-        title: "Paseo通知テスト",
+        title: "Swan通知テスト",
         body: "これが見えれば、デスクトップ通知は機能しています。",
         notDelivered: "通知が届きませんでした。システム設定 > 通知を確認してください。",
         failed: "通知の送信に失敗しました。",
@@ -1540,12 +1692,12 @@ export const ja: TranslationResources = {
     integrations: {
       cli: {
         statusFailed: "CLIのインストール状態を確認できません。",
-        installFailed: "Paseo CLIをインストールできません。",
+        installFailed: "Swan CLIをインストールできません。",
       },
     },
   },
   rootError: {
-    title: "Paseo で問題が発生しました。",
+    title: "Swan で問題が発生しました。",
     body: "アプリを再読み込みするにはもう一度お試しください。繰り返し発生する場合は、以下の詳細を添えて報告してください。",
     details: "詳細",
   },
@@ -1610,6 +1762,12 @@ export const ja: TranslationResources = {
     later: "後で",
     stashRestored: "スタッシュした変更を復元しました",
   },
+  diffBaseSelector: {
+    compareAgainst: "{{ref}} と比較",
+    workspaceDefault: "ワークスペースのデフォルト",
+    worktreeFixed: "この worktree の比較ベースは固定されています。",
+    unableToResolve: "{{ref}} を解決できません",
+  },
   agentAutocomplete: {
     searchingWorkspace: "ワークスペースを検索中...",
     loadingCommands: "コマンドを読み込み中...",
@@ -1642,7 +1800,7 @@ export const ja: TranslationResources = {
     },
   },
   onboarding: {
-    title: "Paseoへようこそ",
+    title: "Swanへようこそ",
     subtitle: "始めるにはコンピューターに接続してください",
     actions: {
       settings: "設定",
@@ -1750,7 +1908,7 @@ export const ja: TranslationResources = {
     },
     direct: {
       title: "直接接続",
-      helper: "Paseoサーバーのアドレスを入力してください。",
+      helper: "Swanサーバーのアドレスを入力してください。",
       fields: {
         host: "ホスト",
         port: "ポート",
@@ -1792,7 +1950,7 @@ export const ja: TranslationResources = {
     },
     remoteSsh: {
       title: "リモート SSH",
-      helper: "リモートホストで動作する Paseo デーモンに接続します。",
+      helper: "リモートホストで動作する Swan デーモンに接続します。",
       fields: {
         target: "SSH ホスト",
         password: "デーモンのパスワード",
@@ -1856,15 +2014,15 @@ export const ja: TranslationResources = {
       enableDescription:
         "リレーを使うと、このデバイスからどこでも接続できます。ペアリング通信はエンドツーエンドで暗号化されます。",
       relayDocs: "リレーの仕組み",
-      relayDocsAccessibility: "Paseo リレーの仕組みを読む",
+      relayDocsAccessibility: "Swan リレーの仕組みを読む",
       enableRelay: "リレーを有効にする",
       enablingRelay: "有効化中...",
       notNow: "今はしない",
       directConnectionHint:
         "リレーを使わない場合は、TCP、Tailscale、または別の VPN で直接接続してください。QR コードは作成されません。",
-      updateRequired: "Paseo Desktop からリレーを有効にするにはホストを更新してください。",
+      updateRequired: "Swan Desktop からリレーを有効にするにはホストを更新してください。",
       unavailable: "ペアリングオファーが利用できません。",
-      hint: "スマートフォンのPaseoでこのQRコードをスキャンするか、以下のリンクをコピーしてください。",
+      hint: "スマートフォンのSwanでこのQRコードをスキャンするか、以下のリンクをコピーしてください。",
       securityWarning:
         "このペアリングリンクはパスワードと同様に扱ってください。リンクを知っている人は誰でもこのデーモンにアクセスできます。",
       qrUnavailable: "QRコードが利用できません。",
@@ -1899,7 +2057,7 @@ export const ja: TranslationResources = {
   serviceUrl: {
     title: "サービスURLを開く",
     message: "{{url}}を開きますか？",
-    inPaseo: "Paseoで",
+    inPaseo: "Swanで",
     externalBrowser: "外部ブラウザ",
     dontAskAgain: "次回から確認しない",
   },
@@ -1913,6 +2071,11 @@ export const ja: TranslationResources = {
   },
   menu: {
     backdrop: "メニューの背景",
+  },
+  backgroundTasks: {
+    title: "バックグラウンドタスク",
+    pillLabelOne: "1 件のバックグラウンドタスク",
+    pillLabelMany: "{{count}} 件のバックグラウンドタスク",
   },
   subagents: {
     title: "サブエージェント",
@@ -1970,6 +2133,7 @@ export const ja: TranslationResources = {
       subtitle: "ワークスペースのファイル",
       tooltip: "ワークスペースのファイルを参照",
       chooseFile: "ファイルを選択",
+      emptyDescription: "ワークスペースのツリーからファイルを選択",
     },
     pullRequest: {
       label: "プルリクエスト",
@@ -2020,10 +2184,35 @@ export const ja: TranslationResources = {
       other: "その他のツールを{{count}}回使用",
     },
     paseoCalls: {
-      one: "Paseoを{{count}}回呼び出し",
-      other: "Paseoを{{count}}回呼び出し",
+      one: "Swanを{{count}}回呼び出し",
+      other: "Swanを{{count}}回呼び出し",
     },
     and: "および",
+    verbSeparator: "、",
+    verbs: {
+      loadTools: "ツールを読み込み",
+      skill: "スキルを使用",
+      read: "ファイルを読み取り",
+      search: "検索",
+      edit: "ファイルを編集",
+      command: "コマンドを実行",
+      paseo: "Swanを呼び出し",
+      other: "ツールを使用",
+    },
+    done: {
+      read: "読み取り済み",
+      edit: "編集済み",
+      shell: "実行済み",
+      search: "検索済み",
+      fetch: "取得済み",
+    },
+    running: {
+      read: "読み取り中",
+      edit: "編集中",
+      shell: "実行中",
+      search: "検索中",
+      fetch: "取得中",
+    },
   },
   renameModal: {
     rename: "名前を変更",
@@ -2036,8 +2225,10 @@ export const ja: TranslationResources = {
     noData: "コンテキストデータがありません",
     accessibilityNoData: "コンテキストウィンドウ：コンテキストデータがありません",
     title: "コンテキストウィンドウ",
-    used: "{{percentage}}%使用",
-    tokens: "{{used}} / {{max}}トークン",
+    summary: "{{used}} / {{max}} ({{percentage}}%)",
+    used: "使用済み",
+    free: "空き容量",
+    buffer: "自動圧縮バッファ",
     sessionCost: "セッションコスト: {{cost}}",
     accessibility: "コンテキストウィンドウ{{percentage}}%使用",
   },
@@ -2119,7 +2310,7 @@ export const ja: TranslationResources = {
       send: "送信",
       sending: "送信中...",
       sentTitle: "テスト通知を送信しました",
-      sentDescription: "Paseo が通知をオペレーティングシステムに渡しました。",
+      sentDescription: "Swan が通知をオペレーティングシステムに渡しました。",
       sendFailedTitle: "テスト通知を送信できません",
     },
     hostSections: {
@@ -2142,10 +2333,10 @@ export const ja: TranslationResources = {
       selection: "モデル選択",
       automatic: "自動",
       preferred: "手動",
-      automaticHint: "Paseo が利用可能な高速モデルを選択します",
-      preferredHint: "Paseo が使用するモデルを選択します",
+      automaticHint: "Swan が利用可能な高速モデルを選択します",
+      preferredHint: "Swan が使用するモデルを選択します",
       model: "モデル",
-      fallbackHint: "利用できない場合、Paseo は別の利用可能なモデルを使用します",
+      fallbackHint: "利用できない場合、Swan は別の利用可能なモデルを使用します",
       docs: "ドキュメント",
       saveError: "メタデータ生成を更新できません",
     },
@@ -2180,7 +2371,7 @@ export const ja: TranslationResources = {
       serviceUrls: {
         options: {
           ask: "確認する",
-          inApp: "Paseoで",
+          inApp: "Swanで",
           external: "外部ブラウザ",
         },
       },
@@ -2264,7 +2455,7 @@ export const ja: TranslationResources = {
         label: "アプリの更新",
         readyToInstall: "インストール準備完了: {{version}}",
         installTitle: "デスクトップの更新をインストール",
-        installMessage: "このコンピューターのPaseoを更新します",
+        installMessage: "このコンピューターのSwanを更新します",
         installConfirm: "更新をインストール",
         update: "更新",
         updateTo: "{{version}}に更新",
@@ -2276,7 +2467,21 @@ export const ja: TranslationResources = {
       },
     },
     appearance: {
+      advanced: {
+        title: "詳細設定",
+        reset: "既定値に戻す",
+        resetLabel: "外観の詳細設定をリセット",
+      },
+      motion: {
+        title: "視差効果を減らす",
+        hint: "アニメーションを減らすか、システム設定に従います。",
+        system: "システム",
+        on: "オン",
+        off: "オフ",
+      },
       theme: {
+        visualStyle: "外観スタイル",
+        mode: "モード",
         title: "テーマ",
         accessibilityLabel: "テーマ: {{value}}",
         options: {
@@ -2288,6 +2493,44 @@ export const ja: TranslationResources = {
           ghostty: "Ghostty",
           pureBlack: "ピュアブラック",
           auto: "システム",
+        },
+      },
+      colors: {
+        title: "{{theme}} のカラー",
+        info: "アプリの主要な部分の色を選びます。空欄にするとテーマの色を使います。",
+        reset: "リセット",
+        resetLabel: "{{theme}} のカラーをリセット",
+        pickerAccessibility: "{{role}}の色を選択",
+        fieldAccessibility: "{{role}}の16進カラー",
+        roles: {
+          main: {
+            title: "メイン画面",
+            hint: "会話とワークスペースの背景",
+          },
+          sidebar: {
+            title: "サイドバー",
+            hint: "サイドバーの背景",
+          },
+          selection: {
+            title: "選択中の行",
+            hint: "サイドバーで選択中の行のハイライト",
+          },
+          accent: {
+            title: "アクセント",
+            hint: "ボタン、トグルなどの強調表示",
+          },
+          text: {
+            title: "テキスト",
+            hint: "主要なテキスト",
+          },
+          mutedText: {
+            title: "補助テキスト",
+            hint: "ラベルと説明",
+          },
+          border: {
+            title: "境界線",
+            hint: "区切り線と枠線",
+          },
         },
       },
       detailLevel: {
@@ -2320,6 +2563,10 @@ export const ja: TranslationResources = {
         interfaceSize: "インターフェースサイズ",
         interfaceSizeHint: "ナビゲーション、コントロール、ラベルに使用されます",
         interfaceSizeAccessibility: "インターフェースのフォントサイズ",
+        contentFont: "本文のフォント",
+        contentFontHint:
+          "チャット本文、Markdown、入力欄に使用します。空欄の場合はインターフェースのフォントを使用します",
+        contentFontAccessibility: "本文のフォントファミリー",
         contentSize: "コンテンツサイズ",
         contentSizeHint: "チャットテキストとレンダリングされた Markdown に使用されます",
         contentSizeAccessibility: "コンテンツのフォントサイズ",
@@ -2327,6 +2574,16 @@ export const ja: TranslationResources = {
         codeFontHint:
           "コード、差分、ターミナル出力で使用されます。システムデフォルトにするには空のままにしてください",
         codeFontAccessibility: "コードフォントファミリー",
+        interfaceStyle: "インターフェースのフォントスタイル",
+        interfaceWeightAccessibility: "インターフェースフォントの太さ：{{value}}",
+        contentWeightAccessibility: "コンテンツフォントの太さ：{{value}}",
+        codeWeightAccessibility: "コードフォントの太さ：{{value}}",
+        weightOptions: {
+          default: "既定",
+          regular: "標準",
+          medium: "ミディアム",
+          semibold: "セミボールド",
+        },
         codeSize: "コードサイズ",
         codeSizeHint: "コード、差分、ターミナル出力に使用されます",
         codeSizeAccessibility: "コードフォントサイズ",
@@ -2515,11 +2772,11 @@ export const ja: TranslationResources = {
         title: "オーケストレーションスキル",
         description: "エージェントがCLI経由でオーケストレーションできるようにします。",
         updateAvailable: "更新が利用可能",
-        updateTitle: "Paseoスキルを更新しますか？",
+        updateTitle: "Swanスキルを更新しますか？",
         updateFallback: "バンドルされたスキルをマシンに同期します。",
-        uninstallTitle: "Paseoスキルをアンインストールしますか？",
+        uninstallTitle: "Swanスキルをアンインストールしますか？",
         uninstallMessage:
-          "~/.agents、~/.claude、~/.codexからすべてのPaseoオーケストレーションスキルを削除します。",
+          "~/.agents、~/.claude、~/.codexからすべてのSwanオーケストレーションスキルを削除します。",
         choose: "スキルを選択",
         chooseAll: "すべてのスキル",
         chooseAllHint:
@@ -2556,9 +2813,9 @@ export const ja: TranslationResources = {
         title: "オーケストレーション",
         unavailable: "オーケストレーションを管理するにはこのホストに接続してください",
         enableTools: {
-          title: "Paseoツールを有効にする",
+          title: "Swanツールを有効にする",
           hint: "エージェントがワークツリー、エージェント、スケジュールを管理できるようになります",
-          accessibilityLabel: "Paseoツールを有効にする",
+          accessibilityLabel: "Swanツールを有効にする",
         },
         systemPrompt: {
           title: "システムプロンプト",
@@ -2663,15 +2920,15 @@ export const ja: TranslationResources = {
             "このホストは接続されていません。再起動する前にオンラインになるまでお待ちください。",
           offlineTitle: "ホストオフライン",
           offlineMessage:
-            "このホストはオフラインです。Paseoが自動再接続します。再起動は、ホストがオンラインに戻ってから行ってください。",
+            "このホストはオフラインです。Swanが自動再接続します。再起動は、ホストがオンラインに戻ってから行ってください。",
           requestFailedTitle: "エラー",
           requestFailedMessage:
-            "再起動リクエストの送信に失敗しました。Paseoは自動的に再接続します。ホストがオンラインになったら再試行してください。",
+            "再起動リクエストの送信に失敗しました。Swanは自動的に再接続します。ホストがオンラインになったら再試行してください。",
           dialogFailedMessage: "再起動確認ダイアログを開けませんでした。",
         },
         update: {
           desktopManagedHint:
-            "このデーモンはPaseo Desktopによって管理されています。ホスト上のPaseo Desktopを更新してください。",
+            "このデーモンはSwan Desktopによって管理されています。ホスト上のSwan Desktopを更新してください。",
           title: "デーモンを更新",
           hint: "デーモンを最新バージョンに更新して再起動します",
           confirm: "更新",
@@ -2780,6 +3037,7 @@ export const ja: TranslationResources = {
       noEditableTarget: "このホストではこのプロジェクトを編集できません。",
       backToProjects: "プロジェクトに戻る",
       edit: {
+        sourceFolder: "ソースフォルダー",
         title: "プロジェクトを編集",
         name: "名前",
         nameLabel: "プロジェクト名",
@@ -2833,7 +3091,7 @@ export const ja: TranslationResources = {
         newScript: "新しいスクリプト",
         editScript: "{{name}}を編集",
         runAsService: "サービスとして実行",
-        serviceHint: "Paseoがプロセスを監督し、$PASEO_PORTを通じてポートを割り当てます",
+        serviceHint: "Swanがプロセスを監督し、$PASEO_PORTを通じてポートを割り当てます",
         actions: {
           add: "スクリプトを追加",
           edit: "編集",
@@ -2842,7 +3100,7 @@ export const ja: TranslationResources = {
       },
       metadata: {
         title: "メタデータ生成",
-        info: "Paseoがメタデータ生成に使うAIプロンプトへ追加する、プロジェクト固有の指示です。ブランチ名、コミット形式、PR形式など、チームの規約を反映するために使います。",
+        info: "Swanがメタデータ生成に使うAIプロンプトへ追加する、プロジェクト固有の指示です。ブランチ名、コミット形式、PR形式など、チームの規約を反映するために使います。",
         branchName: "ブランチ名",
         branchNamePlaceholder: "ブランチ名は feat/ または fix/ で始め、個人ブランチは mb/ にする",
         commitMessage: "コミットメッセージ",

@@ -152,6 +152,28 @@ describe("diff document workspace cache", () => {
     expect(stats.calls).toBe(0);
   });
 
+  it("separates font resources and measured rows when only code weight changes", () => {
+    const cache = createDiffDocumentWorkspaceCache();
+    const { measureText, stats } = countingMeasurer();
+    const input = modelInput([diffFile()], measureText);
+    const first = cache.buildModel(input);
+    const regular = cache.typography({
+      typography: input.typography,
+      load: async () => {},
+      createMeasurer: () => measureText,
+    });
+    const typography = { ...input.typography, weight: "600" as const };
+    const semibold = cache.typography({
+      typography,
+      load: async () => {},
+      createMeasurer: () => measureText,
+    });
+    expect(semibold).not.toBe(regular);
+    stats.calls = 0;
+    expect(cache.buildModel({ ...input, typography })).not.toBe(first);
+    expect(stats.calls).toBeGreaterThan(0);
+  });
+
   it("bounds retained geometry variants for one diff payload", () => {
     const cache = createDiffDocumentWorkspaceCache();
     const files = [diffFile()];

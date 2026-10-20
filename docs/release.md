@@ -2,6 +2,164 @@
 
 All workspaces share one version and release together.
 
+## Custom macOS development package
+
+Use `npm run build:desktop:custom -- --arm64 --dir` for this UI fork. It inherits
+the upstream packaging inputs and selects `electron-builder.custom.yml`: **Swan**,
+bundle ID `local.paseo.custom.desktop`, output in `packages/desktop/release-custom/`.
+Swan was published as Paseo Custom until 2026-10-16. It keeps that bundle ID, because
+Squirrel.Mac installs an update only over an app with the same identifier, and its
+`~/Library/Application Support/Paseo Custom` folder, which holds the daemon home and
+settings (`resolveCustomUserDataPath` in `packages/desktop/src/desktop-startup.ts`). The ordinary desktop build keeps the upstream
+identity and feed; use the custom command for this fork's local artifacts.
+
+The custom profile has no publisher or automatic updates. It declares only the
+`paseo-custom://` operating-system handler, leaving the upstream `paseo://` handler
+to the official application. Internal app routes keep `paseo://app`. Configure a
+separate release source and signing before distribution; do not enable updates
+until the replacement bundle is validated.
+
+Custom agent links use `paseo-custom://h/<serverId>/agent/<agentId>`; percent-encode
+both IDs. Only the **Swan** identity accepts this alias, with the same
+strict route validation as canonical agent links. Existing canonical links passed
+directly to Swan still work. The named host and agent must be available to that
+application. The shared link builder and CLI desktop launches continue to target
+the official app.
+
+The custom packaged smoke requires the final Info.plist to declare exactly
+`paseo-custom`, with no `paseo` handler. Source and parser unit tests do not prove
+macOS handler coexistence. Before distribution, separately verify that both apps
+can be installed together, each scheme opens its intended app, and custom links
+reach the agent on cold launch and in an existing window.
+
+The local profile uses ad-hoc signing, keeps Hardened Runtime and grants JIT plus
+library-validation relaxation to the app and helpers. The latter is required to
+load Electron's frameworks with a different signing team; see
+[electron-builder's macOS signing guidance](https://www.electron.build/v26/docs/features/code-signing/code-signing-mac/).
+Review these entitlements when preparing a Developer ID signed distribution.
+
+Custom GUI startup defaults its daemon home to `daemon/` under Electron user data
+and chooses a free loopback port. Explicit `PASEO_HOME` and `PASEO_LISTEN` values
+remain supported. The bundled CLI keeps its existing CLI defaults; pass `--home`
+or `PASEO_HOME` to target the custom GUI's daemon. Installing a global CLI is a
+separate action.
+
+Run the existing packaged smoke with the custom identity assertion:
+
+```sh
+PASEO_DESKTOP_SMOKE=1 PASEO_DESKTOP_EXPECT_CUSTOM=1 \
+CSC_IDENTITY_AUTO_DISCOVERY=false \
+npm run build:desktop:custom -- --arm64 --dir
+```
+
+This checks the local bundle, isolated renderer/daemon/CLI startup and update IPC.
+Signing, notarization, real-provider runs and remote pairing have separate acceptance
+in the [migration plan](refactors/codex-desktop-ui-plan.md).
+
+### Custom releases
+
+The `Ynd-i/swan` fork (`Ynd-i/codex-app` until 2026-10-16) publishes Swan from `main`, following upstream
+Paseo **stable** releases only. Tags:
+
+| Tag                      | Meaning                                                                 |
+| ------------------------ | ----------------------------------------------------------------------- |
+| `v<stable>-v<N>-beta<M>` | Beta `M` of our release `N` on upstream `<stable>`; a GitHub prerelease |
+| `v<stable>-v<N>`         | Release `N` promoted to stable                                          |
+
+`<stable>` is the newest upstream release merged into the branch. Betas count up within a
+release (`v0.11.0-v1-beta1`, `-v1-beta2`), promotion drops the suffix (`v0.11.0-v1`), and
+the next UI change starts `v0.11.0-v2-beta1`. A newer upstream stable release starts again
+at `-v1-beta1`. While the branch is on an upstream beta, as it is until upstream ships
+`0.11.0`, nothing is released unless you ask for a one-off beta on it, tagged
+`v<upstream-beta>-v<N>-beta<M>` (`v0.11.0-beta.3-v1-beta2`). A one-off promotes with
+`mode=stable -f upstream_beta=true` to `v<upstream-beta>-v<N>` (`v0.11.0-beta.3-v1`) and
+is a full GitHub release. One-offs sort before every release on the stable version, so
+their installs update to it in-app. `scripts/custom-release.mjs` computes the plan.
+Release titles name only our numbers, `Swan v1 beta 2` and `Swan v1`, so titles repeat
+across upstream releases; the tag tells them apart.
+
+`.github/workflows/upstream-pr.yml` checks upstream once a day. When upstream has a
+stable release newer than `main`, it pushes that tag's commit as `upstream-pr/<stable>` and
+opens a pull request into `main`, closing any older `upstream-pr/*` pull request. A conflict
+shows on the pull request; resolve it on that branch, in a full clone, by merging
+`origin/main` into it. Merge with **Create a merge commit**, because a squash or rebase
+merge leaves the tag out of `main` and betas stay on the old backend. Closing a pull request
+without merging skips that release. Opening a pull request needs the `UPSTREAM_PR_TOKEN`
+secret: a fine-grained token for this repository with read and write access to Contents,
+Pull requests and Workflows. The `GITHUB_TOKEN` can neither open pull requests here nor push
+upstream's workflow changes.
+
+`.github/workflows/custom-release.yml` only runs by hand. `beta` mode runs format, lint,
+typecheck and the server and app unit suites, builds, signs and smoke-tests the arm64 app,
+and publishes it as a `.dmg` and a `.zip`. The first beta after an upstream merge is
+`v<stable>-v1-beta1`. Every build runs on GitHub's macOS runners. After merging an upstream
+pull request or pushing UI changes, publish the next beta; promote the latest beta's commit
+to stable once it has proven itself:
+
+```sh
+gh workflow run upstream-pr.yml -R Ynd-i/swan
+gh workflow run custom-release.yml -R Ynd-i/swan -f mode=beta
+gh workflow run custom-release.yml -R Ynd-i/swan -f mode=stable
+gh workflow run custom-release.yml -R Ynd-i/swan -f mode=beta -f upstream_beta=true
+gh workflow run custom-release.yml -R Ynd-i/swan -f mode=stable -f upstream_beta=true
+```
+
+A failure publishes nothing, unless only the update feed step failed after the GitHub
+release was created.
+
+Once the feed names the new release, the workflow deletes every prerelease on an older
+upstream release, with its tag: publishing `v0.11.4-v1-beta2` removes the
+`v0.11.2-v1-beta*` releases. Stable releases stay, and so do betas on the current upstream
+release, because stable mode promotes the latest one. The planner reads only tags on the
+current upstream release, so the deleted tags change no plan. GitHub cannot hide a
+release, and a draft's downloads stop working, so the workflow deletes instead. GitHub emails the failed run, since the fork has issues disabled.
+
+Only the workflow's `GITHUB_TOKEN` creates release tags. Tags created by people still
+start with `v` and would trigger the inherited upstream release, Docker and deploy
+workflows, so each release disables every workflow in the fork except `custom-release.yml` and
+`upstream-pr.yml`.
+
+#### In-app updates
+
+Published builds update themselves from the `update-feed` branch. The app version stays
+upstream's to match the bundled daemon, so the workflow stamps each build with
+`paseoCustomUpdateVersion` from `updateVersion()` in `scripts/custom-release.mjs`
+(`v0.11.0-v1-beta2` becomes `0.11.0-custom.1.beta.2`) and adds an `app-update.yml` for the
+feed. After publishing, it writes `beta-mac.yml` for every release and `latest-mac.yml`
+for stable ones: the beta release channel in Settings receives betas, the stable channel
+only stable releases. Local builds have neither, so their updates stay disabled. Settings ›
+About shows a published build's tag, derived from the stamp, instead of the upstream
+version. The feed is served from `raw.githubusercontent.com`, which caches for five
+minutes, so a check right after publishing can still report the previous release.
+
+Builds published before the rename read the feed at
+`raw.githubusercontent.com/Ynd-i/codex-app/update-feed`. GitHub serves the renamed
+repository there only while `Ynd-i` has no repository named `codex-app`, so never create
+one. Squirrel.Mac replaces the app in place, so an install updated from Paseo Custom stays
+`/Applications/Paseo Custom.app`.
+
+Squirrel.Mac installs an update only when the new app is signed by the same certificate as
+the running one, and ad-hoc signatures never match. The workflow signs with a self-signed
+certificate from the `CUSTOM_SIGNING_P12` (base64) and `CUSTOM_SIGNING_P12_PASSWORD`
+secrets, using rcodesign because `codesign` refuses an untrusted certificate. Never
+replace the certificate: installed copies would stop updating until reinstalled by hand.
+Create it once with the system LibreSSL, keep the `.p12` and its password somewhere safe,
+then delete the key:
+
+```sh
+/usr/bin/openssl req -x509 -newkey rsa:2048 -nodes -days 7300 -subj "/CN=Paseo Custom" \
+  -addext "keyUsage=critical,digitalSignature" -addext "extendedKeyUsage=critical,codeSigning" \
+  -keyout paseo-custom.key -out paseo-custom.crt
+/usr/bin/openssl pkcs12 -export -inkey paseo-custom.key -in paseo-custom.crt -out paseo-custom.p12
+base64 -i paseo-custom.p12 | gh secret set CUSTOM_SIGNING_P12 -R Ynd-i/swan
+gh secret set CUSTOM_SIGNING_P12_PASSWORD -R Ynd-i/swan
+```
+
+The first signed release has to be installed by hand over an ad-hoc build, and macOS asks
+again for the permissions the old signature had. An update runs the installed app's
+updater, so a fix to the update path first takes effect on the release after the one that
+ships it.
+
 ## Two steps
 
 A release has exactly two steps. The agent does the first, the user authorizes the second.

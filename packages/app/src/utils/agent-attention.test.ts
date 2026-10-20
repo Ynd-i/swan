@@ -2,6 +2,30 @@ import { describe, expect, it } from "vitest";
 import type { Agent } from "@/stores/session-store";
 import { pickAttentionAgent, shouldClearAgentAttention } from "@/utils/agent-attention";
 
+it("retains manual unread on blur until the user reads that chat again", () => {
+  const input = {
+    agentId: "selected",
+    isConnected: true,
+    requiresAttention: true,
+    attentionReason: "finished" as const,
+  };
+  expect(shouldClearAgentAttention({ ...input, manualUnread: true, trigger: "agent-blur" })).toBe(
+    false,
+  );
+  expect(shouldClearAgentAttention({ ...input, manualUnread: true, trigger: "input-focus" })).toBe(
+    true,
+  );
+  expect(shouldClearAgentAttention({ ...input, trigger: "agent-blur" })).toBe(true);
+  expect(
+    shouldClearAgentAttention({
+      ...input,
+      manualUnread: true,
+      attentionReason: "permission",
+      trigger: "input-focus",
+    }),
+  ).toBe(false);
+});
+
 function createAgent(input: Partial<Agent> & Pick<Agent, "id">): Agent {
   const { id, ...rest } = input;
   return {

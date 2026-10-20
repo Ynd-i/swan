@@ -166,6 +166,7 @@ export interface AgentCapabilityFlags {
   supportsRewindConversation?: boolean;
   supportsRewindFiles?: boolean;
   supportsRewindBoth?: boolean;
+  supportsNativeFork?: boolean;
 }
 
 export interface AgentPersistenceHandle {
@@ -196,6 +197,27 @@ export interface AgentUsage {
   totalCostUsd?: number;
   contextWindowMaxTokens?: number;
   contextWindowUsedTokens?: number;
+}
+
+/** Work the agent left running in the background, such as a shell command or a monitor. */
+export interface AgentBackgroundTask {
+  id: string;
+  description: string;
+}
+
+export interface AgentContextUsageCategory {
+  name: string;
+  tokens: number;
+}
+
+/** What fills an agent's context window, from a provider that can attribute it. */
+export interface AgentContextUsage {
+  maxTokens: number;
+  usedTokens: number;
+  /** Kept free for compaction, out of the unused part of the window. */
+  bufferTokens: number;
+  /** What fills usedTokens, under the provider's own names. */
+  categories: AgentContextUsageCategory[];
 }
 
 export const TOOL_CALL_ICON_NAMES = [

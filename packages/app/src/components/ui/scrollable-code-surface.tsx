@@ -189,10 +189,11 @@ const styles = StyleSheet.create((theme) => ({
   },
   text: {
     backgroundColor: "transparent",
+    ...(theme.codeFontWeight ? { fontWeight: theme.codeFontWeight } : {}),
     fontFamily: theme.fontFamily.mono,
     fontSize: theme.fontSize.code,
     color: theme.colors.foreground,
-    lineHeight: 18,
+    lineHeight: Math.round(theme.fontSize.code * 1.5),
     ...(isWeb
       ? {
           whiteSpace: "pre",

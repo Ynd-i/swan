@@ -12,6 +12,8 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { getConfig, validateConfiguration } from "app-builder-lib/out/util/config/config.js";
+import { DebugLogger } from "builder-util";
 
 const packageRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -20,23 +22,24 @@ function writeExecutable(filePath: string, contents: string): void {
   chmodSync(filePath, 0o755);
 }
 
-function createFakeMacBundle(options: { includeHelper: boolean }): {
+function createFakeMacBundle(options: { includeHelper: boolean; name?: string }): {
   root: string;
   shimPath: string;
 } {
   const root = mkdtempSync(join(tmpdir(), "paseo-cli-shim-test-"));
-  const appPath = join(root, "Paseo.app");
+  const name = options.name ?? "Paseo";
+  const appPath = join(root, `${name}.app`);
   const contentsPath = join(appPath, "Contents");
   const resourcesPath = join(contentsPath, "Resources");
   const shimPath = join(resourcesPath, "bin", "paseo");
-  const mainPath = join(contentsPath, "MacOS", "Paseo");
+  const mainPath = join(contentsPath, "MacOS", name);
   const helperPath = join(
     contentsPath,
     "Frameworks",
-    "Paseo Helper.app",
+    `${name} Helper.app`,
     "Contents",
     "MacOS",
-    "Paseo Helper",
+    `${name} Helper`,
   );
 
   mkdirSync(dirname(shimPath), { recursive: true });
@@ -126,6 +129,23 @@ describe("desktop packaging", () => {
     expect(config).toContain("- paseo");
   });
 
+  it("declares only the custom operating-system agent scheme after configuration inheritance", async () => {
+    const config = await getConfig(
+      packageRoot,
+      join(packageRoot, "electron-builder.custom.yml"),
+      null,
+    );
+    await validateConfiguration(config, new DebugLogger(false));
+    expect(config.protocols).toEqual({
+      name: "Swan agent link",
+      schemes: ["paseo-custom"],
+    });
+    expect(config.mac?.protocols).toBeUndefined();
+    const official = await getConfig(packageRoot, join(packageRoot, "electron-builder.yml"), null);
+    expect(official.protocols).toEqual([{ name: "Paseo agent link", schemes: ["paseo"] }]);
+    expect(official.mac?.protocols).toBeUndefined();
+  });
+
   // electron-builder packs production dependencies declared in package.json into
   // app.asar. Runtime code in runtime-paths.ts and bin/paseo dynamically resolves
   // these workspace packages by string, so static analysis (TypeScript, Knip) cannot
@@ -143,10 +163,10 @@ describe("desktop packaging", () => {
     }
   });
 
-  it("launches the packaged macOS CLI through Helper instead of the main app executable", () => {
+  it.each(["Paseo", "Swan"])("launches the packaged %s CLI through Helper", (name) => {
     if (process.platform === "win32") return;
 
-    const bundle = createFakeMacBundle({ includeHelper: true });
+    const bundle = createFakeMacBundle({ includeHelper: true, name });
     try {
       const result = spawnSync(bundle.shimPath, ["--version"], { encoding: "utf8" });
 

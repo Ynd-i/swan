@@ -281,7 +281,8 @@ describe("the repository's own CHANGELOG.md", () => {
 
   it("parses every release heading", () => {
     expect(releases.length).toBeGreaterThan(50);
-    for (const release of releases) {
+    // The fork records its custom work under Unreleased; the app reads upstream's changelog.
+    for (const release of releases.filter((entry) => entry.version !== "Unreleased")) {
       expect(release.version).toMatch(/^\d+\.\d+\.\d+/);
       expect(release.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
       expect(release.sections.length).toBeGreaterThan(0);

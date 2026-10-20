@@ -1,5 +1,5 @@
+import { PermissionRequestCard } from "./permission-request-card";
 import { ChatFind, ChatFindExpansion } from "@/agent-stream/chat-find";
-import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import React, {
   forwardRef,
   memo,
@@ -13,20 +13,11 @@ import React, {
   type ReactNode,
 } from "react";
 import { useTranslation } from "react-i18next";
-import {
-  View,
-  Text,
-  Pressable,
-  Platform,
-  type PressableStateCallbackType,
-  type StyleProp,
-  type ViewStyle,
-} from "react-native";
+import { View, Text, Pressable, Platform, type StyleProp, type ViewStyle } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { useIsCompactFormFactor } from "@/constants/layout";
-import { useMutation } from "@tanstack/react-query";
 import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
-import { Check, ChevronDown, X } from "lucide-react-native";
+import { ChevronDown, Hand } from "lucide-react-native";
 import { buildWorkspaceTabPersistenceKey } from "@/workspace-tabs/model";
 import { openExplorerSidebarView } from "@/workspace-tabs/explorer-sidebar";
 import {
@@ -40,16 +31,11 @@ import {
   MessageOuterSpacingProvider,
   type InlinePathTarget,
 } from "@/components/message";
-import { PlanCard } from "@/components/plan-card";
 import type { StreamItem } from "@/types/stream";
 import type { PendingMessageSubmission } from "@/composer/submission/model";
 import type { TurnPresentation } from "@/timeline/turn-liveness";
 import type { PendingPermission } from "@/types/shared";
-import type {
-  AgentCapabilityFlags,
-  AgentPermissionAction,
-  AgentPermissionResponse,
-} from "@getpaseo/protocol/agent-types";
+import type { AgentCapabilityFlags } from "@getpaseo/protocol/agent-types";
 import type { AgentScreenAgent } from "@/hooks/use-agent-screen-state-machine";
 import { useSessionStore } from "@/stores/session-store";
 import { useRevealedText } from "@/hooks/use-revealed-text";
@@ -59,10 +45,9 @@ import { resolveContentMaxWidth, useSettings } from "@/hooks/use-settings";
 import type { ToastApi } from "@/components/toast-host";
 import { returnToTimelineTail } from "./timeline-tail-navigation";
 import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
-import { ToolCallDetailsContent } from "@/components/tool-call-details";
-import { QuestionFormCard } from "@/components/question-form-card";
 import { ToolCallSheetProvider } from "@/components/tool-call-sheet";
 import { createStreamPresentation, getStreamItemMessageId } from "./presentation";
+import { DesktopTurnActivityHeader, useDesktopTurnActivity } from "./desktop-turn-activity-view";
 import { OverviewToolCallGroupView } from "@/tool-calls/detail-level/overview/view";
 import { type AgentStreamRenderModel, buildAgentStreamRenderModel } from "./model";
 import { resolveStreamRenderStrategy } from "./strategy-resolver";
@@ -97,24 +82,36 @@ import {
 import { navigateToWorkspace } from "@/stores/navigation-active-workspace-store";
 import { useStableEvent } from "@/hooks/use-stable-event";
 import { useForkAgent } from "@/hooks/use-fork-agent";
-import { isWeb } from "@/constants/platform";
-import type { Theme } from "@/styles/theme";
+import { getIsElectronMac, isWeb } from "@/constants/platform";
+import { CHAT_MESSAGE_HORIZONTAL_PADDING, type Theme } from "@/styles/theme";
 import { recordRenderProfileReasons } from "@/utils/render-profiler";
 import { useRetainedPanelActive } from "@/components/retained-panel";
 import { useStreamHistoryWindow } from "./use-stream-history-window";
 import { PluginTimelineItemView, useInstalledTimelineTransform } from "@/plugins/timeline";
+import { ForkOriginDivider, useForkDividerPlacement } from "./fork-origin-divider";
+import { ChatProposalCard } from "@/chat-proposals/proposal-card";
+import { proposalKey } from "@/chat-proposals/proposal";
+import { StartedChatBrief } from "@/chat-proposals/started-chat-brief";
+import { StartedChatReports } from "@/chat-proposals/started-chat-report";
 
 function renderLiveAuxiliaryNode(input: {
   pendingPermissions: ReactNode;
   turnFooter: ReactNode;
+  forkOriginDivider: ReactNode;
   bottomOverlayInset: number;
 }): ReactNode {
-  if (!input.pendingPermissions && !input.turnFooter && input.bottomOverlayInset === 0) {
+  if (
+    !input.pendingPermissions &&
+    !input.turnFooter &&
+    !input.forkOriginDivider &&
+    input.bottomOverlayInset === 0
+  ) {
     return null;
   }
   return (
     <>
       {input.turnFooter}
+      {input.forkOriginDivider}
       {input.pendingPermissions ? (
         <View style={stylesheet.contentWrapper}>
           <View style={stylesheet.listHeaderContent}>{input.pendingPermissions}</View>
@@ -262,6 +259,7 @@ export interface AgentStreamViewProps {
   streamItems: StreamItem[];
   streamHead?: StreamItem[];
   pendingPermissions: Map<string, PendingPermission>;
+  hasDockedPermissions?: boolean;
   pendingMessageSubmissions?: readonly PendingMessageSubmission[];
   turnPresentation: TurnPresentation;
   routeBottomAnchorRequest?: BottomAnchorRouteRequest | null;
@@ -318,6 +316,7 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
       streamItems,
       streamHead: providedStreamHead,
       pendingPermissions,
+      hasDockedPermissions,
       pendingMessageSubmissions = EMPTY_PENDING_MESSAGE_SUBMISSIONS,
       turnPresentation,
       routeBottomAnchorRequest = null,
@@ -519,6 +518,7 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
           transform: transformTimelineItem,
           level: toolCallDetailLevel,
           isTurnActive,
+          absorbThoughts: getIsElectronMac() && !isMobile,
         }),
       [
         presentStream,
@@ -527,8 +527,15 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
         transformTimelineItem,
         toolCallDetailLevel,
         isTurnActive,
+        isMobile,
       ],
     );
+    const forkDivider = useForkDividerPlacement({
+      serverId: resolvedServerId,
+      agentId,
+      tail: presentation.tail,
+      head: presentation.head,
+    });
     const {
       start: historyWindowStart,
       hasLocalHistory,
@@ -581,22 +588,24 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
     const handleTimelineHistoryLoadError = useCallback(() => {
       toast?.error(t("agentStream.historyLoadFailed"));
     }, [t, toast]);
-    // Chat find and the chat outline address messages, and an assistant message is a
-    // group of block rows, so these hold message ids and never row ids. Only the head
-    // changes per streamed delta, so the history set is keyed on mounted history alone.
-    const mountedHistoryMessageIds = useMemo(
-      () => new Set(baseRenderModel.history.map(getStreamItemMessageId)),
-      [baseRenderModel.history],
-    );
-    const mountedMessageIds = useMemo(() => {
-      const liveHeadMessageIds = new Set(
-        baseRenderModel.segments.liveHead.map(getStreamItemMessageId),
-      );
-      return {
-        has: (messageId: string) =>
-          mountedHistoryMessageIds.has(messageId) || liveHeadMessageIds.has(messageId),
-      };
-    }, [baseRenderModel.segments.liveHead, mountedHistoryMessageIds]);
+    // Only viewport rows are collapsed. The full layout/copy/fork inputs stay complete.
+    const {
+      projection: turnActivity,
+      segments: visibleSegments,
+      boundary: visibleBoundary,
+      mountedHistoryMessageIds,
+      mountedMessageIds,
+      toggle: toggleTurnActivity,
+      revealLoadedMessage,
+    } = useDesktopTurnActivity({
+      model: baseRenderModel,
+      scope: `${resolvedServerId}:${agentId}`,
+      isMobile,
+      isTurnActive,
+      toolGroups: presentation.groupsByHostId,
+      revealLoadedHistory,
+      viewportRef,
+    });
     const chatOutline = useChatOutline({
       agentId,
       serverId: resolvedServerId,
@@ -607,7 +616,7 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
       viewportRef,
       onJumpError: handleTimelineHistoryLoadError,
       mountedHistoryMessageIds,
-      revealLoadedMessage: revealLoadedHistory,
+      revealLoadedMessage,
     });
 
     useImperativeHandle(
@@ -670,6 +679,39 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
 
     const renderUserMessageItem = useCallback(
       (layoutItem: StreamLayoutItem, item: Extract<StreamItem, { kind: "user_message" }>) => {
+        let chatNote: ReactNode = null;
+        if (item.startedChat) {
+          chatNote = (
+            <StartedChatBrief
+              serverId={resolvedServerId}
+              agentId={agentId}
+              messageId={item.id}
+              brief={item.startedChat}
+            />
+          );
+        } else if (item.startedChatReports) {
+          chatNote = (
+            <StartedChatReports
+              serverId={resolvedServerId}
+              messageId={item.id}
+              reports={item.startedChatReports}
+            />
+          );
+        }
+        if (chatNote) {
+          // Briefs and reports render agent-written Markdown, whose paths and links need the resolver.
+          return (
+            <AssistantFileLinkResolverProvider
+              client={client}
+              serverId={resolvedServerId}
+              workspaceRoot={workspaceRoot}
+              onOpenWorkspaceFile={handleInlinePathPress}
+              toast={toast}
+            >
+              {chatNote}
+            </AssistantFileLinkResolverProvider>
+          );
+        }
         return (
           <UserMessage
             serverId={resolvedServerId}
@@ -690,7 +732,16 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
           />
         );
       },
-      [context.capabilities, agentId, client, pendingClientMessageIds, resolvedServerId],
+      [
+        context.capabilities,
+        agentId,
+        client,
+        handleInlinePathPress,
+        pendingClientMessageIds,
+        resolvedServerId,
+        toast,
+        workspaceRoot,
+      ],
     );
 
     const renderAssistantMessageItem = useCallback(
@@ -718,6 +769,15 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
                 />
               )}
             </ChatFindExpansion>
+            {item.proposals?.map((proposal) => (
+              <ChatProposalCard
+                key={proposalKey(agentId, proposal)}
+                serverId={resolvedServerId}
+                sourceAgentId={agentId}
+                proposal={proposal}
+                client={client}
+              />
+            ))}
           </AssistantFileLinkResolverProvider>
         );
       },
@@ -819,23 +879,39 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
             onExpandedChange={setToolCallGroupExpanded}
           >
             {expanded
-              ? group.run.calls.map((call, index) => (
-                  <React.Fragment key={call.id}>
-                    {renderSingleToolCallItem(
-                      call,
-                      index === group.run.calls.length - 1,
-                      GROUPED_TOOL_CALL_DETAIL_MAX_HEIGHT,
-                    )}
-                  </React.Fragment>
-                ))
+              ? group.run.items.map((runItem, index) => {
+                  const isLast = index === group.run.items.length - 1;
+                  return (
+                    <React.Fragment key={runItem.id}>
+                      {runItem.kind === "thought" ? (
+                        <ThoughtSlot
+                          itemId={runItem.id}
+                          onInlineDetailsExpandedChangeByItemId={setInlineDetailsExpanded}
+                          text={runItem.text}
+                          status={runItem.status}
+                          isLastInSequence={isLast}
+                          defaultExpanded={autoExpandReasoning}
+                        />
+                      ) : (
+                        renderSingleToolCallItem(
+                          runItem,
+                          isLast,
+                          GROUPED_TOOL_CALL_DETAIL_MAX_HEIGHT,
+                        )
+                      )}
+                    </React.Fragment>
+                  );
+                })
               : null}
           </OverviewToolCallGroupView>
         );
       },
       [
+        autoExpandReasoning,
         expandedToolCallGroupIds,
         getToolCallGroup,
         renderSingleToolCallItem,
+        setInlineDetailsExpanded,
         setToolCallGroupExpanded,
       ],
     );
@@ -894,19 +970,54 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
 
     const renderStreamItem = useCallback(
       (layoutItem: StreamLayoutItem) => {
-        const content = renderStreamItemContent(layoutItem);
-        return renderStreamItemWithTurnFooter({
+        const activity = turnActivity.byHostId.get(layoutItem.item.id);
+        const hidden = turnActivity.hiddenItemIds.has(layoutItem.item.id);
+        const body = hidden ? null : renderStreamItemContent(layoutItem);
+        const content = activity ? (
+          <>
+            <DesktopTurnActivityHeader activity={activity} onToggle={toggleTurnActivity} />
+            {body}
+          </>
+        ) : (
+          body
+        );
+        const rendered = renderStreamItemWithTurnFooter({
           content,
-          layoutItem,
+          layoutItem: activity && hidden ? { ...layoutItem, gapBelow: 0 } : layoutItem,
           strategy: streamRenderStrategy,
           supportsTimelineCursor: supportsAgentForkContextCursor,
           onForkAssistantTurn: readOnly ? undefined : handleForkAssistantTurn,
         });
+        // A just-forked chat's last item has its turn actions in the live footer, which places
+        // the divider itself; otherwise the divider follows this item's actions.
+        if (!rendered || !forkDivider || forkDivider.isLast) return rendered;
+        if (layoutItem.item.id !== forkDivider.itemId) return rendered;
+        const divider = (
+          <ForkOriginDivider
+            serverId={resolvedServerId}
+            sourceAgentId={forkDivider.sourceAgentId}
+          />
+        );
+        return streamRenderStrategy.getFrameChildOrder() === "footer-then-content" ? (
+          <>
+            {divider}
+            {rendered}
+          </>
+        ) : (
+          <>
+            {rendered}
+            {divider}
+          </>
+        );
       },
       [
+        forkDivider,
         handleForkAssistantTurn,
         readOnly,
         renderStreamItemContent,
+        resolvedServerId,
+        turnActivity,
+        toggleTurnActivity,
         streamRenderStrategy,
         supportsAgentForkContextCursor,
       ],
@@ -925,40 +1036,41 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
         }),
       [client, pendingPermissionItems],
     );
-    const turnFooterNode = useMemo(
-      () =>
-        isTurnActive || bottomTurnFooterHost ? (
-          <TurnFooter
-            isRunning={isTurnActive}
-            inFlightTurnStartedAt={baseRenderModel.turnTiming.runningStartedAt}
-            host={bottomTurnFooterHost}
-            strategy={streamRenderStrategy}
-            supportsTimelineCursor={supportsAgentForkContextCursor}
-            onForkAssistantTurn={readOnly ? undefined : handleForkAssistantTurn}
-            onForkInFlightTurn={readOnly ? undefined : handleForkInFlightTurn}
-          />
-        ) : null,
-      [
-        handleForkAssistantTurn,
-        handleForkInFlightTurn,
-        readOnly,
-        isTurnActive,
-        baseRenderModel.turnTiming.runningStartedAt,
-        bottomTurnFooterHost,
-        streamRenderStrategy,
-        supportsAgentForkContextCursor,
-      ],
-    );
+    const turnFooterNode = useMemo(() => {
+      if (hasDockedPermissions) return <WaitingForApproval />;
+      return isTurnActive || bottomTurnFooterHost ? (
+        <TurnFooter
+          isRunning={isTurnActive}
+          inFlightTurnStartedAt={baseRenderModel.turnTiming.runningStartedAt}
+          host={bottomTurnFooterHost}
+          strategy={streamRenderStrategy}
+          supportsTimelineCursor={supportsAgentForkContextCursor}
+          onForkAssistantTurn={readOnly ? undefined : handleForkAssistantTurn}
+          onForkInFlightTurn={readOnly ? undefined : handleForkInFlightTurn}
+        />
+      ) : null;
+    }, [
+      handleForkAssistantTurn,
+      handleForkInFlightTurn,
+      readOnly,
+      isTurnActive,
+      hasDockedPermissions,
+      baseRenderModel.turnTiming.runningStartedAt,
+      bottomTurnFooterHost,
+      streamRenderStrategy,
+      supportsAgentForkContextCursor,
+    ]);
     const renderModel = useMemo<AgentStreamRenderModel>(() => {
       return {
         ...baseRenderModel,
-        boundary: baseRenderModel.boundary,
+        segments: visibleSegments,
+        boundary: visibleBoundary,
         auxiliary: {
           pendingPermissions: pendingPermissionsNode,
           turnFooter: turnFooterNode,
         },
       };
-    }, [baseRenderModel, pendingPermissionsNode, turnFooterNode]);
+    }, [baseRenderModel, visibleSegments, visibleBoundary, pendingPermissionsNode, turnFooterNode]);
 
     const emptyStateStyle = useMemo(() => [stylesheet.emptyState, stylesheet.contentWrapper], []);
     const scrollToBottomContainerStyle = useMemo(
@@ -996,13 +1108,15 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
       return itemById;
     }, [streamLayout.liveHead]);
 
-    const handleReadingPositionChange = useStableEvent((rowId: string | null) => {
-      const row =
-        rowId === null
-          ? undefined
-          : (layoutHistoryItemById.get(rowId) ?? layoutLiveHeadItemById.get(rowId));
-      chatOutline.reportReadingPosition(row?.item.timelineCursor?.seq ?? null);
-    });
+    const handleReadingPositionChange = useStableEvent(
+      (rowId: string | null, atBottom: boolean) => {
+        const row =
+          rowId === null
+            ? undefined
+            : (layoutHistoryItemById.get(rowId) ?? layoutLiveHeadItemById.get(rowId));
+        chatOutline.reportReadingPosition(row?.item.timelineCursor?.seq ?? null, atBottom);
+      },
+    );
 
     const renderHistoryRow = useCallback(
       (item: StreamItem) =>
@@ -1043,9 +1157,21 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
       return renderLiveAuxiliaryNode({
         pendingPermissions: auxiliary.pendingPermissions,
         turnFooter: auxiliary.turnFooter,
+        forkOriginDivider: forkDivider?.isLast ? (
+          <ForkOriginDivider
+            serverId={resolvedServerId}
+            sourceAgentId={forkDivider.sourceAgentId}
+          />
+        ) : null,
         bottomOverlayInset,
       });
-    }, [auxiliary.pendingPermissions, auxiliary.turnFooter, bottomOverlayTailClearance]);
+    }, [
+      auxiliary.pendingPermissions,
+      auxiliary.turnFooter,
+      bottomOverlayTailClearance,
+      forkDivider,
+      resolvedServerId,
+    ]);
 
     const renderers = useMemo<StreamSegmentRenderers>(
       () => ({
@@ -1085,7 +1211,7 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
         epoch={timelineEpoch}
         items={findItems}
         viewportRef={viewportRef}
-        revealLoadedMessage={revealLoadedHistory}
+        revealLoadedMessage={revealLoadedMessage}
         visibleMessageIds={mountedMessageIds}
       >
         <ToolCallSheetProvider>
@@ -1120,6 +1246,7 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
               activePrompt={chatOutline.activePrompt}
               onJumpToPrompt={chatOutline.jumpToPrompt}
             />
+            <ComposerEdgeFade />
             {(!isNearBottom || isTimelineDetached) && (
               <View style={scrollToBottomContainerStyle} pointerEvents="box-none">
                 <Animated.View entering={scrollIndicatorFadeIn} exiting={scrollIndicatorFadeOut}>
@@ -1141,6 +1268,11 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
     );
   },
 );
+
+function ComposerEdgeFade() {
+  if (!getIsElectronMac()) return null;
+  return <View style={stylesheet.composerEdgeFade} pointerEvents="none" />;
+}
 
 function agentCapabilityFlagsEqual(
   left: AgentCapabilityFlags | undefined,
@@ -1240,6 +1372,8 @@ function agentStreamViewPropsEqual(
   if (left.streamItems !== right.streamItems) reasons.push("streamItems");
   if (left.streamHead !== right.streamHead) reasons.push("streamHead");
   if (left.pendingPermissions !== right.pendingPermissions) reasons.push("pendingPermissions");
+  if (left.hasDockedPermissions !== right.hasDockedPermissions)
+    reasons.push("hasDockedPermissions");
   if (left.pendingMessageSubmissions !== right.pendingMessageSubmissions) {
     reasons.push("pendingMessageSubmissions");
   }
@@ -1324,293 +1458,21 @@ function ToolCallSlot({
   return <ToolCall {...rest} onInlineDetailsExpandedChange={handleExpandedChange} />;
 }
 
-const ThemedLoadingSpinner = withUnistyles(LoadingSpinner);
-const ThemedCheckIcon = withUnistyles(Check);
-const ThemedXIcon = withUnistyles(X);
-
-const primaryColorMapping = (theme: Theme) => ({
-  color: theme.colors.foreground,
-});
-const mutedColorMapping = (theme: Theme) => ({
+const ThemedWaitingHand = withUnistyles(Hand, (theme: Theme) => ({
   color: theme.colors.foregroundMuted,
-});
+}));
 
-const pressableStyle = ({
-  pressed,
-  hovered = false,
-}: PressableStateCallbackType & { hovered?: boolean }) => [
-  permissionStyles.optionButton,
-  hovered ? permissionStyles.optionButtonHovered : null,
-  pressed ? permissionStyles.optionButtonPressed : null,
-];
-
-interface PermissionActionButtonProps {
-  action: AgentPermissionAction;
-  isRespondingAction: boolean;
-  isResponding: boolean;
-  isPrimary: boolean;
-  Icon: typeof ThemedCheckIcon;
-  testID: string;
-  onPress: (action: AgentPermissionAction) => void;
-}
-
-function PermissionActionButton({
-  action,
-  isRespondingAction,
-  isResponding,
-  isPrimary,
-  Icon,
-  testID,
-  onPress,
-}: PermissionActionButtonProps) {
-  const handlePress = useCallback(() => onPress(action), [onPress, action]);
-  const optionTextStyle = isPrimary
-    ? [permissionStyles.optionText, permissionStyles.optionTextPrimary]
-    : permissionStyles.optionText;
-  const colorMapping = isPrimary ? primaryColorMapping : mutedColorMapping;
-  return (
-    <Pressable
-      accessibilityRole="button"
-      testID={testID}
-      style={pressableStyle}
-      onPress={handlePress}
-      disabled={isResponding}
-    >
-      {isRespondingAction ? (
-        <ThemedLoadingSpinner size="small" uniProps={colorMapping} />
-      ) : (
-        <View style={permissionStyles.optionContent}>
-          <Icon size={14} uniProps={colorMapping} />
-          <Text style={optionTextStyle}>{action.label}</Text>
-        </View>
-      )}
-    </Pressable>
-  );
-}
-
-function PermissionRequestCard({
-  permission,
-  client,
-}: {
-  permission: PendingPermission;
-  client: DaemonClient | null;
-}) {
+function WaitingForApproval() {
   const { t } = useTranslation();
-  const isMobile = useIsCompactFormFactor();
-
-  const { request } = permission;
-  const isPlanRequest = request.kind === "plan";
-  const title = isPlanRequest
-    ? t("agentStream.permission.plan")
-    : (request.title ?? request.name ?? t("agentStream.permission.required"));
-  const description = request.description ?? "";
-  const resolvedToolCallDetail = useMemo(
-    () =>
-      request.detail ?? {
-        type: "unknown" as const,
-        input: request.input ?? null,
-        output: null,
-      },
-    [request.detail, request.input],
-  );
-  const resolvedActions = useMemo((): AgentPermissionAction[] => {
-    if (request.kind === "question") {
-      return [];
-    }
-    if (Array.isArray(request.actions) && request.actions.length > 0) {
-      return request.actions;
-    }
-    return [
-      {
-        id: "reject",
-        label: t("agentStream.permission.deny"),
-        behavior: "deny",
-        variant: "danger",
-        intent: "dismiss",
-      },
-      {
-        id: "accept",
-        label: isPlanRequest
-          ? t("agentStream.permission.implement")
-          : t("agentStream.permission.accept"),
-        behavior: "allow",
-        variant: "primary",
-      },
-    ];
-  }, [isPlanRequest, request, t]);
-
-  const planMarkdown = useMemo(() => {
-    if (!request) {
-      return undefined;
-    }
-    const planFromMetadata =
-      typeof request.metadata?.planText === "string" ? request.metadata.planText : undefined;
-    if (planFromMetadata) {
-      return planFromMetadata;
-    }
-    const candidate = request.input?.["plan"];
-    if (typeof candidate === "string") {
-      return candidate;
-    }
-    return undefined;
-  }, [request]);
-
-  const permissionMutation = useMutation({
-    mutationFn: async (input: {
-      agentId: string;
-      requestId: string;
-      response: AgentPermissionResponse;
-    }) => {
-      if (!client) {
-        throw new Error(t("common.errors.daemonClientUnavailable"));
-      }
-      return client.respondToPermissionAndWait(
-        input.agentId,
-        input.requestId,
-        input.response,
-        15000,
-      );
-    },
-  });
-  const {
-    reset: resetPermissionMutation,
-    mutateAsync: respondToPermission,
-    isPending: isResponding,
-  } = permissionMutation;
-
-  const [respondingActionId, setRespondingActionId] = useState<string | null>(null);
-
-  useEffect(() => {
-    resetPermissionMutation();
-    setRespondingActionId(null);
-  }, [permission.request.id, resetPermissionMutation]);
-  const handleResponse = useCallback(
-    (response: AgentPermissionResponse) => {
-      respondToPermission({
-        agentId: permission.agentId,
-        requestId: permission.request.id,
-        response,
-      }).catch((error) => {
-        console.error("[PermissionRequestCard] Failed to respond to permission:", error);
-      });
-    },
-    [permission.agentId, permission.request.id, respondToPermission],
-  );
-  const handleActionPress = useCallback(
-    (action: AgentPermissionAction) => {
-      setRespondingActionId(action.id);
-      if (action.behavior === "allow") {
-        handleResponse({
-          behavior: "allow",
-          selectedActionId: action.id,
-        });
-        return;
-      }
-      handleResponse({
-        behavior: "deny",
-        selectedActionId: action.id,
-        message: "Denied by user",
-      });
-    },
-    [handleResponse],
-  );
-
-  const optionsContainerStyle = useMemo(
-    () => [
-      permissionStyles.optionsContainer,
-      !isMobile && permissionStyles.optionsContainerDesktop,
-    ],
-    [isMobile],
-  );
-
-  if (request.kind === "question") {
-    const responseFailed =
-      permissionMutation.isError &&
-      permissionMutation.variables?.agentId === permission.agentId &&
-      permissionMutation.variables?.requestId === permission.request.id;
-    const responseError = responseFailed ? t("message.question.responseFailed") : null;
-    return (
-      <QuestionFormCard
-        permission={permission}
-        onRespond={handleResponse}
-        isResponding={isResponding}
-        responseError={responseError}
-      />
-    );
-  }
-
-  const footer = (
-    <>
-      <Text testID="permission-request-question" style={permissionStyles.question}>
-        {t("agentStream.permission.question")}
-      </Text>
-
-      <View style={optionsContainerStyle}>
-        {resolvedActions.map((action) => {
-          const isPrimary = action.variant === "primary";
-          const isRespondingAction = respondingActionId === action.id;
-          const Icon = action.behavior === "allow" ? ThemedCheckIcon : ThemedXIcon;
-          let testID: string;
-          if (action.behavior === "deny") testID = "permission-request-deny";
-          else if (action.id === "accept" || action.id === "implement")
-            testID = "permission-request-accept";
-          else testID = `permission-request-action-${action.id}`;
-
-          return (
-            <PermissionActionButton
-              key={action.id}
-              action={action}
-              isRespondingAction={isRespondingAction}
-              isResponding={isResponding}
-              isPrimary={isPrimary}
-              Icon={Icon}
-              testID={testID}
-              onPress={handleActionPress}
-            />
-          );
-        })}
-      </View>
-    </>
-  );
-
-  if (isPlanRequest && planMarkdown) {
-    return (
-      <PlanCard
-        title={title}
-        description={description}
-        text={planMarkdown}
-        outcome="pending"
-        footer={footer}
-        testID="permission-plan-card"
-        disableOuterSpacing
-      />
-    );
-  }
-
   return (
-    <View style={permissionStyles.container}>
-      <Text style={permissionStyles.title}>{title}</Text>
-
-      {description ? <Text style={permissionStyles.description}>{description}</Text> : null}
-
-      {planMarkdown ? (
-        <PlanCard
-          title={t("agentStream.permission.proposedPlan")}
-          text={planMarkdown}
-          testID="permission-plan-card"
-          disableOuterSpacing
-        />
-      ) : null}
-
-      {!isPlanRequest ? (
-        <ToolCallDetailsContent detail={resolvedToolCallDetail} maxHeight={200} />
-      ) : null}
-
-      {footer}
+    <View style={stylesheet.syncingIndicator} testID="desktop-waiting-for-approval">
+      <ThemedWaitingHand size={14} />
+      <Text style={stylesheet.syncingIndicatorText} accessibilityLiveRegion="polite">
+        {t("agentStream.permission.waiting")}
+      </Text>
     </View>
   );
 }
-
 const stylesheet = StyleSheet.create((theme) => ({
   container: {
     flex: 1,
@@ -1620,7 +1482,7 @@ const stylesheet = StyleSheet.create((theme) => ({
     width: "100%",
     maxWidth: theme.contentMaxWidth,
     alignSelf: "center",
-    paddingHorizontal: theme.spacing[2],
+    paddingHorizontal: CHAT_MESSAGE_HORIZONTAL_PADDING,
   },
   listContentContainer: {
     paddingVertical: 0,
@@ -1641,7 +1503,7 @@ const stylesheet = StyleSheet.create((theme) => ({
     width: "100%",
     maxWidth: theme.contentMaxWidth,
     alignSelf: "center",
-    paddingHorizontal: theme.spacing[2],
+    paddingHorizontal: CHAT_MESSAGE_HORIZONTAL_PADDING,
   },
   emptyState: {
     flex: 1,
@@ -1675,6 +1537,15 @@ const stylesheet = StyleSheet.create((theme) => ({
     fontSize: theme.fontSize.base,
     textAlign: "center",
   },
+  // Fades the transcript into the composer edge instead of cutting it off.
+  composerEdgeFade: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: theme.spacing[6],
+    backgroundImage: `linear-gradient(to bottom, transparent, ${theme.colors.surface0})`,
+  },
   scrollToBottomContainer: {
     position: "absolute",
     left: 0,
@@ -1691,78 +1562,6 @@ const stylesheet = StyleSheet.create((theme) => ({
     ...theme.shadow.sm,
   },
   scrollToBottomIcon: {
-    color: theme.colors.foreground,
-  },
-}));
-
-const permissionStyles = StyleSheet.create((theme) => ({
-  container: {
-    marginVertical: theme.spacing[3],
-    padding: theme.spacing[3],
-    borderRadius: theme.spacing[2],
-    borderWidth: 1,
-    gap: theme.spacing[2],
-    backgroundColor: theme.colors.surface1,
-    borderColor: theme.colors.border,
-  },
-  title: {
-    fontSize: theme.fontSize.base,
-    lineHeight: 22,
-    color: theme.colors.foreground,
-  },
-  description: {
-    fontSize: theme.fontSize.base,
-    lineHeight: 20,
-    color: theme.colors.foregroundMuted,
-  },
-  section: {
-    gap: theme.spacing[2],
-  },
-  sectionTitle: {
-    fontSize: theme.fontSize.sm,
-  },
-  question: {
-    fontSize: theme.fontSize.base,
-    marginTop: theme.spacing[1],
-    marginBottom: theme.spacing[1],
-    color: theme.colors.foregroundMuted,
-  },
-  optionsContainer: {
-    gap: theme.spacing[2],
-  },
-  optionsContainerDesktop: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "flex-start",
-    alignItems: "center",
-    width: "100%",
-  },
-  optionButton: {
-    paddingVertical: theme.spacing[2],
-    paddingHorizontal: theme.spacing[3],
-    borderRadius: theme.borderRadius.md,
-    alignItems: "center",
-    borderWidth: theme.borderWidth[1],
-    backgroundColor: theme.colors.surface1,
-    borderColor: theme.colors.borderAccent,
-  },
-  optionButtonHovered: {
-    backgroundColor: theme.colors.surface2,
-  },
-  optionButtonPressed: {
-    opacity: 0.9,
-  },
-  optionContent: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: theme.spacing[2],
-  },
-  optionText: {
-    fontSize: theme.fontSize.base,
-    fontWeight: theme.fontWeight.normal,
-    color: theme.colors.foregroundMuted,
-  },
-  optionTextPrimary: {
     color: theme.colors.foreground,
   },
 }));

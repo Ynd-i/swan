@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { mkdtemp, mkdir, rm, stat, writeFile } from "node:fs/promises";
+import { cp, mkdtemp, mkdir, rm, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -52,6 +52,24 @@ test("listed built-ins resolve to matching manifests and compile", async () => {
       client: await findEntry(["index.client.ts", "index.client.tsx"]),
     });
     expect(bundles.serverBundle).toBeTruthy();
+  }
+});
+
+test("listed built-ins compile without a node_modules ancestor, as in the packaged app", async () => {
+  const sourceRoot = resolveBuiltinPluginsRoot();
+  const root = await mkdtemp(path.join(os.tmpdir(), "paseo-builtin-packaged-"));
+  roots.push(root);
+  for (const id of builtinPlugins) {
+    const directory = path.join(root, id);
+    await cp(path.join(sourceRoot, id), directory, {
+      recursive: true,
+      filter: (source) => path.basename(source) !== "node_modules",
+    });
+    const bundles = await compilePlugin({
+      server: path.join(directory, "index.server.ts"),
+      client: null,
+    });
+    expect(bundles.serverBundle, id).toBeTruthy();
   }
 });
 

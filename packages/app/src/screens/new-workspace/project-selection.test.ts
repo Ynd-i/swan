@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { filterWorkspaceProjectsForHost, type HostProjectListItem } from "@/projects/host-projects";
 import {
   createManualProjectSelectionContextKey,
+  createNoProjectSelection,
   createProjectSelectionContextKey,
   createProjectSelection,
   reconcileProjectSelection,
@@ -675,5 +676,41 @@ describe("reconcileProjectSelection", () => {
     });
 
     expect(resolveProjectSelection(current, selectionContext)).toEqual(manual);
+  });
+
+  it("keeps no project while projects hydrate, until the route changes", () => {
+    const remembered = project("remembered");
+    const cleared = createNoProjectSelection("");
+    const hydrated = context({
+      initialProject: remembered,
+      projects: [remembered],
+      lastActiveProject: remembered,
+    });
+
+    expect(reconcileProjectSelection(cleared, hydrated)).toBe(cleared);
+    expect(resolveProjectSelection(cleared, hydrated)).toBeNull();
+    expect(
+      reconcileProjectSelection(
+        cleared,
+        context({ ...hydrated, contextKey: "host:remembered", manualContextKey: "other-route" }),
+      ),
+    ).toEqual({ contextKey: "host:remembered", project: remembered, source: "initial" });
+  });
+
+  it("starts without a project when the remembered project is a chat folder", () => {
+    const chatFolder = {
+      ...project("brave-fox"),
+      iconWorkingDir: "/Users/me/Documents/Paseo/2026-10-03/brave-fox",
+    };
+    const selectionContext = context({
+      initialProject: chatFolder,
+      projects: [project("other")],
+      lastActiveProject: chatFolder,
+    });
+
+    const selection = createProjectSelection(selectionContext);
+
+    expect(selection).toEqual(createNoProjectSelection(""));
+    expect(reconcileProjectSelection(selection, selectionContext)).toBe(selection);
   });
 });

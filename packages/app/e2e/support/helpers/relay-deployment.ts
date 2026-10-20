@@ -39,11 +39,19 @@ export async function connectDaemonWebAppOnlyThroughRelay(
     updatedAt: now,
   };
 
-  await page.route(/:(6767)\b/, (route) => route.abort());
-  await page.routeWebSocket(/:(6767)\b/, async (socket) => {
-    await socket.close({ code: 1008, reason: "Blocked developer daemon during relay E2E" });
+  // HTTP serves the bundle from the test daemon, but application sockets must use the relay.
+  await page.routeWebSocket(new RegExp(`:(6767|6768|${daemon.port})\\b`), async (socket) => {
+    await socket.close({
+      code: 1008,
+      reason: "Direct daemon sockets are blocked during relay E2E",
+    });
   });
   await page.route("**/*", async (route) => {
+    const port = new URL(route.request().url()).port;
+    if (port === "6767" || port === "6768") {
+      await route.abort();
+      return;
+    }
     if (route.request().resourceType() !== "document") {
       await route.continue();
       return;
@@ -78,7 +86,15 @@ async function latestAssistantText(page: Page): Promise<string> {
 }
 
 async function waitForAssistantTextToGrow(page: Page, previous: string): Promise<void> {
-  await expect.poll(() => latestAssistantText(page), { timeout: 30_000 }).not.toBe(previous);
+  await expect
+    .poll(
+      async () => {
+        const current = await latestAssistantText(page);
+        return current.length > 0 && current !== previous;
+      },
+      { timeout: 30_000 },
+    )
+    .toBe(true);
 }
 
 async function expectRunningStatusPreserved(page: Page, agentTitle: string): Promise<void> {
@@ -118,6 +134,8 @@ export async function measureRelayRestartDuringStream(input: {
 
   await expectRunningAgentChrome(page, agentTitle);
   await waitForAssistantTextToGrow(page, disconnectedText);
+  // Wait beyond the catch-up snapshot to observe continuing visible output.
+  await waitForAssistantTextToGrow(page, await latestAssistantText(page));
 
   return {
     reconnectToastDelayMs: Math.round(toastVisibleAt - outageStartedAt),

@@ -82,7 +82,12 @@ export async function navigateToTerminal(
   // Its presence is the user-visible proof that workspace and terminal state have hydrated.
   // The tab reconciliation effect also auto-creates terminal tabs once hydration completes,
   // so we give it enough time for the full workspace hydration + tab creation cycle.
-  const terminalTab = page.locator(`[data-testid="workspace-tab-terminal_${input.terminalId}"]`);
+  const terminalTab = page
+    .locator(
+      `[data-testid="workspace-tab-terminal_${input.terminalId}"], [data-testid="explorer-sidebar-tab-terminal_${input.terminalId}"]`,
+    )
+    .filter({ visible: true })
+    .first();
   await terminalTab.waitFor({ state: "visible", timeout: 30_000 });
   await terminalTab.click();
 

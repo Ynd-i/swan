@@ -27,6 +27,8 @@ export interface SearchFieldProps {
   clearAccessibilityLabel: string;
   testID?: string;
   clearTestID?: string;
+  fullWidth?: boolean;
+  onFocus?: () => void;
 }
 
 /**
@@ -44,10 +46,15 @@ export function SearchField({
   clearAccessibilityLabel,
   testID,
   clearTestID,
+  fullWidth = false,
+  onFocus,
 }: SearchFieldProps): ReactElement {
   const [isFocused, setIsFocused] = useState(false);
   const inputRef = useRef<EditingTextInputHandle>(null);
-  const handleFocus = useCallback(() => setIsFocused(true), []);
+  const handleFocus = useCallback(() => {
+    setIsFocused(true);
+    onFocus?.();
+  }, [onFocus]);
   const handleBlur = useCallback(() => setIsFocused(false), []);
   const handleClear = useCallback(() => {
     inputRef.current?.replaceText("");
@@ -55,7 +62,7 @@ export function SearchField({
   }, [onChangeText]);
 
   return (
-    <View style={[styles.field, isFocused && styles.fieldFocused]}>
+    <View style={[styles.field, fullWidth && styles.fullWidth, isFocused && styles.fieldFocused]}>
       <ThemedSearch size={14} uniProps={mutedColorMapping} />
       <ThemedTextInput
         testID={testID}
@@ -102,6 +109,9 @@ const styles = StyleSheet.create((theme) => ({
     backgroundColor: theme.colors.surface1,
     borderWidth: theme.borderWidth[1],
     borderColor: theme.colors.border,
+  },
+  fullWidth: {
+    maxWidth: "100%",
   },
   fieldFocused: {
     borderColor: theme.colors.borderAccent,

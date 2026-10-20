@@ -22,6 +22,7 @@ import type {
   FetchCatalogOptions,
 } from "../agent/agent-sdk-types.js";
 import type { AgentPermissionRequest, AgentPermissionResponse } from "../agent/agent-sdk-types.js";
+import type { ProviderSubagentInputEvent } from "../agent/provider-subagents/store.js";
 import { isLikelyExternalToolName } from "@getpaseo/protocol/tool-name-normalization";
 
 const TEST_CAPABILITIES: AgentCapabilityFlags = {
@@ -61,13 +62,20 @@ interface FakeAgentSessionOptions {
   onStartTurn?: (prompt: AgentPromptInput, config: AgentSessionConfig) => void;
   beforeTurnComplete?: (prompt: AgentPromptInput) => Promise<void>;
   historyEvents?: readonly AgentStreamEvent[];
+  respond?: FakeTurnScript;
 }
+
+/** Overrides the reply text and completion usage of a plain prompt turn, and can report a subagent. */
+export type FakeTurnScript = (
+  prompt: string,
+) => { text?: string; usage?: AgentUsage; subagent?: ProviderSubagentInputEvent } | undefined;
 
 export interface TestAgentClientOptions {
   beforeCreateSession?: (config: AgentSessionConfig) => Promise<void>;
   closeSession?: () => Promise<void>;
   onStartTurn?: (prompt: AgentPromptInput, config: AgentSessionConfig) => void;
   beforeTurnComplete?: (prompt: AgentPromptInput) => Promise<void>;
+  respond?: FakeTurnScript;
   supportsMcpServers?: boolean;
   historyEvents?: readonly AgentStreamEvent[];
 }
@@ -344,6 +352,7 @@ class FakeAgentSession implements AgentSession {
   private readonly onStartTurn: TestAgentClientOptions["onStartTurn"];
   private readonly beforeTurnComplete: ((prompt: AgentPromptInput) => Promise<void>) | undefined;
   private readonly historyEvents: readonly AgentStreamEvent[] | undefined;
+  private readonly respond: FakeTurnScript | undefined;
 
   constructor(options: FakeAgentSessionOptions) {
     this.capabilities = {
@@ -358,6 +367,7 @@ class FakeAgentSession implements AgentSession {
     this.onStartTurn = options.onStartTurn;
     this.beforeTurnComplete = options.beforeTurnComplete;
     this.historyEvents = options.historyEvents;
+    this.respond = options.respond;
     this.historyPath = path.join(
       tmpdir(),
       "paseo-fake-provider-history",
@@ -714,6 +724,17 @@ class FakeAgentSession implements AgentSession {
     return false;
   }
 
+  private async emitScriptedSubagent(event: ProviderSubagentInputEvent | undefined): Promise<void> {
+    if (!event) return;
+    const subagent: AgentStreamEvent = {
+      type: "provider_subagent",
+      provider: this.providerName,
+      event,
+    };
+    await this.appendHistoryEvent(subagent);
+    this.notifySubscribers(subagent);
+  }
+
   private async emitTurnEvents(prompt: AgentPromptInput): Promise<void> {
     this.interruptSignal = createDeferred<void>();
     const slashCommand = await this.resolveSlashCommandInput(prompt);
@@ -756,6 +777,14 @@ class FakeAgentSession implements AgentSession {
         this.notifySubscribers(child);
       }
 
+      if (textPrompt === "Emit a background task") {
+        this.notifySubscribers({
+          type: "background_tasks_changed",
+          provider: this.providerName,
+          tasks: [{ id: "fixture-shell", description: "Fixture background shell" }],
+        });
+      }
+
       if (textPrompt.toLowerCase().includes("emit a turn failure")) {
         const failed: AgentStreamEvent = {
           type: "turn_failed",
@@ -787,7 +816,9 @@ class FakeAgentSession implements AgentSession {
         }
       }
 
-      const assistantText = this.buildAssistantText(textPrompt);
+      const scripted = this.respond?.(textPrompt);
+      await this.emitScriptedSubagent(scripted?.subagent);
+      const assistantText = scripted?.text ?? this.buildAssistantText(textPrompt);
       const assistantChunkA: AgentStreamEvent = {
         type: "timeline",
         provider: this.providerName,
@@ -811,7 +842,7 @@ class FakeAgentSession implements AgentSession {
       const completed: AgentStreamEvent = {
         type: "turn_completed",
         provider: this.providerName,
-        usage: { inputTokens: 1, outputTokens: 1 },
+        usage: scripted?.usage ?? { inputTokens: 1, outputTokens: 1 },
       };
       await this.appendHistoryEvent(completed);
       this.notifySubscribers(completed);
@@ -1235,6 +1266,7 @@ class FakeAgentClient implements AgentClient {
       onStartTurn: this.options.onStartTurn,
       beforeTurnComplete: this.options.beforeTurnComplete,
       historyEvents: this.options.historyEvents,
+      respond: this.options.respond,
     });
   }
 
@@ -1262,6 +1294,7 @@ class FakeAgentClient implements AgentClient {
       onStartTurn: this.options.onStartTurn,
       beforeTurnComplete: this.options.beforeTurnComplete,
       historyEvents: this.options.historyEvents,
+      respond: this.options.respond,
     });
   }
 

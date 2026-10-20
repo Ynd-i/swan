@@ -110,6 +110,32 @@ beforeEach(() => {
 });
 
 describe("fetchCheckoutStatus", () => {
+  it("retains the selected comparison through a matching refetch and expires it after a branch change", async () => {
+    const snapshot = {
+      serverId,
+      cwd,
+      isDirty: true,
+      currentBranch: "main",
+      defaultBaseRef: "origin/main",
+    };
+    selectWorkingDiffComparison({ ...snapshot, comparison: "base", baseRef: "refs/heads/release" });
+    await fetchCheckoutStatus({
+      client: { getCheckoutStatus: async () => checkoutStatus({ isDirty: true }) },
+      serverId,
+      cwd,
+    });
+    expect(resolveWorkingDiffComparison(snapshot)).toBe("base");
+    await fetchCheckoutStatus({
+      client: {
+        getCheckoutStatus: async () => checkoutStatus({ isDirty: true, currentBranch: "other" }),
+      },
+      serverId,
+      cwd,
+    });
+    expect(resolveWorkingDiffComparison({ ...snapshot, currentBranch: "other" })).toBe(
+      "uncommitted",
+    );
+  });
   it("fetches from the client and returns the payload", async () => {
     const fetched = checkoutStatus({ requestId: "fetch-1" });
     const client = { getCheckoutStatus: vi.fn(async () => fetched) };

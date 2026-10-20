@@ -1,5 +1,8 @@
 import { useCallback, useMemo, useState } from "react";
 import { StyleSheet } from "react-native-unistyles";
+import { Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
+import { SearchField } from "@/components/ui/search-field";
 // The sheet-aware list: inside a bottom sheet the tree scrolls with the sheet
 // gesture, and outside one it is the ordinary React Native FlatList.
 import { FlatList } from "@/components/ui/scroll-view";
@@ -10,6 +13,7 @@ import {
   collectDirPaths,
   compressSingleChildChains,
   flattenDiffTree,
+  searchDiffTree,
   type DiffTreeRow,
 } from "@/git/diff-tree";
 import { FileHeader } from "@/git/file-header";
@@ -21,6 +25,7 @@ export interface ChangedFilesTreeProps {
   onSelectFile: (path: string) => void;
   collapsedFolderPaths: string[];
   onCollapsedFolderPathsChange: (paths: string[]) => void;
+  searchable?: boolean;
 }
 
 /** The changed-files tree shared by the desktop Changes rail and the compact Jump to file sheet. */
@@ -30,14 +35,21 @@ export function ChangedFilesTree({
   onSelectFile,
   collapsedFolderPaths,
   onCollapsedFolderPathsChange,
+  searchable = false,
 }: ChangedFilesTreeProps) {
+  const { t } = useTranslation();
+  const [filter, setFilter] = useState("");
+  const query = searchable ? filter.trim() : "";
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const compressedTree = useMemo(() => compressSingleChildChains(buildDiffTree(files)), [files]);
   const allFolderPaths = useMemo(() => collectDirPaths(compressedTree), [compressedTree]);
   const collapsedFolders = useMemo(() => new Set(collapsedFolderPaths), [collapsedFolderPaths]);
   const items = useMemo(
-    () => flattenDiffTree(compressedTree, collapsedFolders),
-    [collapsedFolders, compressedTree],
+    () =>
+      query
+        ? searchDiffTree(compressedTree, query)
+        : flattenDiffTree(compressedTree, collapsedFolders),
+    [collapsedFolders, compressedTree, query],
   );
   const handleSelectPath = useCallback((path: string) => setSelectedPath(path), []);
   const handleSelectFile = useCallback(
@@ -103,7 +115,7 @@ export function ChangedFilesTree({
           showsBodyState={false}
           isSelected={selectedPath === item.file.path}
           depth={item.depth}
-          showDir={false}
+          showDir={Boolean(query)}
           onActivate={handleSelectFile}
           onSelect={handleSelectPath}
           onOpenFile={mode.onOpenFile}
@@ -128,6 +140,7 @@ export function ChangedFilesTree({
       collapsedFolders,
       mode,
       selectedPath,
+      query,
     ],
   );
   const keyExtractor = useCallback(
@@ -136,7 +149,7 @@ export function ChangedFilesTree({
     [],
   );
 
-  return (
+  const list = (
     <FlatList
       data={items}
       renderItem={renderItem}
@@ -146,9 +159,33 @@ export function ChangedFilesTree({
       testID="changes-file-tree"
     />
   );
+  if (!searchable) return list;
+  return (
+    <View style={styles.scrollView}>
+      <View style={styles.filter}>
+        <SearchField
+          value={filter}
+          onChangeText={setFilter}
+          placeholder={t("workspace.fileExplorer.filter.placeholder")}
+          clearAccessibilityLabel={t("sessions.actions.clearSearch")}
+          testID="changes-filter"
+          clearTestID="changes-filter-clear"
+          fullWidth
+        />
+      </View>
+      {query && items.length === 0 ? (
+        <Text style={styles.emptyText} testID="changes-filter-empty">
+          {t("workspace.fileExplorer.filter.noResults")}
+        </Text>
+      ) : null}
+      {list}
+    </View>
+  );
 }
 
 const styles = StyleSheet.create((theme) => ({
+  filter: { margin: 8, height: 30, flexDirection: "row" },
+  emptyText: { padding: 12, color: theme.colors.foregroundMuted, fontSize: theme.fontSize.sm },
   scrollView: {
     flex: 1,
   },

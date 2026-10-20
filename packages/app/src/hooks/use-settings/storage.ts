@@ -1,4 +1,8 @@
-import { isSyntaxThemeId, type SyntaxThemeId } from "@getpaseo/highlight";
+import {
+  getDefaultSyntaxTheme,
+  isSyntaxThemeId,
+  type SyntaxThemeId,
+} from "@/appearance/syntax-theme";
 import type { ActiveTurnBehavior } from "@getpaseo/protocol/messages";
 import type { QueryClient } from "@tanstack/react-query";
 import type { DesktopSettings } from "@/desktop/settings/desktop-settings";
@@ -18,13 +22,18 @@ import {
   isChecksHiddenByLegacyRowItem,
   type SidebarRowItems,
 } from "@/components/sidebar/display-preferences/row-items";
-import { isNative } from "@/constants/platform";
+import { getIsElectronMac, isNative } from "@/constants/platform";
 import {
   DEFAULT_CONTENT_MAX_WIDTH,
   FONT_SIZE,
+  HEX_COLOR_PATTERN,
   PLUGIN_THEME_PREFERENCE,
   THEME_OPTIONS,
+  THEME_TINTS,
+  type ThemeColorRole,
+  type ThemeColorSettings,
   type ThemePreference,
+  type FontWeightSetting,
 } from "@/styles/theme";
 import { z } from "zod";
 import { APP_SETTINGS_KEY, LEGACY_SETTINGS_KEY } from "./keys";
@@ -46,20 +55,39 @@ const ThemePreferenceSchema = z.enum([
   ...THEME_OPTIONS.map((option) => option.name),
   PLUGIN_THEME_PREFERENCE,
 ]);
+const THEME_NAMES = new Set<string>(Object.keys(THEME_TINTS));
+const ThemeColorSchema = z.string().regex(HEX_COLOR_PATTERN).optional().catch(undefined);
+const ThemeColorOverridesSchema = z
+  .object({
+    main: ThemeColorSchema,
+    sidebar: ThemeColorSchema,
+    selection: ThemeColorSchema,
+    accent: ThemeColorSchema,
+    text: ThemeColorSchema,
+    mutedText: ThemeColorSchema,
+    border: ThemeColorSchema,
+  } satisfies Record<ThemeColorRole, typeof ThemeColorSchema>)
+  .catch({});
+
 /** Where the theme picker lands when the persisted preference cannot be honoured. */
 export const DEFAULT_THEME_PREFERENCE = "auto" satisfies ThemePreference;
 export const DEFAULT_TERMINAL_SCROLLBACK_LINES = 10_000;
 export const MIN_TERMINAL_SCROLLBACK_LINES = 0;
 export const MAX_TERMINAL_SCROLLBACK_LINES = 1_000_000;
+// Codex on macOS uses one 13px base for interface and conversation text.
+const MAC_BASE_FONT_SIZE = 13;
+
 export function defaultUiBaseFontSize(native: boolean): number {
-  return native ? 15 : FONT_SIZE.base;
+  if (native) return 15;
+  return getIsElectronMac() ? MAC_BASE_FONT_SIZE : FONT_SIZE.base;
 }
 
 export const DEFAULT_UI_BASE_FONT_SIZE = defaultUiBaseFontSize(isNative);
 export const MIN_UI_BASE_FONT_SIZE = 10;
 export const MAX_UI_BASE_FONT_SIZE = 21;
 export function defaultContentFontSize(native: boolean): number {
-  return native ? 16 : FONT_SIZE.content;
+  if (native) return 16;
+  return getIsElectronMac() ? MAC_BASE_FONT_SIZE : FONT_SIZE.content;
 }
 
 export const DEFAULT_CONTENT_FONT_SIZE = defaultContentFontSize(isNative);
@@ -77,19 +105,25 @@ export interface AppSettings {
   theme: ThemePreference;
   /** Which contributed theme `theme: "plugin"` selects. */
   pluginThemeId: string | null;
+  themeColors: ThemeColorSettings;
   language: AppLanguage;
   sendBehavior: SendBehavior;
   serviceUrlBehavior: ServiceUrlBehavior;
   terminalScrollbackLines: number;
   useLegacyTerminalRenderer: boolean;
   uiFontFamily: string; // "" = platform default UI stack
+  contentFontFamily: string; // "" = use the selected UI font
   monoFontFamily: string; // "" = platform default mono stack
   uiBaseFontSize: number; // clamped px, platform default 14 or 15
   contentFontSize: number; // clamped px, platform default 15 or 16
   codeFontSize: number; // clamped px, default 12
+  codeFontWeight: FontWeightSetting;
+  contentFontWeight: FontWeightSetting;
+  uiFontWeight: FontWeightSetting;
   /** Max width of chat and markdown content in px; null follows the current default. */
   contentMaxWidth: number | null;
-  syntaxTheme: SyntaxThemeId; // default "one"
+  syntaxTheme: SyntaxThemeId;
+  reducedMotion: "system" | "on" | "off";
   workspaceTitleSource: WorkspaceTitleSource;
   sidebarWorkspaceTrailing: SidebarWorkspaceTrailing;
   sidebarRowItems: SidebarRowItems;
@@ -137,18 +171,24 @@ export interface Settings extends AppSettings {
 export const DEFAULT_CLIENT_SETTINGS: AppSettings = {
   theme: DEFAULT_THEME_PREFERENCE,
   pluginThemeId: null,
+  themeColors: {},
   language: "system",
   sendBehavior: "steer",
   serviceUrlBehavior: "ask",
   terminalScrollbackLines: DEFAULT_TERMINAL_SCROLLBACK_LINES,
   useLegacyTerminalRenderer: false,
   uiFontFamily: "",
+  contentFontFamily: "",
   monoFontFamily: "",
   uiBaseFontSize: DEFAULT_UI_BASE_FONT_SIZE,
   contentFontSize: DEFAULT_CONTENT_FONT_SIZE,
   codeFontSize: DEFAULT_CODE_FONT_SIZE,
+  codeFontWeight: null,
+  contentFontWeight: null,
+  uiFontWeight: null,
   contentMaxWidth: null,
-  syntaxTheme: "one",
+  syntaxTheme: getDefaultSyntaxTheme(),
+  reducedMotion: "system",
   workspaceTitleSource: "title",
   sidebarWorkspaceTrailing: "timestamp",
   sidebarRowItems: DEFAULT_SIDEBAR_ROW_ITEMS,
@@ -213,6 +253,14 @@ const StoredAppSettingsSchema = z
   .looseObject({
     theme: ThemePreferenceSchema.catch(DEFAULT_THEME_PREFERENCE),
     pluginThemeId: z.string().nullable().catch(null),
+    // Per entry, so a retired theme name does not discard the other themes' colors.
+    themeColors: z
+      .record(z.string(), ThemeColorOverridesSchema)
+      .transform(
+        (stored): ThemeColorSettings =>
+          Object.fromEntries(Object.entries(stored).filter(([name]) => THEME_NAMES.has(name))),
+      )
+      .catch({}),
     language: z
       .enum(["system", "ar", "en", "es", "fr", "ja", "ko", "pt-BR", "ru", "zh-CN"])
       .catch("system"),
@@ -224,6 +272,7 @@ const StoredAppSettingsSchema = z
     ).catch(DEFAULT_TERMINAL_SCROLLBACK_LINES),
     useLegacyTerminalRenderer: z.boolean().catch(false),
     uiFontFamily: sanitizedFontFamily().catch(""),
+    contentFontFamily: sanitizedFontFamily().catch(""),
     monoFontFamily: sanitizedFontFamily().catch(""),
     uiBaseFontSize: clampedNumber(MIN_UI_BASE_FONT_SIZE, MAX_UI_BASE_FONT_SIZE)
       .optional()
@@ -236,11 +285,15 @@ const StoredAppSettingsSchema = z
     codeFontSize: clampedNumber(MIN_CODE_FONT_SIZE, MAX_CODE_FONT_SIZE).catch(
       DEFAULT_CODE_FONT_SIZE,
     ),
+    codeFontWeight: z.enum(["400", "500", "600"]).nullable().catch(null),
+    contentFontWeight: z.enum(["400", "500", "600"]).nullable().catch(null),
+    uiFontWeight: z.enum(["400", "500", "600"]).nullable().catch(null),
     contentMaxWidth: z
       .null()
       .or(clampedNumber(MIN_CONTENT_MAX_WIDTH, MAX_CONTENT_MAX_WIDTH))
       .catch(null),
-    syntaxTheme: z.string().refine(isSyntaxThemeId).catch("one"),
+    syntaxTheme: z.string().refine(isSyntaxThemeId).catch(getDefaultSyntaxTheme),
+    reducedMotion: z.enum(["system", "on", "off"]).catch("system"),
     workspaceTitleSource: z.enum(["title", "branch"]).catch("title"),
     sidebarWorkspaceTrailing: z.enum(["diff", "timestamp", "none"]).catch("timestamp"),
     sidebarRowItems: SidebarRowItemsSchema,
@@ -248,8 +301,12 @@ const StoredAppSettingsSchema = z
       .enum(["iconAndText", "icon", "none"])
       .optional()
       .catch(DEFAULT_SIDEBAR_CHECKS_DISPLAY),
-    sidebarNavItems: z.array(z.object({ key: z.string(), visible: z.boolean() })).catch([]),
-    sidebarFooterItems: z.array(z.object({ key: z.string(), visible: z.boolean() })).catch([]),
+    sidebarNavItems: z
+      .array(z.object({ key: z.string(), visible: z.boolean().optional() }))
+      .catch([]),
+    sidebarFooterItems: z
+      .array(z.object({ key: z.string(), visible: z.boolean().optional() }))
+      .catch([]),
     usage: UsagePreferencesSchema,
     autoExpandReasoning: z.boolean().catch(false),
     toolCallDetailLevel: z
@@ -414,7 +471,11 @@ async function readAppSettings(
   }
 
   const defaultStored = StoredAppSettingsSchema.parse({});
-  return { settings: DEFAULT_CLIENT_SETTINGS, needsWrite: true, stored: defaultStored };
+  return {
+    settings: { ...DEFAULT_CLIENT_SETTINGS, syntaxTheme: defaultStored.syntaxTheme },
+    needsWrite: true,
+    stored: defaultStored,
+  };
 }
 
 export async function loadSettingsFromStorage(deps: SettingsDeps): Promise<Settings> {

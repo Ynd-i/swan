@@ -2,6 +2,116 @@ import { en, type TranslationResources } from "./en";
 import { pluginSettings } from "./plugin-settings";
 
 export const fr: TranslationResources = {
+  usage: {
+    options: "Options d’utilisation",
+    displayAs: "Afficher",
+    showInSidebar: "Afficher dans la barre latérale",
+    showInSidebarHint: "Les fenêtres épinglées apparaissent dans le pied de la barre latérale",
+    hostUnavailableNamed: "Connectez-vous à {{host}} pour consulter l’utilisation",
+    hostUpgradeRequiredNamed: "Mettez à jour {{host}} pour consulter l’utilisation",
+    pin: "Épingler",
+    unpin: "Détacher",
+    displayUsed: "Utilisé",
+    displayRemaining: "Restant",
+    title: "Utilisation",
+    planUsage: "Utilisation du forfait",
+    refresh: "Actualiser",
+    refreshing: "Actualisation…",
+    refreshFailed: "Impossible d’actualiser l’utilisation",
+    refreshAll: "Tout actualiser",
+    agentError: "Impossible de charger l’utilisation : {{reason}}",
+    updated: "Mis à jour {{time}}",
+    updatedNow: "Mis à jour à l’instant",
+    lastUpdated: "Dernière mise à jour {{time}}",
+    lastUpdatedNow: "Dernière mise à jour à l’instant",
+    noSuccessfulUpdate: "Aucune mise à jour réussie",
+    loading: "Chargement de l’utilisation…",
+    empty: "Aucune donnée d’utilisation",
+    noHosts: "Aucun hôte connecté",
+    errorTitle: "Impossible de charger l’utilisation",
+    hostUnavailable: "Connectez cet hôte pour voir l’utilisation",
+    hostUpgradeRequired: "Mettez l’hôte à jour pour voir l’utilisation",
+    clientUnavailable: "La connexion à l’hôte n’est pas prête",
+    unavailable: "Indisponible",
+    remainingPercent: "{{percent}} restant",
+    usedPercent: "{{percent}} utilisé",
+    remainingBalance: "{{amount}} restants",
+    resetsIn: "réinitialisation dans {{duration}}",
+    resetDue: "Réinitialisation attendue",
+    resetPassed: "Heure de réinitialisation dépassée",
+    runsOutIn: "épuisement dans {{duration}}",
+    runsOutNow: "Épuisement imminent",
+    durationMinutes: "{{count}} min",
+    durationHours: "{{count}} h",
+    durationDays: "{{count}} j",
+    ago: "il y a {{duration}}",
+    lessThanMinute: "moins de 1 min",
+    problemExpired: "La connexion a expiré {{ago}}. {{remedy}}",
+    problemRejected: "Connexion refusée (HTTP {{status}}). {{remedy}}",
+    problemRunToRefresh: "Exécutez {{command}} pour l’actualiser.",
+    problemSignInAgain: "Reconnectez-vous.",
+  },
+  chatProposals: {
+    suggested: "Chat suggéré",
+    start: "Démarrer",
+    startFailed: "Impossible de démarrer : {{error}}",
+    unknownModel: "Modèle inconnu : {{model}}",
+    unknownThinking: "Niveau de réflexion inconnu : {{thinking}}",
+    open: "Ouvrir {{title}}",
+    archived: "Archivé",
+    task: "Tâche",
+    context: "Contexte",
+    startedFrom: "Démarré depuis",
+    reportFrom: "Rapport de",
+    reportFailed: "Tour échoué dans",
+    reply: "Réponse",
+  },
+  desktopChat: {
+    handoffs: { toggle: "Passations précédentes ({{count}})" },
+    activity: "Activité",
+    workedFor: "Durée : {{duration}}",
+    failedCount: "{{count}} en échec",
+    thinking: "Réflexion",
+    startWork: "Sur quoi allons-nous travailler ?",
+    startInProject: "Sur quoi allons-nous travailler dans {{project}} ?",
+    resetReasoning: "Réinitialiser l’intensité du raisonnement",
+    newChat: "Nouvelle conversation",
+    actions: "Actions de la conversation",
+    markRead: "Marquer comme lu",
+    markUnread: "Marquer comme non lu",
+    fork: "Dupliquer",
+    forkNewChat: "Dupliquer dans une nouvelle conversation",
+    sections: {
+      actions: "Actions de la section",
+      sortLatest: "Mis à jour récemment",
+      sortManual: "Ordre manuel",
+      chatSort: "Trier les chats",
+      show: "Afficher",
+      projects: "Projets",
+      newSection: "Nouvelle section",
+      newSectionMenu: "Nouvelle section…",
+      section: "Section",
+      edit: "Modifier",
+      markAllRead: "Tout marquer comme lu",
+      archiveChats: "Archiver les chats",
+      archiveConfirm: "Archiver {{count}} chats de cette section ?",
+      archiveProjectConfirm: "Archiver {{count}} chats de ce projet ?",
+      removeSection: "Supprimer la section",
+      createDescription: "Organisez chats et projets à votre façon",
+      namePlaceholder: "Nom de la section",
+      create: "Créer la section",
+      editTitle: "Modifier la section",
+      save: "Enregistrer",
+      notifications: "Notifications",
+      priority: "Priorité",
+      priorityEmpty: "Aucune tâche ne nécessite d'attention",
+      organize: "Organiser la barre latérale",
+      byProject: "Par projet",
+      merged: "Fusionné",
+      revealInFinder: "Afficher dans le Finder",
+      removeProject: "Retirer le projet",
+    },
+  },
   paneFind: {
     connectionFailure:
       "Impossible de rechercher dans cette conversation. Vérifiez la connexion à l’hôte et réessayez.",
@@ -90,6 +200,10 @@ export const fr: TranslationResources = {
       searchingFiles: "Recherche de fichiers…",
       noMatches: "Aucun résultat",
       actions: "Actions",
+      chatPlaceholder: "Rechercher des discussions",
+      chats: "Discussions",
+      quickActions: "Actions rapides",
+      openFolder: "Ouvrir un dossier",
       files: "Fichiers",
       workspaces: "Espaces de travail",
       agents: "Agents",
@@ -117,10 +231,22 @@ export const fr: TranslationResources = {
     },
   },
   composer: {
+    queue: {
+      steer: "Orienter",
+      delete: "Supprimer",
+      more: "Plus",
+      edit: "Modifier le message",
+      turnOff: "Désactiver la file",
+    },
+    goalMode: {
+      label: "Objectif",
+      placeholder: "Décrivez votre objectif et un résultat mesurable pour de meilleurs résultats",
+    },
     placeholders: {
       desktop: "Écrivez à l’agent, mentionnez des @fichiers ou utilisez les /commandes et /skills",
       mobile: "Message, @fichiers, /commandes",
       fallback: "Message…",
+      chat: "Posez toutes vos questions",
       terminal: "Prompt",
     },
     input: {
@@ -226,6 +352,11 @@ export const fr: TranslationResources = {
       title: "Mode",
       searchPlaceholder: "Rechercher un mode…",
       selectWithValue: "Choisir le mode de l’agent ({{value}})",
+      desktop: {
+        askForReview: "Demander une revue",
+        autoReview: "Revue automatique",
+        fullAccess: "Accès complet",
+      },
     },
     hints: {
       thinking: "Mode de réflexion",
@@ -250,6 +381,8 @@ export const fr: TranslationResources = {
       implement: "Implémenter",
       question: "Comment souhaitez-vous procéder ?",
       proposedPlan: "Plan proposé",
+      waiting: "En attente d’approbation",
+      responseFailed: "Impossible de répondre : {{message}}",
     },
   },
   agentPanel: {
@@ -341,6 +474,9 @@ export const fr: TranslationResources = {
       forkUnavailable: "Mettez à jour l’hôte pour utiliser cette fonction.",
       forkMissingWorkspace: "Cet agent n’est dans aucun espace de travail.",
       forkFailed: "Impossible de forker la conversation",
+      runInTerminal: "Exécuter dans le terminal",
+      plainText: "Texte brut",
+      forkOrigin: "Suite de la discussion",
       openFile: "Ouvrir le fichier",
       copied: "Copié",
     },
@@ -377,6 +513,9 @@ export const fr: TranslationResources = {
     question: {
       responseFailed: "Impossible d’envoyer votre réponse. Réessayez.",
       submit: "Envoyer",
+      title: "Question",
+      skip: "Ignorer",
+      send: "Envoyer",
       next: "Suivant",
       answerPlaceholder: "Saisissez votre réponse…",
       otherPlaceholder: "Autre…",
@@ -521,6 +660,10 @@ export const fr: TranslationResources = {
         hideHiddenFiles: "Masquer les fichiers cachés",
         showHiddenFiles: "Afficher les fichiers cachés",
       },
+      filter: {
+        placeholder: "Filtrer les fichiers...",
+        noResults: "Aucun fichier correspondant",
+      },
       empty: {
         noFiles: "Aucun fichier",
         noVisibleFiles: "Aucun fichier visible",
@@ -577,6 +720,11 @@ export const fr: TranslationResources = {
       },
     },
     browser: {
+      newTab: {
+        tools: "Outils",
+        moreTools: "Plus d’outils",
+        openPages: "Pages ouvertes",
+      },
       unavailable: {
         title: "Le navigateur est réservé à l’app de bureau",
         subtitle: "Ouvrez cet espace de travail dans Electron pour utiliser le navigateur intégré.",
@@ -711,8 +859,6 @@ export const fr: TranslationResources = {
         close: "Fermer",
         cancel: "Annuler",
         archive: "Archiver",
-        closeTerminalTitle: "Fermer le terminal ?",
-        closeTerminalMessage: "Tout processus en cours dans ce terminal sera arrêté immédiatement.",
         archiveRunningAgentTitle: "Archiver l’agent en cours ?",
         archiveRunningAgentMessage:
           "Cet agent est toujours en cours d’exécution. L’archiver arrêtera l’agent et fermera l’onglet.",
@@ -904,7 +1050,7 @@ export const fr: TranslationResources = {
           mergePrNoGithub:
             "Impossible de fusionner la PR pour l’instant : GitHub n’est pas connecté",
           archiveNotWorktree:
-            "Archivage indisponible : cet espace de travail n’a pas été créé comme worktree Paseo",
+            "Archivage indisponible : cet espace de travail n’a pas été créé comme worktree Swan",
           mergePrNoForge:
             "Impossible de fusionner la {{noun}} pour l’instant : {{brand}} n’est pas connecté",
           mergePrMissing: "Impossible de fusionner la PR : il n’y a pas encore de pull request",
@@ -989,6 +1135,7 @@ export const fr: TranslationResources = {
         modifiedFile: "Modifié",
         commits: {
           title: "Commits",
+          baseHint: "L’historique utilise {{baseRef}}",
           countLabel: "{{count}} commits de l’espace de travail",
           noneAhead: "Aucun commit en avance sur {{baseRef}} pour l’instant",
           fileDiffEmpty: "Aucune modification à afficher",
@@ -1089,6 +1236,8 @@ export const fr: TranslationResources = {
             cancelled: "Annulée",
           },
         },
+        previewFiles_one: "{{count}} fichier",
+        previewFiles_other: "{{count}} fichiers",
         states: {
           draft: "Brouillon",
           merged: "Fusionnée",
@@ -1259,7 +1408,7 @@ export const fr: TranslationResources = {
       discord: "Discord",
       github: "Créer un ticket GitHub",
       whatsNew: "Nouveautés",
-      appName: "Paseo",
+      appName: "Swan",
     },
     sections: {
       sessions: "Historique",
@@ -1364,6 +1513,9 @@ export const fr: TranslationResources = {
     fields: {
       project: "Projet",
       branch: "Branche",
+      noProject: "Aucun projet",
+      clearProject: "Retirer le projet",
+      base: "Base",
       baseNotApplicable: "Non applicable",
       host: "Hôte",
     },
@@ -1407,7 +1559,7 @@ export const fr: TranslationResources = {
       close: "Fermer la fenêtre",
     },
     quitting: {
-      title: "Fermeture de Paseo…",
+      title: "Fermeture de Swan…",
       detail: "Arrêt du daemon local.",
     },
     daemon: {
@@ -1422,20 +1574,20 @@ export const fr: TranslationResources = {
       },
       management: {
         title: "Gérer le daemon intégré",
-        hint: "Laisser Paseo démarrer et arrêter le daemon intégré",
+        hint: "Laisser Swan démarrer et arrêter le daemon intégré",
         pauseTitle: "Suspendre le daemon intégré",
         pauseMessage:
           "Le daemon intégré sera arrêté immédiatement. Les agents en cours et les terminaux connectés au daemon intégré seront arrêtés.",
         pauseAndStop: "Suspendre et arrêter",
         registrationFailed:
-          "Le daemon intégré a démarré, mais Paseo n’a pas pu enregistrer la connexion localhost. Désactivez puis réactivez la gestion du daemon, ou ajoutez localhost manuellement.",
+          "Le daemon intégré a démarré, mais Swan n’a pas pu enregistrer la connexion localhost. Désactivez puis réactivez la gestion du daemon, ou ajoutez localhost manuellement.",
         pausedStopFailed:
-          "La gestion du daemon intégré a été suspendue, mais Paseo n’a pas pu arrêter le daemon.",
+          "La gestion du daemon intégré a été suspendue, mais Swan n’a pas pu arrêter le daemon.",
         updateFailed: "Impossible de mettre à jour la gestion du daemon intégré.",
       },
       keepRunning: {
         title: "Laisser le daemon tourner après la fermeture",
-        hint: "Le daemon continue de tourner quand vous quittez Paseo",
+        hint: "Le daemon continue de tourner quand vous quittez Swan",
       },
       logs: {
         title: "Fichier journal",
@@ -1505,7 +1657,7 @@ export const fr: TranslationResources = {
     },
     rosetta: {
       title: "Téléchargez la version Apple Silicon",
-      runningIntel: "Vous utilisez la version Intel de Paseo via Rosetta sur Apple Silicon.",
+      runningIntel: "Vous utilisez la version Intel de Swan via Rosetta sur Apple Silicon.",
       highCpu:
         "Cela entraîne une forte utilisation du processeur. Téléchargez la version Apple Silicon pour corriger le problème.",
       download: "Télécharger",
@@ -1554,7 +1706,7 @@ export const fr: TranslationResources = {
         microphone: "L’état du microphone n’a pas encore été vérifié.",
       },
       testNotification: {
-        title: "Test de notification Paseo",
+        title: "Test de notification Swan",
         body: "Si vous voyez ceci, les notifications de bureau fonctionnent.",
         notDelivered:
           "La notification n’a pas été délivrée. Vérifiez Réglages système > Notifications.",
@@ -1564,12 +1716,12 @@ export const fr: TranslationResources = {
     integrations: {
       cli: {
         statusFailed: "Impossible de vérifier l’installation de la CLI.",
-        installFailed: "Impossible d’installer la CLI Paseo.",
+        installFailed: "Impossible d’installer la CLI Swan.",
       },
     },
   },
   rootError: {
-    title: "Paseo a rencontré un problème.",
+    title: "Swan a rencontré un problème.",
     body: "Réessayez pour recharger l’application. Si le problème persiste, joignez les détails ci-dessous à votre signalement.",
     details: "Détails",
   },
@@ -1635,6 +1787,12 @@ export const fr: TranslationResources = {
     later: "Plus tard",
     stashRestored: "Modifications remisées restaurées",
   },
+  diffBaseSelector: {
+    compareAgainst: "Comparer avec {{ref}}",
+    workspaceDefault: "Valeur par défaut de l’espace de travail",
+    worktreeFixed: "La base de comparaison de ce worktree est fixe.",
+    unableToResolve: "Impossible de résoudre {{ref}}",
+  },
   agentAutocomplete: {
     searchingWorkspace: "Recherche dans l’espace de travail…",
     loadingCommands: "Chargement des commandes…",
@@ -1668,7 +1826,7 @@ export const fr: TranslationResources = {
     },
   },
   onboarding: {
-    title: "Bienvenue dans Paseo",
+    title: "Bienvenue dans Swan",
     subtitle: "Connectez votre ordinateur pour commencer",
     actions: {
       settings: "Paramètres",
@@ -1776,7 +1934,7 @@ export const fr: TranslationResources = {
     },
     direct: {
       title: "Connexion directe",
-      helper: "Saisissez l’adresse d’un serveur Paseo.",
+      helper: "Saisissez l’adresse d’un serveur Swan.",
       fields: {
         host: "Hôte",
         port: "Port",
@@ -1819,7 +1977,7 @@ export const fr: TranslationResources = {
     },
     remoteSsh: {
       title: "SSH distant",
-      helper: "Connectez-vous à un daemon Paseo qui tourne sur l’hôte distant.",
+      helper: "Connectez-vous à un daemon Swan qui tourne sur l’hôte distant.",
       fields: {
         target: "Hôte SSH",
         password: "Mot de passe du daemon",
@@ -1882,15 +2040,15 @@ export const fr: TranslationResources = {
       enableDescription:
         "Le relais permet à cet appareil de se connecter depuis n’importe où. Le trafic d’association est chiffré de bout en bout.",
       relayDocs: "Fonctionnement du relais",
-      relayDocsAccessibility: "Découvrir le fonctionnement du relais Paseo",
+      relayDocsAccessibility: "Découvrir le fonctionnement du relais Swan",
       enableRelay: "Activer le relais",
       enablingRelay: "Activation…",
       notNow: "Pas maintenant",
       directConnectionHint:
         "Sans relais, connectez-vous directement via TCP, Tailscale ou un autre VPN. Aucun code QR n’est créé.",
-      updateRequired: "Mettez à jour l’hôte pour activer le relais depuis Paseo Desktop.",
+      updateRequired: "Mettez à jour l’hôte pour activer le relais depuis Swan Desktop.",
       unavailable: "Offre d’association indisponible.",
-      hint: "Scannez ce code QR avec Paseo sur votre téléphone, ou copiez le lien ci-dessous.",
+      hint: "Scannez ce code QR avec Swan sur votre téléphone, ou copiez le lien ci-dessous.",
       securityWarning:
         "Traitez ce lien d’association comme un mot de passe. Toute personne qui le possède peut accéder à ce daemon.",
       qrUnavailable: "Code QR indisponible.",
@@ -1925,7 +2083,7 @@ export const fr: TranslationResources = {
   serviceUrl: {
     title: "Ouvrir l’URL du service",
     message: "Ouvrir {{url}} ?",
-    inPaseo: "Dans Paseo",
+    inPaseo: "Dans Swan",
     externalBrowser: "Navigateur externe",
     dontAskAgain: "Ne plus demander",
   },
@@ -1939,6 +2097,11 @@ export const fr: TranslationResources = {
   },
   menu: {
     backdrop: "Arrière-plan du menu",
+  },
+  backgroundTasks: {
+    title: "Tâches en arrière-plan",
+    pillLabelOne: "1 tâche en arrière-plan",
+    pillLabelMany: "{{count}} tâches en arrière-plan",
   },
   subagents: {
     title: "Sous-agents",
@@ -1996,6 +2159,7 @@ export const fr: TranslationResources = {
       subtitle: "Fichiers de l’espace de travail",
       tooltip: "Parcourir les fichiers de l’espace de travail",
       chooseFile: "Choisissez un fichier",
+      emptyDescription: "Sélectionnez un fichier dans l’arborescence de l’espace de travail",
     },
     pullRequest: {
       label: "Pull request",
@@ -2046,10 +2210,35 @@ export const fr: TranslationResources = {
       other: "{{count}} autres outils utilisés",
     },
     paseoCalls: {
-      one: "{{count}} appel à Paseo",
-      other: "{{count}} appels à Paseo",
+      one: "{{count}} appel à Swan",
+      other: "{{count}} appels à Swan",
     },
     and: "et",
+    verbSeparator: ", ",
+    verbs: {
+      loadTools: "outils chargés",
+      skill: "compétences utilisées",
+      read: "fichiers lus",
+      search: "recherche effectuée",
+      edit: "fichiers modifiés",
+      command: "commandes exécutées",
+      paseo: "Swan appelé",
+      other: "outils utilisés",
+    },
+    done: {
+      read: "Lu",
+      edit: "Modifié",
+      shell: "Exécuté",
+      search: "Recherché",
+      fetch: "Récupéré",
+    },
+    running: {
+      read: "Lecture",
+      edit: "Modification",
+      shell: "Exécution",
+      search: "Recherche",
+      fetch: "Récupération",
+    },
   },
   renameModal: {
     rename: "Renommer",
@@ -2062,10 +2251,12 @@ export const fr: TranslationResources = {
     noData: "Aucune donnée de contexte",
     accessibilityNoData: "Fenêtre de contexte : aucune donnée de contexte",
     title: "Fenêtre de contexte",
-    used: "{{percentage}} % utilisés",
-    tokens: "{{used}} / {{max}} tokens",
+    used: "Utilisé",
     sessionCost: "Coût de la session : {{cost}}",
     accessibility: "Fenêtre de contexte : {{percentage}} % utilisés",
+    summary: "{{used}} / {{max}} ({{percentage}}%)",
+    free: "Espace libre",
+    buffer: "Réserve de compactage automatique",
   },
   review: {
     feedback: {
@@ -2145,7 +2336,7 @@ export const fr: TranslationResources = {
       send: "Envoyer",
       sending: "Envoi…",
       sentTitle: "Notification de test envoyée",
-      sentDescription: "Paseo a transmis la notification au système d’exploitation.",
+      sentDescription: "Swan a transmis la notification au système d’exploitation.",
       sendFailedTitle: "Impossible d’envoyer la notification de test",
     },
     hostSections: {
@@ -2164,14 +2355,14 @@ export const fr: TranslationResources = {
     metadataGeneration: {
       title: "Génération de métadonnées",
       description:
-        "Choisissez le modèle utilisé par Paseo pour les titres d’espaces de travail, les noms de branches, les messages de commit et les brouillons de pull request",
+        "Choisissez le modèle utilisé par Swan pour les titres d’espaces de travail, les noms de branches, les messages de commit et les brouillons de pull request",
       selection: "Sélection du modèle",
       automatic: "Automatique",
       preferred: "Manuel",
-      automaticHint: "Paseo choisit un modèle rapide disponible",
-      preferredHint: "Choisissez le modèle utilisé par Paseo",
+      automaticHint: "Swan choisit un modèle rapide disponible",
+      preferredHint: "Choisissez le modèle utilisé par Swan",
       model: "Modèle",
-      fallbackHint: "S’il est indisponible, Paseo utilise un autre modèle disponible",
+      fallbackHint: "S’il est indisponible, Swan utilise un autre modèle disponible",
       docs: "Documentation",
       saveError: "Impossible de mettre à jour la génération de métadonnées",
     },
@@ -2182,7 +2373,7 @@ export const fr: TranslationResources = {
         title: "Données du navigateur",
         siteData: "Cookies et données des sites",
         description:
-          "Les onglets du navigateur partagent les connexions et les données des sites dans Paseo.",
+          "Les onglets du navigateur partagent les connexions et les données des sites dans Swan.",
         clear: "Effacer les données du navigateur",
         clearing: "Effacement…",
         confirmTitle: "Effacer les données du navigateur ?",
@@ -2209,7 +2400,7 @@ export const fr: TranslationResources = {
       serviceUrls: {
         options: {
           ask: "Demander",
-          inApp: "Dans Paseo",
+          inApp: "Dans Swan",
           external: "Navigateur externe",
         },
       },
@@ -2295,7 +2486,7 @@ export const fr: TranslationResources = {
         label: "Mises à jour de l’application",
         readyToInstall: "Prête à installer : {{version}}",
         installTitle: "Installer la mise à jour de l’app de bureau",
-        installMessage: "Paseo sera mis à jour sur cet ordinateur",
+        installMessage: "Swan sera mis à jour sur cet ordinateur",
         installConfirm: "Installer la mise à jour",
         update: "Mettre à jour",
         updateTo: "Mettre à jour vers {{version}}",
@@ -2307,7 +2498,21 @@ export const fr: TranslationResources = {
       },
     },
     appearance: {
+      advanced: {
+        title: "Avancé",
+        reset: "Rétablir les valeurs par défaut",
+        resetLabel: "Réinitialiser les paramètres avancés d’apparence",
+      },
+      motion: {
+        title: "Réduire les animations",
+        hint: "Réduire les animations ou suivre le réglage du système.",
+        system: "Système",
+        on: "Activé",
+        off: "Désactivé",
+      },
       theme: {
+        visualStyle: "Style visuel",
+        mode: "Mode",
         title: "Thème",
         accessibilityLabel: "Thème : {{value}}",
         options: {
@@ -2319,6 +2524,44 @@ export const fr: TranslationResources = {
           ghostty: "Ghostty",
           pureBlack: "Noir pur",
           auto: "Système",
+        },
+      },
+      colors: {
+        title: "Couleurs de {{theme}}",
+        info: "Choisissez les couleurs des principales parties de l’app. Laissez un champ vide pour garder la couleur du thème.",
+        reset: "Réinitialiser",
+        resetLabel: "Réinitialiser les couleurs de {{theme}}",
+        pickerAccessibility: "Choisir la couleur : {{role}}",
+        fieldAccessibility: "Couleur hexadécimale : {{role}}",
+        roles: {
+          main: {
+            title: "Écran principal",
+            hint: "Fond de la conversation et de l’espace de travail",
+          },
+          sidebar: {
+            title: "Barre latérale",
+            hint: "Fond de la barre latérale",
+          },
+          selection: {
+            title: "Ligne sélectionnée",
+            hint: "Surbrillance de la ligne sélectionnée dans la barre latérale",
+          },
+          accent: {
+            title: "Accent",
+            hint: "Boutons, interrupteurs et autres mises en évidence",
+          },
+          text: {
+            title: "Texte",
+            hint: "Texte principal",
+          },
+          mutedText: {
+            title: "Texte secondaire",
+            hint: "Libellés et descriptions",
+          },
+          border: {
+            title: "Bordures",
+            hint: "Séparateurs et contours",
+          },
         },
       },
       detailLevel: {
@@ -2352,6 +2595,10 @@ export const fr: TranslationResources = {
         interfaceSize: "Taille de l’interface",
         interfaceSizeHint: "Utilisée pour la navigation, les contrôles et les libellés",
         interfaceSizeAccessibility: "Taille de police de l’interface",
+        contentFont: "Police du contenu",
+        contentFontHint:
+          "Utilisée pour le chat, Markdown et la zone de saisie. Laissez vide pour utiliser la police de l’interface",
+        contentFontAccessibility: "Famille de police du contenu",
         contentSize: "Taille du contenu",
         contentSizeHint: "Utilisée pour le texte de la discussion et le Markdown rendu",
         contentSizeAccessibility: "Taille de police du contenu",
@@ -2359,6 +2606,16 @@ export const fr: TranslationResources = {
         codeFontHint:
           "Utilisée pour le code, les diffs et la sortie du terminal. Laissez vide pour utiliser la police par défaut du système",
         codeFontAccessibility: "Famille de police du code",
+        interfaceStyle: "Style de police de l’interface",
+        interfaceWeightAccessibility: "Graisse de la police de l’interface : {{value}}",
+        contentWeightAccessibility: "Graisse de la police du contenu : {{value}}",
+        codeWeightAccessibility: "Graisse de la police de code : {{value}}",
+        weightOptions: {
+          default: "Par défaut",
+          regular: "Normal",
+          medium: "Moyen",
+          semibold: "Demi-gras",
+        },
         codeSize: "Taille du code",
         codeSizeHint: "Utilisée pour le code, les diffs et la sortie du terminal",
         codeSizeAccessibility: "Taille de police du code",
@@ -2548,11 +2805,11 @@ export const fr: TranslationResources = {
         title: "Skills d’orchestration",
         description: "Apprenez à vos agents à orchestrer via la CLI",
         updateAvailable: "Mise à jour disponible",
-        updateTitle: "Mettre à jour les skills Paseo ?",
+        updateTitle: "Mettre à jour les skills Swan ?",
         updateFallback: "Synchronisez les skills fournis sur cet hôte.",
-        uninstallTitle: "Désinstaller les skills Paseo ?",
+        uninstallTitle: "Désinstaller les skills Swan ?",
         uninstallMessage:
-          "Supprime tous les skills d’orchestration Paseo de ~/.agents, ~/.claude et ~/.codex sur cet hôte.",
+          "Supprime tous les skills d’orchestration Swan de ~/.agents, ~/.claude et ~/.codex sur cet hôte.",
         choose: "Choisir les skills",
         chooseAll: "Tous les skills",
         chooseAllHint:
@@ -2589,9 +2846,9 @@ export const fr: TranslationResources = {
         title: "Orchestration",
         unavailable: "Connectez-vous à cet hôte pour gérer l’orchestration",
         enableTools: {
-          title: "Activer les outils Paseo",
+          title: "Activer les outils Swan",
           hint: "Les agents pourront gérer les worktrees, les agents et les planifications",
-          accessibilityLabel: "Injecter les outils Paseo",
+          accessibilityLabel: "Injecter les outils Swan",
         },
         systemPrompt: {
           title: "Prompt système",
@@ -2697,16 +2954,16 @@ export const fr: TranslationResources = {
             "Cet hôte n’est pas connecté. Attendez qu’il soit en ligne avant de redémarrer.",
           offlineTitle: "Hôte hors ligne",
           offlineMessage:
-            "Cet hôte est hors ligne. Paseo se reconnecte automatiquement : attendez qu’il soit de nouveau en ligne avant de redémarrer.",
+            "Cet hôte est hors ligne. Swan se reconnecte automatiquement : attendez qu’il soit de nouveau en ligne avant de redémarrer.",
           requestFailedTitle: "Erreur",
           requestFailedMessage:
-            "Impossible d’envoyer la demande de redémarrage. Paseo se reconnecte automatiquement : réessayez quand l’hôte apparaît en ligne.",
+            "Impossible d’envoyer la demande de redémarrage. Swan se reconnecte automatiquement : réessayez quand l’hôte apparaît en ligne.",
           dialogFailedMessage:
             "Impossible d’ouvrir la boîte de dialogue de confirmation du redémarrage.",
         },
         update: {
           desktopManagedHint:
-            "Ce daemon est géré par Paseo Desktop. Mettez à jour Paseo Desktop sur l’hôte.",
+            "Ce daemon est géré par Swan Desktop. Mettez à jour Swan Desktop sur l’hôte.",
           title: "Mettre à jour le daemon",
           hint: "Met à jour le daemon vers la dernière version puis le redémarre",
           confirm: "Mettre à jour",
@@ -2817,6 +3074,7 @@ export const fr: TranslationResources = {
       noEditableTarget: "Ce projet n’est pas modifiable sur cet hôte.",
       backToProjects: "Retour aux projets",
       edit: {
+        sourceFolder: "Dossier source",
         title: "Modifier le projet",
         name: "Nom",
         nameLabel: "Nom du projet",
@@ -2870,7 +3128,7 @@ export const fr: TranslationResources = {
         newScript: "Nouveau script",
         editScript: "Modifier {{name}}",
         runAsService: "Exécuter comme service",
-        serviceHint: "Paseo supervise le processus et lui attribue un port via $PASEO_PORT",
+        serviceHint: "Swan supervise le processus et lui attribue un port via $PASEO_PORT",
         actions: {
           add: "Ajouter un script",
           edit: "Modifier",
@@ -2879,7 +3137,7 @@ export const fr: TranslationResources = {
       },
       metadata: {
         title: "Génération des métadonnées",
-        info: "Instructions propres au projet, injectées dans les prompts IA que Paseo utilise pour générer les métadonnées : servez-vous-en pour imposer les conventions de votre équipe (nommage des branches, style de commit, format des PR).",
+        info: "Instructions propres au projet, injectées dans les prompts IA que Swan utilise pour générer les métadonnées : servez-vous-en pour imposer les conventions de votre équipe (nommage des branches, style de commit, format des PR).",
         branchName: "Noms de branches",
         branchNamePlaceholder:
           "Préfixez les branches par feat/ ou fix/, et par mb/ pour les branches personnelles",

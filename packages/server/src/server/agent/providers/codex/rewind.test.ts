@@ -9,6 +9,7 @@ import type {
 import {
   type CodexUserMessageTurnIndex,
   type CodexRewindClient,
+  forkCodexConversation,
   revertCodexConversation,
 } from "./rewind.js";
 
@@ -249,5 +250,64 @@ describe("Codex Rewind", () => {
     ).rejects.toThrow("Codex could not find user message missing-message");
     expect(codex.recordedForks).toEqual([]);
     expect(codex.recordedRollbacks).toEqual([]);
+  });
+});
+
+class ForkedThreadCodex extends FakeCodex {
+  constructor(private readonly childTurnIds: string[]) {
+    super();
+  }
+
+  override request(method: string, params?: unknown): Promise<unknown> {
+    if (method === "thread/read") {
+      expect(params).toEqual({ threadId: "forked-thread", includeTurns: true });
+      return Promise.resolve({
+        thread: { id: "forked-thread", turns: this.childTurnIds.map((id) => ({ id, items: [] })) },
+      });
+    }
+    return super.request(method);
+  }
+}
+
+describe("Codex native fork", () => {
+  test("forks through the selected turn with the source model and config", async () => {
+    const codex = new ForkedThreadCodex(["turn-first", "turn-second"]);
+
+    const threadId = await forkCodexConversation({
+      client: codex,
+      threadId: "source-thread",
+      lastTurnId: "turn-second",
+      cwd: "/workspace/project",
+      model: "gpt-5.4-mini",
+      serviceTier: "fast",
+      config: { model_provider: "custom" },
+    });
+
+    expect(threadId).toBe("forked-thread");
+    expect(codex.recordedForks).toEqual([
+      {
+        threadId: "source-thread",
+        lastTurnId: "turn-second",
+        cwd: "/workspace/project",
+        model: "gpt-5.4-mini",
+        serviceTier: "fast",
+        config: { model_provider: "custom" },
+        excludeTurns: true,
+        persistExtendedHistory: true,
+      },
+    ]);
+    expect(codex.recordedRollbacks).toEqual([]);
+  });
+
+  test("rejects a fork that copied turns after the selected one", async () => {
+    const codex = new ForkedThreadCodex(["turn-first", "turn-second", "turn-sentinel"]);
+
+    await expect(
+      forkCodexConversation({
+        client: codex,
+        threadId: "source-thread",
+        lastTurnId: "turn-second",
+      }),
+    ).rejects.toThrow("Codex fork did not end at turn turn-second");
   });
 });

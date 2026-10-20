@@ -1,6 +1,6 @@
 import type { MarkdownStyle } from "react-native-enriched-markdown";
-import type { Theme } from "@/styles/theme";
-import { isWeb } from "@/constants/platform";
+import { getContentLineHeight, type Theme } from "@/styles/theme";
+import { getIsElectronMac, isWeb } from "@/constants/platform";
 
 // iOS Safari needs the prefix to override the gesture host's selection suppression.
 const WEB_CONTAINER = { userSelect: "text", WebkitUserSelect: "text" } as const;
@@ -12,10 +12,12 @@ export function createMarkdownStyles(
   const fontSize = compact ? theme.fontSize.base : theme.fontSize.content;
   // Every block is followed by the same gap; the library drops it after the last block.
   const block = { marginTop: 0, marginBottom: blockGap };
+  const isMac = getIsElectronMac();
   const paragraph = {
     fontSize,
-    fontFamily: theme.fontFamily.ui,
-    lineHeight: Math.round(fontSize * 1.4),
+    fontFamily: theme.fontFamily.content,
+    ...(theme.contentFontWeight ? { fontWeight: theme.contentFontWeight } : {}),
+    lineHeight: getContentLineHeight(fontSize),
     color: theme.colors.foreground,
     ...block,
   };
@@ -38,8 +40,8 @@ export function createMarkdownStyles(
       h6: { ...heading(1), color: theme.colors.foregroundMuted },
       list: {
         ...paragraph,
-        bulletColor: theme.colors.foregroundMuted,
-        markerColor: theme.colors.foregroundMuted,
+        bulletColor: isMac ? theme.colors.foreground : theme.colors.foregroundMuted,
+        markerColor: isMac ? theme.colors.foreground : theme.colors.foregroundMuted,
         gapWidth: 7,
         itemSpacing: 4,
         marginLeft: 20,
@@ -52,6 +54,16 @@ export function createMarkdownStyles(
         borderWidth: 3,
         padding: 12,
         gapWidth: 8,
+        // The macOS reference draws a bare left rule with no quote surface.
+        ...(isMac
+          ? {
+              backgroundColor: "transparent",
+              borderColor: theme.colors.foregroundExtraMuted,
+              borderRadius: 0,
+              padding: 0,
+              gapWidth: 12,
+            }
+          : {}),
         admonitions: {
           note: { color: theme.colors.accentBright, backgroundColor: theme.colors.surface2 },
           tip: { color: theme.colors.statusSuccess, backgroundColor: theme.colors.surface2 },
@@ -60,16 +72,16 @@ export function createMarkdownStyles(
           caution: { color: theme.colors.statusDanger, backgroundColor: theme.colors.surface2 },
         },
       },
-      link: { color: theme.colors.accentBright, underline: false },
+      link: { color: theme.colors.link, underline: false },
       linkVariants: {
         "^(?!https?://).+": {
-          color: theme.colors.accentBright,
+          color: theme.colors.link,
         },
       },
       code: {
         fontFamily: theme.fontFamily.mono === "ui-monospace" && !isWeb ? "" : theme.fontFamily.mono,
         fontSize: theme.fontSize.code,
-        color: theme.colors.foreground,
+        color: theme.colors.inlineCode,
         backgroundColor: theme.colors.surface2,
         borderColor: "transparent",
       },

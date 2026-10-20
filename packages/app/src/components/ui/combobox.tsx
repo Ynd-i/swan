@@ -47,7 +47,7 @@ import {
   shouldShowCustomComboboxOption,
 } from "./combobox-options";
 import type { ComboboxOptionModel } from "./combobox-options";
-import { isWeb } from "@/constants/platform";
+import { getIsElectronMac, isWeb } from "@/constants/platform";
 import {
   IsolatedBottomSheetModal,
   SheetVisibleFrame,
@@ -1172,6 +1172,13 @@ function DesktopComboboxBody(props: DesktopBodyProps): ReactElement {
   const handleDesktopKey = props.handleDesktopKey;
   const handleWebOverlayKeyDown = useCallback(
     (event: KeyboardEvent) => {
+      // Claim range keys for the overlay while preserving the input's native action.
+      if (
+        event.target instanceof HTMLInputElement &&
+        event.target.type === "range" &&
+        (event.key.startsWith("Arrow") || event.key === "Home" || event.key === "End")
+      )
+        return true;
       if (!isDesktopKey(event.key)) return false;
       return handleDesktopKey(event.key, event);
     },
@@ -1776,10 +1783,10 @@ const styles = StyleSheet.create((theme) => ({
     left: 0,
   },
   desktopContainer: {
-    backgroundColor: theme.colors.surface0,
-    borderRadius: theme.borderRadius.lg,
+    backgroundColor: getIsElectronMac() ? theme.colors.surface2 : theme.colors.surface0,
+    borderRadius: getIsElectronMac() ? theme.borderRadius["2xl"] : theme.borderRadius.lg,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: getIsElectronMac() ? theme.colors.borderAccent : theme.colors.border,
     ...theme.shadow.md,
     maxHeight: 400,
     overflow: "hidden",

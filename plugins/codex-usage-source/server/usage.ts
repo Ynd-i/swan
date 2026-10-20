@@ -26,8 +26,10 @@ const authSchema = z.object({
 });
 const number = z.coerce.number().finite();
 const windowSchema = z.object({
-  used_percent: number.optional(),
-  reset_at: number.optional(),
+  // Codex sends null for a window it has no reading for; a nullish schema keeps the rest
+  // of the report parseable.
+  used_percent: number.nullish(),
+  reset_at: number.nullish(),
   limit_window_seconds: number.nullish(),
 });
 const rateLimitSchema = z.object({
@@ -48,7 +50,7 @@ const responseSchema = z.object({
     )
     .nullish(),
   code_review_rate_limit: rateLimitSchema.nullish(),
-  credits: z.object({ balance: number.optional() }).nullish(),
+  credits: z.object({ balance: number.nullish() }).nullish(),
 });
 
 interface Auth {
@@ -238,7 +240,7 @@ export async function fetchUsage(
     planLabel: usage.plan_type,
     windows,
     balances:
-      balance === undefined
+      balance == null
         ? []
         : [
             {

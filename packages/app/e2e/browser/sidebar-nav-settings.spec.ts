@@ -12,6 +12,7 @@ import {
   expectFooterIconRow,
   expectFooterSeparator,
   hoverFooterAddProject,
+  sidebarShortcutLabel,
   footerScreenshot,
   expectFooterItemHidden,
   expectFooterOrder,
@@ -40,7 +41,7 @@ test("fixed footer line keeps its five icons, Help and Settings at the end", asy
   ]);
   await page.setViewportSize({ width: 1440, height: 900 });
   await gotoAppShell(page);
-  await expectPinnedUsage(page, ["31% 5h", "54% wk", "7% 5h", "12% wk"]);
+  await expectPinnedUsage(page, "54% wk", 1);
   await expectFooterIconRow(page);
   await expectFooterSeparator(page, true);
   await footerScreenshot(page, "footer-desktop-with-rows");
@@ -80,6 +81,7 @@ test("fixed footer line keeps its five icons, Help and Settings at the end", asy
 
 test.describe("Sidebar items in Appearance settings", () => {
   test("owner reorders and hides top-level sidebar items", async ({ page }) => {
+    await installUsageReportsFixture(page, { lists: [[]] });
     await gotoAppShell(page);
 
     await test.step("the sidebar starts in the default order", async () => {
@@ -103,10 +105,11 @@ test.describe("Sidebar items in Appearance settings", () => {
         label: "History",
         visible: true,
       });
-      // Items with a keyboard shortcut badge it next to their name. Chords render
-      // with Ctrl off macOS, which is what the browser project runs on.
+      // Items badge their shortcut using the browser runtime's platform.
       await expect(
-        page.getByTestId("sidebar-nav-item-new-workspace").getByText("Ctrl+N", { exact: true }),
+        page
+          .getByTestId("sidebar-nav-item-new-workspace")
+          .getByText(await sidebarShortcutLabel(page, ["mod", "n"]), { exact: true }),
       ).toBeVisible();
     });
 
@@ -134,10 +137,10 @@ test.describe("Sidebar items in Appearance settings", () => {
       await openSidebarNavSettings(page);
       await setSidebarNavItemVisible(page, "history", false);
       await expectStoredSidebarNav(page, [
-        { key: "new-workspace", visible: true },
-        { key: "schedules", visible: true },
+        { key: "new-workspace" },
+        { key: "schedules" },
         { key: "history", visible: false },
-        { key: "search", visible: true },
+        { key: "search" },
       ]);
 
       await leaveSettings(page);
@@ -183,6 +186,34 @@ test.describe("Sidebar footer rows in Appearance settings", () => {
 
   test.afterEach(async () => {
     await cleanup();
+  });
+
+  test("compact footer edits preserve responsive Usage defaults across reload", async ({
+    page,
+  }) => {
+    await installUsageReportsFixture(page, { lists: [() => claudeAndCodexReports()] });
+    await seedSidebarFooterPreferences(page, []);
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await gotoAppShell(page);
+    await openSidebarNavSettings(page);
+    const usage = page
+      .getByTestId("sidebar-nav-section-footer")
+      .getByTestId("sidebar-nav-toggle-usage");
+    await expect(usage).toHaveAttribute("aria-checked", "true");
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expect(usage).toHaveAttribute("aria-checked", "false");
+    await moveFooterItemUp(page, syncKey);
+    await setFooterItemVisible(page, syncKey, false);
+    await expect(usage).toHaveAttribute("aria-checked", "false");
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await expect(usage).toHaveAttribute("aria-checked", "true");
+    await page.reload();
+    await expect(page).toHaveURL(/\/settings\/sidebar$/);
+    await expect(usage).toHaveAttribute("aria-checked", "true");
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expect(usage).toHaveAttribute("aria-checked", "false");
+    await setFooterItemVisible(page, "usage", true);
+    await expect(usage).toHaveAttribute("aria-checked", "true");
   });
 
   test("owner reorders and hides footer rows; the icon row stays fixed", async ({ page }) => {

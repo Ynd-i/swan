@@ -1,5 +1,7 @@
-import { formatCompactTimeAgoAsProse } from "@/utils/time";
+import type { TFunction } from "i18next";
+import { i18n } from "@/i18n/i18next";
 import { usageCopy } from "./copy";
+import { formatUsageTimeAgo } from "./format";
 import type { UsageDisplayAs } from "./preferences";
 import type { UsageReport, UsageReportEntry, UsageView, UsageWindow } from "./types";
 
@@ -9,12 +11,16 @@ export function usedPercent(window: UsageWindow): number | null {
   return null;
 }
 
+export function remainingPercent(window: UsageWindow): number | null {
+  if (window.remainingPct != null) return window.remainingPct;
+  if (window.usedPct != null) return 100 - window.usedPct;
+  return null;
+}
+
 /** The percent a window shows under the user's used/remaining preference. */
 export function displayPercent(window: UsageWindow, displayAs: UsageDisplayAs): number | null {
   if (displayAs === "used") return usedPercent(window);
-  if (window.remainingPct != null) return window.remainingPct;
-  const used = usedPercent(window);
-  return used == null ? null : 100 - used;
+  return remainingPercent(window);
 }
 
 /**
@@ -32,8 +38,21 @@ export function usageWindowRowLabel(input: {
 }
 
 /** When a report was fetched, from its compact relative time: "Updated 3m ago". */
-export function formatUsageFreshness(compactTimeAgo: string, retained = false): string {
-  return `${retained ? "Last updated" : usageCopy.updated} ${formatCompactTimeAgoAsProse(compactTimeAgo)}`;
+export function formatUsageFreshness(
+  compactTimeAgo: string,
+  t: TFunction = i18n.t,
+  fetchedAt?: string,
+  retained = false,
+): string {
+  if (compactTimeAgo === "now") return t(retained ? "usage.lastUpdatedNow" : "usage.updatedNow");
+  let time = formatUsageTimeAgo(compactTimeAgo, t);
+  if (time === compactTimeAgo && fetchedAt && Number.isFinite(new Date(fetchedAt).getTime())) {
+    time = new Date(fetchedAt).toLocaleDateString(i18n.resolvedLanguage, {
+      month: "short",
+      day: "numeric",
+    });
+  }
+  return t(retained ? "usage.lastUpdated" : "usage.updated", { time });
 }
 
 /** A user-requested refresh of one report. The previous report stays on screen throughout. */

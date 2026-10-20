@@ -42,7 +42,7 @@ export interface ChatOutline {
   prompts: ChatOutlinePrompt[];
   activePrompt: ActivePromptSource;
   jumpToPrompt: (seq: number) => void;
-  reportReadingPosition: (seq: number | null) => void;
+  reportReadingPosition: (seq: number | null, atBottom: boolean) => void;
 }
 
 function latestPromptSeqIn(items: StreamItem[], timelineEpoch: string | null): number {
@@ -79,6 +79,7 @@ export function useChatOutline({
   const [pendingJump, setPendingJump] = useState<PendingPromptJump | null>(null);
   const [activePrompt] = useState(createActivePromptPublisher);
   const readingSeqRef = useRef<number | null>(null);
+  const readingAtBottomRef = useRef(false);
   const nextJumpRequestIdRef = useRef(0);
   const nextIndexRequestIdRef = useRef(0);
   // A disabled outline (every native viewport) must not pay for the timeline per delta.
@@ -132,11 +133,14 @@ export function useChatOutline({
   // The transcript resolves display rows (including Markdown blocks and plugin cards) to
   // timeline positions. The outline uses the complete index, including unloaded prompts.
   const publishActivePrompt = useStableEvent(() => {
-    activePrompt.publish(resolveActivePromptSeq(prompts, readingSeqRef.current));
+    activePrompt.publish(
+      resolveActivePromptSeq(prompts, readingSeqRef.current, readingAtBottomRef.current),
+    );
   });
 
-  const reportReadingPosition = useStableEvent((seq: number | null) => {
+  const reportReadingPosition = useStableEvent((seq: number | null, atBottom: boolean) => {
     readingSeqRef.current = seq;
+    readingAtBottomRef.current = atBottom;
     publishActivePrompt();
   });
 
@@ -144,6 +148,7 @@ export function useChatOutline({
     nextJumpRequestIdRef.current += 1;
     setPendingJump(null);
     readingSeqRef.current = null;
+    readingAtBottomRef.current = false;
     activePrompt.publish(null);
   }, [activePrompt, agentId, timelineEpoch]);
 

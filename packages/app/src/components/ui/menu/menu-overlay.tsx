@@ -16,6 +16,7 @@ import {
   Pressable,
   StatusBar,
   View,
+  useWindowDimensions,
   type StyleProp,
   type ViewStyle,
 } from "react-native";
@@ -114,6 +115,7 @@ export function useAnchoredPosition({
   offset,
   scrollable,
   maxHeight,
+  matchAnchorWidth = false,
 }: {
   open: boolean;
   anchorRect: Rect | null;
@@ -123,7 +125,11 @@ export function useAnchoredPosition({
   offset: number;
   scrollable: boolean;
   maxHeight?: number;
+  matchAnchorWidth?: boolean;
 }) {
+  const viewport = useWindowDimensions();
+  const geometryRevision = matchAnchorWidth ? `${viewport.width}:${viewport.height}` : null;
+  const trackedHeight = matchAnchorWidth ? viewport.height : undefined;
   const [triggerRect, setTriggerRect] = useState<Rect | null>(null);
   const [contentSize, setContentSize] = useState<Size | null>(null);
   const [position, setPosition] = useState<{ x: number; y: number } | null>(null);
@@ -133,7 +139,7 @@ export function useAnchoredPosition({
     if (!contentSize) return null;
     if (!scrollable) return contentSize;
 
-    const { height: screenHeight } = Dimensions.get("window");
+    const screenHeight = trackedHeight ?? Dimensions.get("window").height;
     const viewportMaxHeight = Math.max(screenHeight - 16, 0);
     const resolvedMaxHeight =
       typeof maxHeight === "number" ? Math.min(maxHeight, viewportMaxHeight) : viewportMaxHeight;
@@ -142,7 +148,7 @@ export function useAnchoredPosition({
       width: contentSize.width,
       height: Math.min(contentSize.height, resolvedMaxHeight),
     };
-  }, [contentSize, scrollable, maxHeight]);
+  }, [contentSize, scrollable, maxHeight, trackedHeight]);
 
   useEffect(() => {
     if (!open) {
@@ -167,18 +173,33 @@ export function useAnchoredPosition({
     const statusBarHeight = Platform.OS === "android" ? (StatusBar.currentHeight ?? 0) : 0;
     let cancelled = false;
 
-    void measureElement(anchorRef.current).then((rect) => {
-      if (cancelled) return undefined;
-      // On Android with statusBarTranslucent, measureInWindow returns coordinates relative to
-      // below the status bar while Modal content starts at the screen top.
-      setTriggerRect({ ...rect, y: rect.y + statusBarHeight });
-      return undefined;
-    });
+    const element = anchorRef.current;
+    const measure = () => {
+      void measureElement(element).then((rect) => {
+        if (cancelled) return undefined;
+        // Android measurement excludes the translucent status bar; the modal does not.
+        setTriggerRect({ ...rect, y: rect.y + statusBarHeight });
+        return undefined;
+      });
+    };
+    measure();
+    let observer: ResizeObserver | null = null;
+    if (
+      matchAnchorWidth &&
+      isWeb &&
+      typeof ResizeObserver !== "undefined" &&
+      typeof HTMLElement !== "undefined" &&
+      element instanceof HTMLElement
+    ) {
+      observer = new ResizeObserver(measure);
+      observer.observe(element);
+    }
 
     return () => {
       cancelled = true;
+      observer?.disconnect();
     };
-  }, [anchorRect, anchorRef, open]);
+  }, [anchorRect, anchorRef, open, matchAnchorWidth, geometryRevision]);
 
   useEffect(() => {
     if (!triggerRect || !visibleContentSize) return;
@@ -196,7 +217,7 @@ export function useAnchoredPosition({
 
     setPosition({ x: result.x, y: result.y });
     setActualPlacement(result.actualPlacement);
-  }, [triggerRect, visibleContentSize, side, align, offset]);
+  }, [triggerRect, visibleContentSize, side, align, offset, geometryRevision]);
 
   const onContentLayout = useCallback(
     (event: { nativeEvent: { layout: { width: number; height: number } } }) => {
@@ -209,7 +230,14 @@ export function useAnchoredPosition({
     [],
   );
 
-  return { position, actualPlacement, contentSize, visibleContentSize, onContentLayout };
+  return {
+    position,
+    actualPlacement,
+    contentSize,
+    visibleContentSize,
+    onContentLayout,
+    triggerRect,
+  };
 }
 
 export interface AnchoredSurfaceProps {
@@ -222,6 +250,8 @@ export interface AnchoredSurfaceProps {
   align?: Alignment;
   offset?: number;
   width?: number;
+  matchAnchorWidth?: boolean;
+  surfaceStyle?: StyleProp<ViewStyle>;
   minWidth?: number;
   maxWidth?: number;
   maxHeight?: number;
@@ -232,6 +262,8 @@ export interface AnchoredSurfaceProps {
   revision?: string | number;
   /** A submenu sits inside its parent's overlay and must not paint a second backdrop. */
   backdrop?: boolean;
+  /** Flyouts entered by hover must not take keyboard focus. */
+  autoFocus?: boolean;
   /**
    * Hover tracking for the surface box, per docs/hover.md: plain View, pointer events, never
    * a Pressable. Web-only by nature, which is all a flyout needs.
@@ -257,6 +289,8 @@ export function AnchoredSurface({
   align = "start",
   offset = 4,
   width,
+  matchAnchorWidth,
+  surfaceStyle,
   minWidth = 180,
   maxWidth,
   maxHeight,
@@ -265,6 +299,7 @@ export function AnchoredSurface({
   scrollable = false,
   revision,
   backdrop = true,
+  autoFocus,
   onPointerEnter,
   onPointerLeave,
   testID,
@@ -273,17 +308,24 @@ export function AnchoredSurface({
 }: AnchoredSurfaceProps): ReactElement | null {
   const { t } = useTranslation();
   const surfaceNativeID = useId();
-  const { position, actualPlacement, contentSize, visibleContentSize, onContentLayout } =
-    useAnchoredPosition({
-      open,
-      anchorRect,
-      anchorRef,
-      side,
-      align,
-      offset,
-      scrollable,
-      maxHeight,
-    });
+  const {
+    position,
+    actualPlacement,
+    contentSize,
+    visibleContentSize,
+    onContentLayout,
+    triggerRect,
+  } = useAnchoredPosition({
+    open,
+    anchorRect,
+    anchorRef,
+    matchAnchorWidth,
+    side,
+    align,
+    offset,
+    scrollable,
+    maxHeight,
+  });
 
   useReleaseFixedMenuHeight({
     contentSize,
@@ -301,22 +343,45 @@ export function AnchoredSurface({
   const placed = position !== null;
 
   useEffect(() => {
-    if (!isWeb || !open || !placed || typeof document === "undefined") return undefined;
-    const frame = requestAnimationFrame(() => {
-      document
-        .getElementById(surfaceNativeID)
+    if (!isWeb || !open || !placed || autoFocus === false || typeof document === "undefined")
+      return undefined;
+    let surface: HTMLElement | null = null;
+    let focusOrigin: Element | null = null;
+    const focusFirstItem = () => {
+      surface
         ?.querySelector<HTMLElement>('[data-menu-item="true"]:not([data-menu-disabled="true"])')
         ?.focus();
+    };
+    const handleAnimationEnd = (event: AnimationEvent) => {
+      if (event.target !== surface) return;
+      surface?.removeEventListener("animationend", handleAnimationEnd);
+      if (document.activeElement === focusOrigin) focusFirstItem();
+    };
+    const frame = requestAnimationFrame(() => {
+      surface = document.getElementById(surfaceNativeID);
+      if (!surface) return;
+      focusOrigin = document.activeElement;
+      // Reanimated can keep a placed surface hidden until its entering animation starts.
+      // Browsers silently ignore focus on that first frame.
+      if (getComputedStyle(surface).visibility === "hidden") {
+        surface.addEventListener("animationend", handleAnimationEnd);
+      } else {
+        focusFirstItem();
+      }
     });
-    return () => cancelAnimationFrame(frame);
-  }, [open, placed, surfaceNativeID]);
+    return () => {
+      cancelAnimationFrame(frame);
+      surface?.removeEventListener("animationend", handleAnimationEnd);
+    };
+  }, [open, placed, autoFocus, surfaceNativeID]);
 
   const frameStyle = useMemo<StyleProp<ViewStyle>>(() => {
     const { width: screenWidth } = Dimensions.get("window");
+    const resolvedWidth = matchAnchorWidth ? triggerRect?.width : width;
     const resolvedWidthStyle: ViewStyle = fullWidth
       ? { width: screenWidth - horizontalPadding * 2 }
       : {
-          ...(typeof width === "number" ? { width } : null),
+          ...(typeof resolvedWidth === "number" ? { width: resolvedWidth } : null),
           ...(typeof minWidth === "number" ? { minWidth } : null),
           ...(typeof maxWidth === "number" ? { maxWidth } : null),
         };
@@ -333,6 +398,8 @@ export function AnchoredSurface({
     fullWidth,
     horizontalPadding,
     width,
+    matchAnchorWidth,
+    triggerRect,
     minWidth,
     maxWidth,
     position?.x,
@@ -345,6 +412,7 @@ export function AnchoredSurface({
     () => [visibleContentSize ? { height: visibleContentSize.height } : null],
     [visibleContentSize],
   );
+  const contentStyle = useMemo(() => [styles.content, surfaceStyle], [surfaceStyle]);
   const surfaceDataSet = useMemo(
     () => ({
       menuSurface: "true",
@@ -385,7 +453,7 @@ export function AnchoredSurface({
         nativeID={surfaceNativeID}
         testID={testID}
         dataSet={surfaceDataSet}
-        style={styles.content}
+        style={contentStyle}
         frameStyle={frameStyle}
         entering={placed ? contentEntering : undefined}
         exiting={
@@ -425,11 +493,13 @@ export function MenuOverlay({
   visible,
   onClose,
   restoreFocusRef,
+  onSubmenuKeyDown,
   children,
 }: {
   visible: boolean;
   onClose: () => void;
   restoreFocusRef?: RefObject<View | null>;
+  onSubmenuKeyDown?: (event: KeyboardEvent) => boolean;
   children: ReactElement | null;
 }): ReactElement | null {
   const floatingLayer = useOverlayLayer("floating");
@@ -446,6 +516,12 @@ export function MenuOverlay({
       const target = event.target instanceof Element ? event.target : null;
       const surface = target?.closest<HTMLElement>('[data-menu-surface="true"]');
       if (!surface) return false;
+      if (target?.closest('input, textarea, [contenteditable="true"]')) return false;
+      if (onSubmenuKeyDown?.(event)) {
+        event.preventDefault();
+        event.stopPropagation();
+        return true;
+      }
       const items = Array.from(
         surface.querySelectorAll<HTMLElement>(
           '[data-menu-item="true"]:not([data-menu-disabled="true"])',
@@ -464,10 +540,10 @@ export function MenuOverlay({
       if (nextIndex !== null) {
         event.preventDefault();
         event.stopPropagation();
-        items[nextIndex]?.focus();
+        items[nextIndex]!.focus();
         return true;
       }
-      if ((event.key === "Enter" || event.key === " ") && currentIndex >= 0) {
+      if (["Enter", " "].includes(event.key) && currentIndex >= 0) {
         event.preventDefault();
         event.stopPropagation();
         items[currentIndex]?.click();
@@ -475,7 +551,7 @@ export function MenuOverlay({
       }
       return false;
     },
-    [onClose],
+    [onClose, onSubmenuKeyDown],
   );
   const setWebOverlayScope = useWebOverlayRegistration({
     active: isWeb && visible,

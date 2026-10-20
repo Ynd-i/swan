@@ -10,14 +10,18 @@ import {
   Pressable,
   Text,
   View,
+  type NativeSyntheticEvent,
   type PressableStateCallbackType,
+  type TargetedEvent,
   type ViewStyle,
+  type StyleProp,
 } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { Check, CheckCircle } from "lucide-react-native";
 import { AdaptiveTextInput } from "@/components/adaptive-modal-sheet";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { isWeb } from "@/constants/platform";
 import type { Theme } from "@/styles/theme";
 import { MenuDepthProvider, useMenuContext } from "./menu-context";
 import { MENU_ITEM_HEIGHT } from "./menu-geometry";
@@ -72,9 +76,12 @@ export type ActionStatus = "idle" | "pending" | "success";
  * It also carries the page's depth, so the two presentations cannot disagree about what a page is.
  */
 export function MenuPage({ depth, children }: PropsWithChildren<{ depth: number }>): ReactElement {
+  const pageDataSet = useMemo(() => ({ menuDepth: String(depth) }), [depth]);
   return (
     <MenuDepthProvider value={depth}>
-      <View style={styles.page}>{children}</View>
+      <View style={styles.page} dataSet={pageDataSet}>
+        {children}
+      </View>
     </MenuDepthProvider>
   );
 }
@@ -222,6 +229,14 @@ function resolveItemLabel(input: {
 }
 
 export interface MenuItemProps {
+  style?:
+    | StyleProp<ViewStyle>
+    | ((state: {
+        pressed: boolean;
+        hovered: boolean;
+        focused: boolean;
+        disabled: boolean;
+      }) => StyleProp<ViewStyle>);
   description?: string;
   onSelect?: () => void;
   disabled?: boolean;
@@ -272,6 +287,7 @@ export function MenuItem({
   closeOnSelect = true,
   testID,
   tooltip,
+  style,
 }: PropsWithChildren<MenuItemProps>): ReactElement {
   const { selectItem } = useMenuContext("MenuItem");
   const isPending = status === "pending" || loading;
@@ -295,6 +311,15 @@ export function MenuItem({
     selectItem(onSelect, closeOnSelect);
   }, [isDisabled, selectItem, onSelect, closeOnSelect]);
 
+  // Opening a menu focuses its first item for the keyboard. Only keyboard focus draws the
+  // highlight, so a menu opened with the pointer starts with nothing highlighted.
+  const [keyboardFocused, setKeyboardFocused] = useState(false);
+  const handleFocus = useCallback((event: NativeSyntheticEvent<TargetedEvent>) => {
+    const target = event.nativeEvent.target as unknown as Element;
+    setKeyboardFocused(!isWeb || target.matches(":focus-visible"));
+  }, []);
+  const handleBlur = useCallback(() => setKeyboardFocused(false), []);
+
   // A row that draws a check has to say so as well: a multi-select page is a list of things that
   // are on or off, and the check is the only thing telling a sighted user which. Rows that answer
   // no such question stay plain buttons.
@@ -304,20 +329,20 @@ export function MenuItem({
   );
 
   const itemPressableStyle = useCallback(
-    ({
-      pressed,
-      hovered = false,
-      focused = false,
-    }: PressableStateCallbackType & { hovered?: boolean; focused?: boolean }) => [
+    ({ pressed, hovered = false }: PressableStateCallbackType & { hovered?: boolean }) => [
       styles.item,
       active ? styles.itemActive : null,
       isDisabled ? styles.itemDisabled : null,
       muted && !isDisabled ? styles.itemMuted : null,
       hovered && !pressed && !isDisabled ? styles.itemHovered : null,
-      focused && !isDisabled ? styles.itemHovered : null,
+      keyboardFocused && !isDisabled ? styles.itemHovered : null,
       pressed && !isDisabled ? styles.itemPressed : null,
+      typeof style === "function"
+        ? // Custom styles get keyboard focus only, like the built-in highlight above.
+          style({ pressed, hovered, focused: keyboardFocused, disabled: Boolean(isDisabled) })
+        : style,
     ],
-    [active, isDisabled, muted],
+    [active, isDisabled, keyboardFocused, muted, style],
   );
 
   const itemTextStyle = useMemo(
@@ -344,6 +369,8 @@ export function MenuItem({
       dataSet={itemDataSet}
       disabled={isDisabled}
       onPress={handleItemPress}
+      onFocus={handleFocus}
+      onBlur={handleBlur}
       style={itemPressableStyle}
     >
       {showSelectedCheck ? (

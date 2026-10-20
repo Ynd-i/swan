@@ -81,6 +81,7 @@ const styles = StyleSheet.create((theme) => ({
     minHeight: CODE_LINE_HEIGHT,
   },
   gutterText: {
+    ...(theme.codeFontWeight ? { fontWeight: theme.codeFontWeight } : {}),
     fontFamily: theme.fontFamily.mono,
     fontSize: theme.fontSize.code,
     lineHeight: CODE_LINE_HEIGHT,
@@ -90,6 +91,7 @@ const styles = StyleSheet.create((theme) => ({
     flexShrink: 0,
   },
   lineText: {
+    ...(theme.codeFontWeight ? { fontWeight: theme.codeFontWeight } : {}),
     fontFamily: theme.fontFamily.mono,
     fontSize: theme.fontSize.code,
     color: theme.colors.foreground,

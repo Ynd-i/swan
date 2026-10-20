@@ -5,6 +5,7 @@ import { EditorView } from "@codemirror/view";
 import { getLanguageForFile } from "@getpaseo/highlight";
 import { getCM, vim } from "@replit/codemirror-vim";
 import { isRenderedMarkdownFile } from "@/components/file-pane-render-mode";
+import { getIsElectronMac } from "@/constants/platform";
 import type { WorkspaceFileLocation } from "@/workspace/file-open";
 import type { FileEditorModel } from "./model";
 import { editorBaseExtensions, editorTheme, type EditorVisualTheme } from "./extensions.web";
@@ -26,7 +27,7 @@ const themeCompartment = new Compartment();
 const vimCompartment = new Compartment();
 
 function wrappingForFile(filename: string) {
-  return isRenderedMarkdownFile(filename) ? EditorView.lineWrapping : [];
+  return getIsElectronMac() || isRenderedMarkdownFile(filename) ? EditorView.lineWrapping : [];
 }
 
 export function FileEditorView({

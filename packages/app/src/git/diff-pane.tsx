@@ -60,6 +60,7 @@ import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip
 import { GitActionsSplitButton } from "@/git/actions-split-button";
 import type { GitActions } from "@/git/policy";
 import { BranchSwitcher } from "@/components/branch-switcher";
+import { DiffBaseSelector } from "@/git/diff-base-selector";
 import { useGitActions } from "@/git/use-actions";
 import { GIT_ACTION_ICONS } from "@/git/action-icons";
 import { buildForgeSignInCommand, getForgePresentation, type Forge } from "@/git/forge";
@@ -91,7 +92,7 @@ import { FOCUSED_PANE_PLACEMENT, useWorkspaceLayoutStore } from "@/stores/worksp
 import type { WorkspaceTabPlacement } from "@/stores/workspace-layout-actions";
 import type { WorkspaceTabTarget } from "@/workspace-tabs/model";
 import { buildWorkspaceTabPersistenceKey } from "@/workspace-tabs/model";
-import { isWeb } from "@/constants/platform";
+import { getIsElectronMac, isWeb } from "@/constants/platform";
 import { usePublishWorkingDiffAttachment, useWorkingDiff } from "@/git/use-working-diff";
 import type { CheckoutStatusPayload } from "@/git/use-status-query";
 import { DiffTooLargeState } from "@/git/diff-too-large-state";
@@ -183,6 +184,7 @@ interface ChangesSurfaceProps {
   cwd: string;
   enabled?: boolean;
   presentation?: ChangesPresentation;
+  standaloneDiff?: boolean;
   focusPath?: string;
   focusRequestId?: number;
   onOpenFile?: (path: string) => void;
@@ -392,6 +394,7 @@ type ChangesToolbarMode =
 
 function buildChangesToolbarMode(input: {
   presentation: ChangesPresentation;
+  standaloneDiff?: boolean;
   compact: boolean;
   hasChanges: boolean;
   canUseSplitLayout: boolean;
@@ -450,7 +453,7 @@ function buildChangesToolbarMode(input: {
       !input.compact && input.hasChanges
         ? { visible: input.treeVisible, onToggle: input.onToggleTree }
         : null,
-    inlineDiff: input.inlineDiff,
+    inlineDiff: input.standaloneDiff ? null : input.inlineDiff,
   };
 }
 
@@ -481,6 +484,7 @@ interface ChangesHeaderProps {
   repository: ChangesRepositoryToolbarModel;
   comparison: ChangesComparisonToolbarModel;
   sidebarSurface: boolean;
+  standaloneDiff?: boolean;
 }
 
 interface BuildChangesHeaderModelInput {
@@ -528,7 +532,13 @@ function buildChangesHeaderModel(input: BuildChangesHeaderModelInput): {
 
 // Presentation resolves into these two capability models before rendering. The rows
 // never infer which host or Changes presentation produced them.
-function ChangesHeader({ compact, repository, comparison, sidebarSurface }: ChangesHeaderProps) {
+function ChangesHeader({
+  compact,
+  repository,
+  comparison,
+  sidebarSurface,
+  standaloneDiff,
+}: ChangesHeaderProps) {
   if (comparison.mode.kind === "diff") {
     return (
       <ChangesDiffOnlyToolbar
@@ -538,18 +548,29 @@ function ChangesHeader({ compact, repository, comparison, sidebarSurface }: Chan
       />
     );
   }
+  const comparisonFirst = getIsElectronMac() && !compact && !sidebarSurface;
   return (
-    <View>
+    <View style={comparisonFirst ? styles.macHeader : undefined}>
+      {comparisonFirst ? (
+        <ChangesComparisonToolbar
+          compact={compact}
+          model={comparison}
+          sidebarSurface={sidebarSurface}
+        />
+      ) : null}
       <ChangesRepositoryToolbar
         compact={compact}
         model={repository}
         sidebarSurface={sidebarSurface}
+        standaloneDiff={standaloneDiff}
       />
-      <ChangesComparisonToolbar
-        compact={compact}
-        model={comparison}
-        sidebarSurface={sidebarSurface}
-      />
+      {!comparisonFirst ? (
+        <ChangesComparisonToolbar
+          compact={compact}
+          model={comparison}
+          sidebarSurface={sidebarSurface}
+        />
+      ) : null}
     </View>
   );
 }
@@ -592,13 +613,15 @@ function ChangesToolbarRow({
   /** What the row's last control paints, so it can pad to the shared trailing rail. */
   trailing: ToolbarTrailingControl;
 }) {
+  const mac = getIsElectronMac() && !compact && !sidebarSurface;
   const toolbarStyle = useMemo(
     () => [
       styles.changesToolbar,
       { paddingRight: paneContentToolbarTrailingPadding(compact, trailing) },
       sidebarSurface ? styles.changesToolbarSidebar : null,
+      mac ? styles.macToolbar : null,
     ],
-    [compact, sidebarSurface, trailing],
+    [compact, sidebarSurface, trailing, mac],
   );
   return (
     <PaneContentToolbar style={toolbarStyle} testID={testID}>
@@ -607,22 +630,44 @@ function ChangesToolbarRow({
   );
 }
 
-function ChangesToolbarLeading({ children }: { children?: ReactNode }) {
-  return <View style={styles.changesToolbarIdentity}>{children}</View>;
+function ChangesToolbarLeading({
+  children,
+  pill = false,
+}: {
+  children?: ReactNode;
+  pill?: boolean;
+}) {
+  return (
+    <View style={styles.changesToolbarIdentity}>
+      {pill ? <View style={styles.macToolbarPill}>{children}</View> : children}
+    </View>
+  );
 }
 
-function ChangesToolbarTrailing({ children }: { children: ReactNode }) {
-  return <ToolbarControls style={styles.changesToolbarControls}>{children}</ToolbarControls>;
+function ChangesToolbarTrailing({
+  children,
+  pill = false,
+}: {
+  children: ReactNode;
+  pill?: boolean;
+}) {
+  return (
+    <ToolbarControls style={[styles.changesToolbarControls, pill && styles.macToolbarPill]}>
+      {children}
+    </ToolbarControls>
+  );
 }
 
 function ChangesRepositoryToolbar({
   compact,
   model,
   sidebarSurface,
+  standaloneDiff,
 }: {
   compact: boolean;
   model: ChangesRepositoryToolbarModel;
   sidebarSurface: boolean;
+  standaloneDiff?: boolean;
 }) {
   return (
     <ChangesToolbarRow
@@ -631,15 +676,23 @@ function ChangesRepositoryToolbar({
       testID="changes-repository-header"
       trailing={model.gitActions ? "framed" : "glyph"}
     >
-      <ChangesToolbarLeading>
-        <BranchSwitcher
-          currentBranchName={model.branchName}
-          serverId={model.serverId}
-          workspaceId={model.workspaceId ?? model.cwd}
-          workspaceDirectory={model.cwd}
-          isGitCheckout
-          testID="changes-branch-switcher"
-        />
+      <ChangesToolbarLeading pill={getIsElectronMac() && !compact && !sidebarSurface}>
+        {getIsElectronMac() && standaloneDiff && !compact ? (
+          <DiffBaseSelector
+            serverId={model.serverId}
+            workspaceId={model.workspaceId}
+            cwd={model.cwd}
+          />
+        ) : (
+          <BranchSwitcher
+            currentBranchName={model.branchName}
+            serverId={model.serverId}
+            workspaceId={model.workspaceId ?? model.cwd}
+            workspaceDirectory={model.cwd}
+            isGitCheckout
+            testID="changes-branch-switcher"
+          />
+        )}
       </ChangesToolbarLeading>
       <ChangesToolbarTrailing>
         {model.pullRequest ? (
@@ -731,7 +784,7 @@ function ChangesComparisonToolbar({
       testID="changes-header"
       trailing="glyph"
     >
-      <ChangesToolbarLeading>
+      <ChangesToolbarLeading pill={getIsElectronMac() && !compact && !sidebarSurface}>
         <DiffModeMenu
           diffMode={model.diffMode}
           committedDescription={model.committedDescription}
@@ -746,7 +799,7 @@ function ChangesComparisonToolbar({
           />
         ) : null}
       </ChangesToolbarLeading>
-      <ChangesToolbarTrailing>
+      <ChangesToolbarTrailing pill={getIsElectronMac() && !compact && !sidebarSurface}>
         <ChangesToolbarActions mode={model.mode} compact={compact} />
       </ChangesToolbarTrailing>
     </ChangesToolbarRow>
@@ -770,17 +823,20 @@ function ChangesToolbarActions({ mode, compact }: { mode: ChangesToolbarMode; co
       </>
     );
   }
+  const treeToggle = mode.treeToggle ? (
+    <TreeRailToggle
+      visible={mode.treeToggle.visible}
+      testID="changes-toggle-tree"
+      onToggle={mode.treeToggle.onToggle}
+    />
+  ) : null;
+  const options = <ChangesOptionsMenu mode={mode} compact={compact} />;
+  const mac = getIsElectronMac() && !compact;
   return (
     <>
-      {mode.treeToggle ? (
-        <TreeRailToggle
-          visible={mode.treeToggle.visible}
-          testID="changes-toggle-tree"
-          onToggle={mode.treeToggle.onToggle}
-        />
-      ) : null}
+      {mac ? options : treeToggle}
       {mode.refresh ? <ChangesRefreshButton refresh={mode.refresh} compact={compact} /> : null}
-      <ChangesOptionsMenu mode={mode} compact={compact} />
+      {mac ? treeToggle : options}
     </>
   );
 }
@@ -1289,14 +1345,19 @@ function ChangesTreeRail({
   collapsedFolderPaths: string[];
   onCollapsedFolderPathsChange: (paths: string[]) => void;
 }) {
-  if (!shown) return children;
   return (
-    <TreeRail testID="changes-tree-rail" width={treeWidth ?? 220} onWidthChange={onTreeWidthChange}>
+    <TreeRail
+      testID="changes-tree-rail"
+      visible={shown}
+      width={treeWidth ?? 220}
+      onWidthChange={onTreeWidthChange}
+    >
       {children}
       <ChangedFilesTree
         files={files}
         mode={mode}
         onSelectFile={onSelectFile}
+        searchable={getIsElectronMac()}
         collapsedFolderPaths={collapsedFolderPaths}
         onCollapsedFolderPathsChange={onCollapsedFolderPathsChange}
       />
@@ -1360,6 +1421,9 @@ function ChangesBody({
 
 function ChangesCommits({
   presentation,
+  standaloneDiff,
+  baseRef,
+  defaultBaseRef,
   serverId,
   cwd,
   collapsed,
@@ -1367,21 +1431,32 @@ function ChangesCommits({
   onCollapsedChange,
 }: {
   presentation: ChangesPresentation;
+  standaloneDiff?: boolean;
+  baseRef?: string;
+  defaultBaseRef?: string;
   serverId: string;
   cwd: string;
   collapsed: boolean;
   onCommitPress: (sha: string) => void;
   onCollapsedChange: (collapsed: boolean) => void;
 }) {
-  if (presentation === "diff") return null;
+  const { t } = useTranslation();
+  if (standaloneDiff || presentation === "diff") return null;
   return (
-    <CommitsSection
-      serverId={serverId}
-      cwd={cwd}
-      onCommitPress={onCommitPress}
-      collapsed={collapsed}
-      onCollapsedChange={onCollapsedChange}
-    />
+    <>
+      {defaultBaseRef && baseRef !== defaultBaseRef ? (
+        <Text style={styles.commitsBaseHint} testID="commits-base-hint">
+          {t("workspace.git.diff.commits.baseHint", { baseRef: defaultBaseRef })}
+        </Text>
+      ) : null}
+      <CommitsSection
+        serverId={serverId}
+        cwd={cwd}
+        onCommitPress={onCommitPress}
+        collapsed={collapsed}
+        onCollapsedChange={onCollapsedChange}
+      />
+    </>
   );
 }
 
@@ -1444,6 +1519,7 @@ export function ChangesSurface({
   cwd,
   enabled,
   presentation = "combined",
+  standaloneDiff,
   focusPath,
   focusRequestId,
   onOpenFile,
@@ -1542,6 +1618,8 @@ export function ChangesSurface({
     statusErrorMessage,
     baseRef,
     currentBranchName,
+    defaultBaseRef,
+    reviewBaseRef,
     diffMode,
     selectUncommitted: handleSelectUncommitted,
     selectBase: handleSelectBase,
@@ -1840,6 +1918,7 @@ export function ChangesSurface({
     () =>
       buildChangesToolbarMode({
         presentation,
+        standaloneDiff,
         compact: isMobile,
         hasChanges,
         canUseSplitLayout,
@@ -1882,6 +1961,7 @@ export function ChangesSurface({
       isMobile,
       isRefreshing,
       presentation,
+      standaloneDiff,
       refreshSupported,
       wrapLines,
     ],
@@ -1936,6 +2016,7 @@ export function ChangesSurface({
           repository={changesHeaderModel.repository}
           comparison={changesHeaderModel.comparison}
           sidebarSurface={presentation === "tree"}
+          standaloneDiff={standaloneDiff}
         />
       ) : null}
 
@@ -1963,6 +2044,9 @@ export function ChangesSurface({
 
       <ChangesCommits
         presentation={presentation}
+        standaloneDiff={standaloneDiff}
+        baseRef={reviewBaseRef}
+        defaultBaseRef={defaultBaseRef}
         serverId={serverId}
         cwd={cwd}
         onCommitPress={handleCommitPress}
@@ -1974,6 +2058,12 @@ export function ChangesSurface({
 }
 
 const styles = StyleSheet.create((theme) => ({
+  commitsBaseHint: {
+    paddingHorizontal: 12,
+    paddingTop: 4,
+    fontSize: theme.fontSize.sm,
+    color: theme.colors.foregroundMuted,
+  },
   container: {
     flex: 1,
     minHeight: 0,
@@ -1986,6 +2076,23 @@ const styles = StyleSheet.create((theme) => ({
   },
   changesToolbarSidebar: {
     backgroundColor: theme.colors.surfaceSidebar,
+  },
+  macHeader: { paddingTop: 4, paddingBottom: 8 },
+  macToolbar: {
+    height: 40,
+    paddingHorizontal: 8,
+    borderBottomWidth: 0,
+  },
+  macToolbarPill: {
+    minHeight: 32,
+    borderRadius: 16,
+    paddingHorizontal: 8,
+    backgroundColor: theme.colors.surface2,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    minWidth: 0,
+    flexShrink: 1,
   },
   changesToolbarIdentity: {
     flex: 1,

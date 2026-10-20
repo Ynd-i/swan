@@ -132,6 +132,8 @@ export function navigateToLastWorkspace(deps: NavigateToLastWorkspaceDeps): bool
   if (!selection) {
     return false;
   }
-  navigateToWorkspace(selection, deps);
+  // Returning from another screen restores the existing pane selection. Opening
+  // a workspace explicitly still uses navigateToWorkspace's attention priority.
+  deps.navigateToRoute(buildHostWorkspaceRoute(selection.serverId, selection.workspaceId));
   return true;
 }

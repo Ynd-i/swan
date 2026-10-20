@@ -11,6 +11,7 @@ import {
   workspaceTabTargetsEqual,
 } from "@/workspace-tabs/identity";
 import { createNewWorkspaceTab } from "@/workspace-tabs/new-tab";
+import { getIsElectronMac } from "@/constants/platform";
 
 export interface SplitPane {
   id: string;
@@ -1226,6 +1227,14 @@ export function getFocusedBrowserId(layout: WorkspaceLayout | null | undefined):
   if (!layout) {
     return null;
   }
+  if (getIsElectronMac()) {
+    const browser = collectAllTabs(layout.root).find(
+      (tab) =>
+        tab.target.kind === "browser" &&
+        collectAllPanes(layout.root).some((pane) => pane.focusedTabId === tab.tabId),
+    );
+    if (browser?.target.kind === "browser") return browser.target.browserId;
+  }
   const focusedPane = findPaneById(layout.root, layout.focusedPaneId);
   if (!focusedPane?.focusedTabId || focusedPane.hidden === true) {
     return null;
@@ -1244,6 +1253,8 @@ export function createDefaultLayout(): WorkspaceLayout {
 }
 
 function createDefaultExplorerSidebarTabs(): WorkspaceTab[] {
+  // The macOS Explorer opens on the launcher; Files and Changes are a click away there.
+  if (getIsElectronMac()) return [createNewWorkspaceTab()];
   const createdAt = Date.now();
   const targets = [{ kind: "files" }, { kind: "changes_tree" }] as const;
   return targets.map((target) => ({

@@ -1,3 +1,4 @@
+import { webDiffFont } from "./typography.web";
 import { selectionRectangles } from "./hit-testing";
 import {
   DIFF_BODY_BORDER_HEIGHT,
@@ -65,7 +66,7 @@ export function paintWebViewport(input: PaintWebViewportInput): void {
   context.clearRect(0, paintTop, input.viewportWidth, paintHeight);
   context.fillStyle = input.palette.surface;
   context.fillRect(0, paintTop, input.viewportWidth, paintHeight);
-  context.font = `${input.typography.size}px ${input.typography.family}`;
+  context.font = webDiffFont(input.typography);
   context.textBaseline = "alphabetic";
 
   const range = visibleRowRange(input.model.rows, input.scrollTop + paintTop, paintHeight);
@@ -283,7 +284,30 @@ function paintLine(
         input.row.reviewHeight,
       );
     }
-    if (!cell) return;
+    const bodyHeight = input.row.height - input.row.reviewHeight;
+    if (!cell) {
+      if (input.palette.emptyStripe) {
+        paintEmptyStripes(
+          input.context,
+          x,
+          input.y,
+          columnWidth,
+          bodyHeight,
+          input.row.top,
+          input.palette.emptyStripe,
+        );
+      }
+      return;
+    }
+    paintChangedGutter(
+      input.context,
+      cell,
+      input.palette,
+      x,
+      input.y,
+      file.gutterWidth,
+      bodyHeight,
+    );
     input.context.fillStyle = input.palette.border;
     input.context.fillRect(x + file.gutterWidth, input.y, 1, reviewDividerHeight(input.row.height));
     if (cell.lineNumber !== null) {
@@ -309,6 +333,50 @@ function paintLine(
   });
 }
 
+function paintChangedGutter(
+  context: CanvasRenderingContext2D,
+  cell: DiffCell,
+  palette: DiffPalette,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+): void {
+  if (cell.type !== "add" && cell.type !== "remove") return;
+  const background =
+    cell.type === "add" ? palette.additionGutterBackground : palette.deletionGutterBackground;
+  if (!background) return;
+  context.fillStyle = background;
+  context.fillRect(x, y, width, height);
+  context.fillStyle = cell.type === "add" ? palette.addition : palette.deletion;
+  context.fillRect(x, y, 4, height);
+}
+
+function paintEmptyStripes(
+  context: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  documentTop: number,
+  color: string,
+): void {
+  context.save();
+  context.beginPath();
+  context.rect(x, y, width, height);
+  context.clip();
+  context.strokeStyle = color;
+  context.lineWidth = 1;
+  context.beginPath();
+  // Anchor the pattern to document coordinates so adjacent rows and scroll paints agree.
+  for (let offset = -(documentTop % 8) - height; offset < width; offset += 8) {
+    context.moveTo(x + offset, y + height);
+    context.lineTo(x + offset + height, y);
+  }
+  context.stroke();
+  context.restore();
+}
+
 function paintCellText(
   input: PaintWebViewportInput & {
     row: DiffLineRow;
@@ -322,6 +390,15 @@ function paintCellText(
   for (const fragment of input.cell.fragments) {
     const baseline = input.y + fragment.baseline;
     const textX = input.x - offset;
+    paintIntralineRanges(
+      input.context,
+      input.cell,
+      fragment,
+      input.palette,
+      textX,
+      input.y + fragment.top,
+      input.model.lineHeight,
+    );
     for (const band of fragmentColorBands(input.cell, fragment, input.palette)) {
       input.context.save();
       input.context.beginPath();
@@ -338,6 +415,33 @@ function paintCellText(
       input.context.fillText(fragment.text, textX, baseline);
       input.context.restore();
     }
+  }
+}
+
+function paintIntralineRanges(
+  context: CanvasRenderingContext2D,
+  cell: DiffCell,
+  fragment: DiffCell["fragments"][number],
+  palette: DiffPalette,
+  x: number,
+  y: number,
+  height: number,
+): void {
+  if (cell.type !== "add" && cell.type !== "remove") return;
+  const color =
+    cell.type === "add" ? palette.additionInlineBackground : palette.deletionInlineBackground;
+  if (!color) return;
+  context.fillStyle = color;
+  for (const range of cell.intralineRanges ?? []) {
+    const start = Math.max(range.start, fragment.start);
+    const end = Math.min(range.end, fragment.end);
+    if (start >= end) continue;
+    context.fillRect(
+      x + fragmentWidthForRange(fragment, fragment.start, start),
+      y,
+      fragmentWidthForRange(fragment, start, end),
+      height,
+    );
   }
 }
 

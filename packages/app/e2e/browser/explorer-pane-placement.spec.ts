@@ -236,8 +236,8 @@ async function closeOnlyDraft(page: Page): Promise<void> {
 }
 
 async function moveOnlyDraftIntoRightSplit(page: Page): Promise<void> {
-  await mainTabRow(page).getByRole("button", { name: "More actions", exact: true }).click();
-  await page.getByRole("menuitem", { name: /^Split pane right/ }).click();
+  await page.getByTestId("workspace-split-pane-menu").filter({ visible: true }).first().click();
+  await page.getByTestId("workspace-split-pane-right").click();
   const target = await emptyPaneBox(page);
   await dragChipTo(page, draftTabChip(page), {
     x: target.x + target.width / 2,
@@ -252,7 +252,7 @@ async function expectNewLauncher(page: Page): Promise<void> {
   ).toBeVisible();
   await expect(draftTabChip(page)).toHaveCount(0);
   await expect(page.getByRole("textbox", { name: "Message agent..." })).toHaveCount(0);
-  await expect(page.getByText("Paseo ran into a problem.", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("Swan ran into a problem.", { exact: true })).toHaveCount(0);
 }
 
 async function openAgentDraftFromLauncher(page: Page): Promise<void> {

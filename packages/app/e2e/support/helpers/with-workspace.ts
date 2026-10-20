@@ -1,7 +1,7 @@
 import { execSync } from "node:child_process";
 import path from "node:path";
 import type { Page } from "@playwright/test";
-import { waitForTabBar } from "./launcher";
+import { waitForWorkspaceReady } from "./launcher";
 import { selectWorkspaceInSidebar } from "./sidebar";
 import { createTempGitRepo, resolveTempRoot } from "./workspace";
 import {
@@ -83,7 +83,7 @@ export function createWithWorkspace(page: Page): WithWorkspaceHandle {
       navigateTo: async () => {
         await openHomeWithProject(page, repo.path);
         await selectWorkspaceInSidebar(page, workspaceId);
-        await waitForTabBar(page);
+        await waitForWorkspaceReady(page);
       },
     };
   };

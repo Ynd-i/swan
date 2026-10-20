@@ -323,10 +323,32 @@ export function buildContributionSections(
 export function projectCommandCenterRows(
   sections: readonly CommandCenterResultSection[],
   metrics: CommandCenterListMetrics,
+  options?: { presentation: "mac-chat"; query: string },
 ): CommandCenterListProjection {
+  const compact = options?.presentation === "mac-chat";
+  const primaryIds = [
+    "root:new-workspace",
+    "root:add-project",
+    "root:search-files",
+    "root:settings",
+  ];
   const populated = sections
+    .map((section) => {
+      if (!compact || options.query.trim()) return section;
+      if (section.id === "agents") return { ...section, results: section.results.slice(0, 9) };
+      if (section.id !== "actions") return { ...section, results: [] };
+      return {
+        ...section,
+        results: primaryIds.flatMap((id) => section.results.filter((result) => result.id === id)),
+      };
+    })
     .filter((section) => section.results.length > 0)
-    .sort(compareResultSections);
+    .sort((left, right) => {
+      if (compact && (left.id === "agents") !== (right.id === "agents")) {
+        return left.id === "agents" ? -1 : 1;
+      }
+      return compareResultSections(left, right);
+    });
   const rows: CommandCenterListRow[] = [];
   const selectableResults: CommandCenterResult[] = [];
   const rowIndexByResultId = new Map<string, number>();
@@ -334,9 +356,10 @@ export function projectCommandCenterRows(
   let offset = 0;
 
   for (const [sectionIndex, section] of populated.entries()) {
-    const divider = sectionIndex > 0;
-    const sectionHeight =
+    const divider = !compact && sectionIndex > 0;
+    let sectionHeight =
       (divider ? metrics.sectionDivider : 0) + (section.title ? metrics.sectionTitle : 0);
+    if (compact && section.title) sectionHeight = 24;
     if (sectionHeight > 0) {
       offsets.push(offset);
       rows.push({
@@ -349,7 +372,9 @@ export function projectCommandCenterRows(
       offset += sectionHeight;
     }
     for (const result of section.results) {
-      const height = hasSubtitleLine(result) ? metrics.twoLineRow : metrics.singleLineRow;
+      const twoLine = hasSubtitleLine(result);
+      const standardHeight = twoLine ? metrics.twoLineRow : metrics.singleLineRow;
+      const height = compact && (result.kind === "agent" || !twoLine) ? 30 : standardHeight;
       offsets.push(offset);
       rowIndexByResultId.set(result.id, rows.length);
       rows.push({ kind: "result", key: result.id, result, height });

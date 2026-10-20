@@ -2,7 +2,14 @@ import React, { useCallback, useMemo } from "react";
 import { View } from "react-native";
 import { useRouter, type Href } from "expo-router";
 import { useTranslation } from "react-i18next";
-import { Copy, Ellipsis, Globe, Import as ImportIcon, Settings } from "lucide-react-native";
+import {
+  Copy,
+  Ellipsis,
+  FolderOpen,
+  Globe,
+  Import as ImportIcon,
+  Settings,
+} from "lucide-react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import type { TerminalProfile } from "@getpaseo/protocol/messages";
 import {
@@ -33,6 +40,7 @@ import {
 } from "@/screens/workspace/scripts";
 
 const ThemedEllipsis = withUnistyles(Ellipsis);
+const ThemedFolderOpen = withUnistyles(FolderOpen);
 const ThemedCopy = withUnistyles(Copy);
 const ThemedGlobe = withUnistyles(Globe);
 const ThemedImport = withUnistyles(ImportIcon);
@@ -154,7 +162,10 @@ function workspaceHeaderMenuButtonStyle({
 /**
  * Wide layouts make tabs from the tab strip's `+` menu, so this one carries workspace actions only.
  */
-export function WorkspaceHeaderMenuDesktop(props: WorkspaceHeaderWorkspaceActions) {
+export function WorkspaceHeaderMenuDesktop({
+  title,
+  ...props
+}: WorkspaceHeaderWorkspaceActions & { title?: string }) {
   const { t } = useTranslation();
   return (
     <DropdownMenu>
@@ -162,11 +173,20 @@ export function WorkspaceHeaderMenuDesktop(props: WorkspaceHeaderWorkspaceAction
         testID="workspace-header-menu-trigger"
         style={workspaceHeaderMenuButtonStyle}
         accessibilityRole="button"
-        accessibilityLabel={t("workspace.header.actions.workspaceActions")}
+        accessibilityLabel={
+          title
+            ? `${t("workspace.header.actions.workspaceActions")} (${title})`
+            : t("workspace.header.actions.workspaceActions")
+        }
       >
-        <WorkspaceHeaderMenuTriggerIcon />
+        {title ? (
+          <ThemedFolderOpen size={18} uniProps={extraMutedIconColorMapping} />
+        ) : (
+          <WorkspaceHeaderMenuTriggerIcon />
+        )}
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" width={220} testID="workspace-header-menu">
+        {title ? <DropdownMenuLabel>{title}</DropdownMenuLabel> : null}
         <WorkspaceHeaderWorkspaceActionItems {...props} />
       </DropdownMenuContent>
     </DropdownMenu>

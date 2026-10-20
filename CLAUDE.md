@@ -26,10 +26,13 @@ At the start of non-trivial work, list `docs/` and skim anything relevant to the
 | [docs/product.md](docs/product.md)                                   | What Paseo is, who it's for, where it's going                                                                                  |
 | [docs/architecture.md](docs/architecture.md)                         | System design, package layering, WebSocket protocol, agent lifecycle, data flow                                                |
 | [docs/agent-lifecycle.md](docs/agent-lifecycle.md)                   | Agent states, parent/child relationships, archive semantics, tabs vs archive, subagents track                                  |
+| [docs/auto-handoff.md](docs/auto-handoff.md)                         | Built-in auto handoff at a context threshold: threshold math, label link, latch and retries, sidebar folding                   |
+| [docs/chat-proposals.md](docs/chat-proposals.md)                     | Agent-proposed follow-up chats: proposal block, instruction text, label link, sidebar nesting, report back                     |
 | [docs/data-model.md](docs/data-model.md)                             | File-based JSON persistence, Zod schemas, atomic writes, no migrations                                                         |
 | [docs/glossary.md](docs/glossary.md)                                 | Authoritative terminology — UI label wins, no synonyms                                                                         |
 | [docs/coding-standards.md](docs/coding-standards.md)                 | Type hygiene, error handling, state design, React patterns, file organization                                                  |
 | [docs/design.md](docs/design.md)                                     | Design system — tokens, buttons, hierarchy, density, alignment rails, states, what's forbidden                                 |
+| [Desktop UI plan](docs/refactors/codex-desktop-ui-plan.md)           | Custom macOS desktop UI boundaries, incremental steps, upstream integration, and validation evidence                           |
 | [docs/forms.md](docs/forms.md)                                       | Form architecture — non-React form model, form kit, load-state gating; the schedule form is the golden example                 |
 | [docs/hover.md](docs/hover.md)                                       | Hover — the canonical pattern (plain View + onPointerEnter/Leave, separate inner Pressable) and the three ways agents break it |
 | [docs/unistyles.md](docs/unistyles.md)                               | Unistyles gotchas — `useUnistyles()` is forbidden, alternatives in order                                                       |

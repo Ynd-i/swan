@@ -18,6 +18,7 @@ export class ProjectDirectoryRequestError extends Error {
 export interface CreateProjectDirectoryInput {
   parentPath: string;
   name: string;
+  createParents?: boolean;
 }
 
 export interface CreateProjectDirectoryResult {
@@ -27,7 +28,7 @@ export interface CreateProjectDirectoryResult {
 
 interface ProjectDirectoryFileSystem {
   stat(path: string): Promise<{ isDirectory(): boolean }>;
-  mkdir(path: string): Promise<void>;
+  mkdir(path: string, options?: { recursive: boolean }): Promise<void>;
   rmdir(path: string): Promise<void>;
 }
 
@@ -38,8 +39,8 @@ interface CreateProjectDirectoryDependencies {
 
 const nodeProjectDirectoryFileSystem: ProjectDirectoryFileSystem = {
   stat,
-  async mkdir(path) {
-    await mkdir(path);
+  async mkdir(path, options) {
+    await mkdir(path, options);
   },
   rmdir,
 };
@@ -67,6 +68,13 @@ export async function createProjectDirectory(
   }
 
   const filesystem = dependencies.filesystem ?? nodeProjectDirectoryFileSystem;
+  if (input.createParents) {
+    try {
+      await filesystem.mkdir(parentDirectory, { recursive: true });
+    } catch (error) {
+      throw mapCreateDirectoryError(error, parentDirectory);
+    }
+  }
   await requireExistingParent(filesystem, parentDirectory);
 
   try {

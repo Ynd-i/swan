@@ -468,6 +468,33 @@
         "paseo/no-raw-pressable": "off"
       }
     },
+    // Swan fork surfaces that predate the rule. Kept apart from the upstream list so
+    // upstream merges don't conflict here. They may only leave this list.
+    {
+      "files": [
+        "packages/app/src/agent-stream/desktop-turn-activity-view.tsx",
+        "packages/app/src/agent-stream/fork-origin-divider.tsx",
+        "packages/app/src/agent-stream/permission-request-card.tsx",
+        "packages/app/src/chat-proposals/brief-rows.tsx",
+        "packages/app/src/chat-proposals/linked-chat-line.tsx",
+        "packages/app/src/chat-proposals/proposal-card.tsx",
+        "packages/app/src/components/desktop/desktop-chat-inbox.tsx",
+        "packages/app/src/components/desktop/desktop-chat-project.tsx",
+        "packages/app/src/components/desktop/desktop-chat-row.tsx",
+        "packages/app/src/components/desktop/desktop-chat-section-header.tsx",
+        "packages/app/src/components/desktop/desktop-model-preferences.tsx",
+        "packages/app/src/components/project-edit-sheet.tsx",
+        "packages/app/src/composer/desktop-queued-message-row.tsx",
+        "packages/app/src/desktop/browser/pane/new-tab-page.tsx",
+        "packages/app/src/pull-request-links/link.tsx",
+        "packages/app/src/screens/new-workspace/form/index.tsx",
+        "packages/app/src/screens/settings/appearance/appearance-section.tsx",
+        "packages/app/src/screens/workspace/explorer-sidebar-tab-rail.tsx"
+      ],
+      "rules": {
+        "paseo/no-raw-pressable": "off"
+      }
+    },
     {
       "files": ["**/e2e/**/fixtures.ts"],
       "rules": {

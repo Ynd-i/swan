@@ -6,11 +6,23 @@ import { createAgentTabFromMenu } from "./workspace-tabs";
 
 // ─── Navigation ────────────────────────────────────────────────────────────
 
-/** Navigate to a workspace and wait for the tab bar to appear. */
+/** Navigate to a workspace and wait for its current platform layout. */
 export async function gotoWorkspace(page: Page, workspaceId: string): Promise<void> {
   const route = buildHostWorkspaceRoute(getServerId(), workspaceId);
   await page.goto(route);
-  await waitForTabBar(page);
+  await waitForWorkspaceReady(page);
+}
+
+/** Workspace readiness is independent of whether the main area has a tab bar. */
+export async function waitForWorkspaceReady(page: Page): Promise<void> {
+  const singleChatDesktop = await page.evaluate(() => window.paseoDesktop?.platform === "darwin");
+  if (singleChatDesktop) {
+    await expect(
+      page.getByTestId("workspace-header-menu-trigger").filter({ visible: true }).first(),
+    ).toBeVisible({ timeout: 30_000 });
+  } else {
+    await waitForTabBar(page);
+  }
 }
 
 // ─── Tab bar queries ───────────────────────────────────────────────────────

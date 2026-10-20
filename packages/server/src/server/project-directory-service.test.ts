@@ -119,4 +119,36 @@ describe("project directory creation", () => {
     ).resolves.toEqual({ directoryPath, project });
     await expect(access(directoryPath)).resolves.toBeUndefined();
   });
+
+  it("creates missing parents only when asked, still as a single named child", async () => {
+    const root = await createRoot();
+    const parentPath = join(root, "Documents", "Paseo", "2026-10-03");
+    const registerProject = async (directoryPath: string) => ({
+      projectId: `directory:${directoryPath}`,
+      rootPath: directoryPath,
+      kind: "non_git" as const,
+      displayName: "chat",
+      customName: null,
+      createdAt: "2026-10-03T10:00:00Z",
+      updatedAt: "2026-10-03T10:00:00Z",
+      archivedAt: null,
+    });
+
+    await expect(
+      createProjectDirectory({ parentPath, name: "chat" }, { registerProject }),
+    ).rejects.toMatchObject({ code: "parent_directory_not_found" });
+    await expect(
+      createProjectDirectory(
+        { parentPath, name: "../escape", createParents: true },
+        { registerProject },
+      ),
+    ).rejects.toMatchObject({ code: "invalid_name" });
+
+    const result = await createProjectDirectory(
+      { parentPath, name: "chat", createParents: true },
+      { registerProject },
+    );
+    expect(result.directoryPath).toBe(join(parentPath, "chat"));
+    await expect(access(result.directoryPath)).resolves.toBeUndefined();
+  });
 });

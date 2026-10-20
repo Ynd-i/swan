@@ -1,7 +1,8 @@
+import { useAppReducedMotion } from "@/appearance/reduced-motion";
+import { getIsElectronMac } from "@/constants/platform";
 import { memo, useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { Pressable, Text, View, type PointerEvent as RNPointerEvent } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
-import { useReducedMotion } from "react-native-reanimated";
 import { useContainerWidthBelow } from "@/hooks/use-container-width";
 import { inlineUnistylesStyle } from "@/styles/unistyles-inline-style";
 import { createChatOutlineHoverIntent } from "./hover-intent";
@@ -30,7 +31,7 @@ export const ChatOutlineRail = memo(function ChatOutlineRail({
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
   const activeSeq = useSyncExternalStore(activePrompt.subscribe, activePrompt.getActiveSeq);
-  const prefersReducedMotion = useReducedMotion();
+  const prefersReducedMotion = useAppReducedMotion();
   const { onLayout, isBelow: isPanelNarrow } = useContainerWidthBelow(MIN_PANEL_WIDTH);
 
   const hoverIntent = useMemo(
@@ -96,6 +97,7 @@ export const ChatOutlineRail = memo(function ChatOutlineRail({
               label={`${index + 1} of ${prompts.length}: ${prompt.preview}`}
               isActive={prompt.seq === activeSeq}
               hasAttention={index === attentionIndex}
+              reducedMotion={getIsElectronMac() && prefersReducedMotion}
               magnification={
                 prefersReducedMotion || attentionIndex === null
                   ? 0
@@ -120,6 +122,7 @@ interface ChatOutlineTickProps {
   isActive: boolean;
   hasAttention: boolean;
   magnification: number;
+  reducedMotion: boolean;
   onHover: (index: number) => void;
   onFocusChange: (index: number, focused: boolean) => void;
   onJumpToPrompt: (seq: number) => void;
@@ -133,6 +136,7 @@ const ChatOutlineTick = memo(function ChatOutlineTick({
   isActive,
   hasAttention,
   magnification,
+  reducedMotion,
   onHover,
   onFocusChange,
   onJumpToPrompt,
@@ -169,7 +173,11 @@ const ChatOutlineTick = memo(function ChatOutlineTick({
             styles.pill,
             isActive && styles.pillActive,
             hasAttention && styles.pillAttention,
-            inlineUnistylesStyle({ width: pillWidth, height: pillHeight }),
+            inlineUnistylesStyle({
+              width: pillWidth,
+              height: pillHeight,
+              ...(reducedMotion ? { transitionDuration: "0ms" } : {}),
+            }),
           ]}
         />
       </Pressable>

@@ -103,6 +103,12 @@ test.describe("context window meter", () => {
       const centroid = await progressArcCentroid(meter);
       expect(centroid.x).toBeGreaterThan(1);
       expect(centroid.y).toBeLessThan(-1);
+
+      // The mock provider cannot attribute its usage, so the popup splits used from free.
+      await meter.hover();
+      const tooltip = page.getByTestId("context-window-meter-tooltip");
+      await expect(tooltip).toBeVisible();
+      await expect(tooltip.getByTestId("context-window-meter-row")).toHaveCount(2);
     } finally {
       await session.cleanup();
     }

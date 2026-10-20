@@ -8,15 +8,18 @@ import {
   type ViewStyle,
 } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
+import { ScrollView } from "@/components/ui/scroll-view";
 import * as Clipboard from "expo-clipboard";
-import { Check, Copy } from "lucide-react-native";
+import { ArrowRightToLine, Check, Copy, Code, Play, WrapText } from "lucide-react-native";
 import { useTranslation } from "react-i18next";
 import type { HighlightToken } from "@getpaseo/highlight";
-import { isNative, isWeb } from "@/constants/platform";
+import { getIsElectronMac, isNative, isWeb } from "@/constants/platform";
 import { useIsCompactFormFactor } from "@/constants/layout";
+import { useRunInTerminal } from "@/panels/pane-context";
 import { syntaxTokenStyleFor } from "@/styles/syntax-token-styles";
 import { CODE_SURFACE_DATASET } from "@/styles/code-surface";
 import { highlightToKeyedLines, type KeyedLine } from "@/utils/highlight-cache";
+import { resolveRunnableShellCommand } from "@/utils/shell-command-block";
 import {
   markdownCopyCodeBlockDataSet,
   markdownCopyDataSet,
@@ -85,6 +88,11 @@ export const HighlightedCodeBlock = React.memo(function HighlightedCodeBlock({
   );
 
   const isCompact = useIsCompactFormFactor();
+  const isMac = getIsElectronMac();
+  const { t } = useTranslation();
+  const [wrap, setWrap] = useState(true);
+  const WrapActionIcon = wrap ? ArrowRightToLine : WrapText;
+  const toggleWrap = useCallback(() => setWrap((value) => !value), []);
   const [isHovered, setIsHovered] = useState(false);
   const handlePointerEnter = useCallback(() => setIsHovered(true), []);
   const handlePointerLeave = useCallback(() => setIsHovered(false), []);
@@ -93,24 +101,65 @@ export const HighlightedCodeBlock = React.memo(function HighlightedCodeBlock({
   // and ends in more than one when the author left a blank line before the closing
   // fence; pasting any of them into a terminal runs the last line.
   const getCode = useCallback(() => code.replace(TRAILING_CODE_LINE_BREAKS, ""), [code]);
+  const runInTerminal = useRunInTerminal();
+  const shellCommand = useMemo(
+    () => resolveRunnableShellCommand(fenceLanguageToExtension(language), getCode()),
+    [getCode, language],
+  );
+  const handleRun = useMemo(
+    () => (runInTerminal && shellCommand ? () => runInTerminal(shellCommand) : null),
+    [runInTerminal, shellCommand],
+  );
 
+  const codeText = (
+    <Text
+      style={[innerTextStyle, isMac && (wrap ? macStyles.wrappedText : macStyles.scrollingText)]}
+      dataSet={markdownCopyDataSet.code}
+    >
+      {keyedLines ? renderCodeSegments(keyedLines) : renderedCode}
+    </Text>
+  );
   return (
     <View
-      style={containerStyle}
+      style={[containerStyle, isMac && macStyles.container]}
       dataSet={copyDataSet}
       onPointerEnter={handlePointerEnter}
       onPointerLeave={handlePointerLeave}
     >
-      {keyedLines ? (
-        <Text style={innerTextStyle} dataSet={markdownCopyDataSet.code}>
-          {renderCodeSegments(keyedLines)}
-        </Text>
+      {isMac ? (
+        <>
+          <View style={macStyles.header} dataSet={markdownCopyDataSet.ignore}>
+            <Code size={16} color={macStyles.headerText.color} />
+            <Text style={macStyles.headerText}>
+              {language || (shellCommand ? "shell" : t("message.actions.plainText"))}
+            </Text>
+            <View style={macStyles.actions}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t(
+                  wrap ? "workspace.git.diff.scrollLongLines" : "workspace.git.diff.wrapLongLines",
+                )}
+                aria-pressed={wrap}
+                onPress={toggleWrap}
+                style={macStyles.action}
+              >
+                <WrapActionIcon size={16} color={macStyles.headerText.color} />
+              </Pressable>
+              {handleRun ? <RunButton onRun={handleRun} visible inline /> : null}
+              <CopyButton getCode={getCode} visible inline />
+            </View>
+          </View>
+          <ScrollView horizontal={!wrap} style={macStyles.codeScroll} testID="markdown-code-scroll">
+            {codeText}
+          </ScrollView>
+        </>
       ) : (
-        <Text style={innerTextStyle} dataSet={markdownCopyDataSet.code}>
-          {renderedCode}
-        </Text>
+        <>
+          {codeText}
+          {handleRun ? <RunButton onRun={handleRun} visible={controlsVisible} /> : null}
+          <CopyButton getCode={getCode} visible={controlsVisible} />
+        </>
       )}
-      <CopyButton getCode={getCode} visible={controlsVisible} />
     </View>
   );
 });
@@ -156,11 +205,13 @@ const CONTAINER_BASE: ViewStyle = { position: "relative" };
 const WEB_SELECTABLE: TextStyle = isWeb ? ({ userSelect: "text" } as TextStyle) : {};
 
 function splitFenceStyle(inheritedStyles: TextStyle, textStyle: TextStyle): SplitStyles {
-  const { fontFamily, fontSize, color, ...box } = textStyle;
+  const { fontFamily, fontSize, fontWeight, color, ...box } = textStyle;
   const textOnly: TextStyle = { ...WEB_SELECTABLE };
   if (fontFamily !== undefined) textOnly.fontFamily = fontFamily;
   if (fontSize !== undefined) textOnly.fontSize = fontSize;
-  if (fontSize !== undefined) textOnly.lineHeight = Math.round(fontSize * 1.45);
+  if (fontWeight !== undefined) textOnly.fontWeight = fontWeight;
+  if (fontSize !== undefined)
+    textOnly.lineHeight = Math.round(fontSize * (getIsElectronMac() ? 1.5 : 1.45));
   if (color !== undefined) textOnly.color = color;
   return {
     containerStyle: [box as ViewStyle, CONTAINER_BASE],
@@ -168,14 +219,64 @@ function splitFenceStyle(inheritedStyles: TextStyle, textStyle: TextStyle): Spli
   };
 }
 
+interface RunButtonProps {
+  onRun: () => void;
+  visible: boolean;
+  inline?: boolean;
+}
+
+const RunButton = React.memo(function RunButton({
+  onRun,
+  visible,
+  inline = false,
+}: RunButtonProps) {
+  const { t } = useTranslation();
+  const visibilityStyle = visible
+    ? copyButtonStyles.containerVisible
+    : copyButtonStyles.containerHidden;
+  const wrapperStyle = useMemo(
+    () => [
+      copyButtonStyles.container,
+      inline ? copyButtonStyles.inline : copyButtonStyles.runOffset,
+      visibilityStyle,
+    ],
+    [inline, visibilityStyle],
+  );
+  return (
+    <Pressable
+      onPress={onRun}
+      style={wrapperStyle}
+      pointerEvents={visible ? "auto" : "none"}
+      accessibilityRole="button"
+      accessibilityLabel={t("message.actions.runInTerminal")}
+      hitSlop={8}
+      dataSet={markdownCopyDataSet.ignore}
+    >
+      {({ hovered }) => (
+        <Play
+          size={14}
+          color={
+            hovered ? copyButtonStyles.iconHoveredColor.color : copyButtonStyles.iconColor.color
+          }
+        />
+      )}
+    </Pressable>
+  );
+});
+
 interface CopyButtonProps {
   getCode: () => string;
   visible: boolean;
+  inline?: boolean;
 }
 
 const COPIED_RESET_MS = 1500;
 
-const CopyButton = React.memo(function CopyButton({ getCode, visible }: CopyButtonProps) {
+const CopyButton = React.memo(function CopyButton({
+  getCode,
+  visible,
+  inline = false,
+}: CopyButtonProps) {
   const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
   const resetRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -203,8 +304,8 @@ const CopyButton = React.memo(function CopyButton({ getCode, visible }: CopyButt
     ? copyButtonStyles.containerVisible
     : copyButtonStyles.containerHidden;
   const wrapperStyle = useMemo(
-    () => [copyButtonStyles.container, visibilityStyle],
-    [visibilityStyle],
+    () => [copyButtonStyles.container, inline && copyButtonStyles.inline, visibilityStyle],
+    [inline, visibilityStyle],
   );
 
   return (
@@ -238,6 +339,8 @@ const copyButtonStyles = StyleSheet.create((theme) => ({
     right: theme.spacing[2],
     padding: theme.spacing[1],
   },
+  inline: { position: "relative", top: 0, right: 0, padding: 6 },
+  runOffset: { right: theme.spacing[2] + 28 },
   containerVisible: {
     opacity: 1,
   },
@@ -250,4 +353,32 @@ const copyButtonStyles = StyleSheet.create((theme) => ({
   iconHoveredColor: {
     color: theme.colors.foreground,
   },
+}));
+
+const macStyles = StyleSheet.create((theme, rt) => ({
+  container: {
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: rt.themeName === "dark" ? theme.colors.surface1 : theme.colors.surface2,
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 14,
+    gap: 12,
+    minWidth: 0,
+    overflow: "hidden",
+  },
+  header: { flexDirection: "row", alignItems: "center", gap: 8 },
+  headerText: {
+    fontFamily: theme.fontFamily.ui,
+    fontWeight: theme.fontWeight.normal,
+    fontSize: theme.fontSize.base,
+    color: theme.colors.foreground,
+    flexShrink: 1,
+  },
+  actions: { marginLeft: "auto", flexDirection: "row", alignItems: "center", gap: 12 },
+  action: { padding: 6 },
+  codeScroll: { flexGrow: 0, minWidth: 0 },
+  wrappedText: { whiteSpace: "pre-wrap", overflowWrap: "anywhere", minWidth: 0 },
+  scrollingText: { whiteSpace: "pre", overflowWrap: "normal", minWidth: 0 },
 }));

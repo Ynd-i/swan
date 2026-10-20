@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 
 export const builtinPlugins = [
   "antigravity-provider",
+  "auto-handoff",
   "claude-usage-source",
   "codex-usage-source",
   "copilot-usage-source",
@@ -14,6 +15,7 @@ export const builtinPlugins = [
   "minimax-usage-source",
   "muse-provider",
   "opencode-go-usage-source",
+  "started-chat-report",
   "zai-usage-source",
 ] as const;
 

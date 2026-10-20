@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ICON_SIZE, type Theme } from "@/styles/theme";
+import { getIsElectronMac } from "@/constants/platform";
 
 export type AssistantForkTarget = "tab" | "workspace";
 
@@ -56,7 +57,11 @@ export const AssistantForkMenu = memo(function AssistantForkMenu({
   );
 
   const triggerStyle = useCallback(
-    () => [styles.trigger, isLocked ? styles.triggerDisabled : null],
+    ({ hovered, open }: { hovered: boolean; open: boolean }) => [
+      styles.trigger,
+      hovered || open ? styles.triggerActive : null,
+      isLocked ? styles.triggerDisabled : null,
+    ],
     [isLocked],
   );
 
@@ -128,7 +133,12 @@ const styles = StyleSheet.create((theme) => ({
     padding: theme.spacing[1],
     alignItems: "center",
     justifyContent: "center",
+    borderRadius: theme.borderRadius.md,
     backgroundColor: "transparent",
+  },
+  // The Mac desktop UI boxes hovered icon buttons; other platforms only recolor the icon.
+  triggerActive: {
+    backgroundColor: getIsElectronMac() ? theme.colors.interactionHighlight : "transparent",
   },
   triggerDisabled: {
     opacity: theme.opacity[50],

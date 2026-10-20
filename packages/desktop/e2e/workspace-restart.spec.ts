@@ -92,6 +92,8 @@ test("refresh keeps one continuous splash before restoring the desktop workspace
       title: `workspace-refresh-route-${Date.now()}`,
     });
     await installDesktopRuntime(page, {
+      // Splash continuity is platform-neutral; the Mac single-chat shell has no workspace rows or tabs.
+      platform: "win32",
       serverId,
       manageBuiltInDaemon: true,
       hangDaemonStart: true,

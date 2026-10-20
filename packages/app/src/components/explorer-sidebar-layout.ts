@@ -3,6 +3,7 @@ import {
   paneContentToolbarTrailingPadding,
 } from "@/components/ui/pane-content-toolbar";
 import { smallIconButtonChromeFrameSize } from "@/components/ui/icon-button-chrome";
+import { getIsElectronMac } from "@/constants/platform";
 
 export function explorerSidebarCloseButtonLayout(compact: boolean) {
   // The inline native dock retains its padded close action and touch slop.
@@ -31,7 +32,8 @@ export function resolveExplorerSidebarWidth(input: {
   requestedWidth?: number;
   containerWidth: number;
 }): number {
-  const requestedWidth = input.requestedWidth ?? DEFAULT_EXPLORER_SIDEBAR_WIDTH;
+  const defaultWidth = getIsElectronMac() ? 576 : DEFAULT_EXPLORER_SIDEBAR_WIDTH;
+  const requestedWidth = input.requestedWidth ?? defaultWidth;
   const maximumVisibleWidth =
     input.containerWidth > 0
       ? Math.max(MIN_EXPLORER_SIDEBAR_WIDTH, input.containerWidth - MIN_WORKSPACE_BODY_WIDTH)

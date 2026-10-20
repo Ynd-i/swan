@@ -24,7 +24,7 @@ const ThemedSettings = withUnistyles(Settings);
 export function UsageOptions() {
   const compact = useIsCompactFormFactor();
   const { display } = useUsagePreferences();
-  const { inSidebar, setInSidebar } = useUsageInSidebar();
+  const { available, inSidebar, setInSidebar } = useUsageInSidebar();
   return (
     <DropdownMenu compactMode="sheet">
       <ToolbarButton
@@ -45,13 +45,15 @@ export function UsageOptions() {
         testID="usage-options-surface"
       >
         <View testID="usage-options-fields">
-          <SettingsSwitch
-            label={usageCopy.showInSidebar}
-            hint={usageCopy.showInSidebarHint}
-            value={inSidebar}
-            onValueChange={setInSidebar}
-            testID="usage-show-in-sidebar"
-          />
+          {available ? (
+            <SettingsSwitch
+              label={usageCopy.showInSidebar}
+              hint={usageCopy.showInSidebarHint}
+              value={inSidebar}
+              onValueChange={setInSidebar}
+              testID="usage-show-in-sidebar"
+            />
+          ) : null}
           <View style={settingsStyles.rowBorder}>
             <SettingsRow label={usageCopy.displayAs}>
               <SegmentedControl

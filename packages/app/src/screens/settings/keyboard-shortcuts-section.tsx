@@ -8,6 +8,8 @@ import type { Theme } from "@/styles/theme";
 import { settingsStyles } from "@/styles/settings";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
 import { Button } from "@/components/ui/button";
+import { SearchField } from "@/components/ui/search-field";
+import { filterShortcutHelpSections } from "@/keyboard/shortcut-help-search";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -17,6 +19,7 @@ import {
 import { Shortcut } from "@/components/ui/shortcut";
 import { useKeyboardShortcutOverrides } from "@/hooks/use-keyboard-shortcut-overrides";
 import {
+  buildEffectiveBindings,
   buildKeyboardShortcutHelpSections,
   getBindingIdForAction,
   normalizeCapturedShortcutCombo,
@@ -326,6 +329,7 @@ function ShortcutRow({
 
 export function KeyboardShortcutsSection() {
   const { t } = useTranslation();
+  const [query, setQuery] = useState("");
   const [capturingBindingId, setCapturingBindingId] = useState<string | null>(null);
   const [capturedCombos, setCapturedCombos] = useState<string[]>([]);
   const [heldModifiers, setHeldModifiers] = useState<string | null>(null);
@@ -335,9 +339,18 @@ export function KeyboardShortcutsSection() {
   const capturing = useKeyboardShortcutsStore((s) => s.capturingShortcut);
 
   const isFocused = useIsFocused();
-  const isMac = getShortcutOs() === "mac";
+  const shortcutOs = getShortcutOs();
+  const isMac = shortcutOs === "mac";
   const isDesktopApp = getIsElectronRuntime();
-  const sections = buildKeyboardShortcutHelpSections({ isMac, isDesktop: isDesktopApp });
+  const bindings = useMemo(() => buildEffectiveBindings(overrides), [overrides]);
+  const sections = useMemo(
+    () => buildKeyboardShortcutHelpSections({ isMac, isDesktop: isDesktopApp }, bindings),
+    [bindings, isMac, isDesktopApp],
+  );
+  const visibleSections = useMemo(
+    () => filterShortcutHelpSections({ sections, query, translate: t, shortcutOs }),
+    [sections, query, t, shortcutOs],
+  );
 
   const cancelCapture = useCallback(() => {
     setCapturedCombos([]);
@@ -445,7 +458,22 @@ export function KeyboardShortcutsSection() {
 
   return (
     <>
-      {sections.map(function (section, sectionIndex) {
+      <View style={styles.search}>
+        <SearchField
+          value={query}
+          onChangeText={setQuery}
+          onFocus={cancelCapture}
+          fullWidth
+          placeholder={t("settings.shortcuts.searchPlaceholder")}
+          clearAccessibilityLabel={t("settings.shortcuts.actions.clear")}
+          testID="settings-shortcuts-search"
+          clearTestID="settings-shortcuts-search-clear"
+        />
+      </View>
+      {visibleSections.length === 0 ? (
+        <Text style={styles.empty}>{t("common.empty.noResults")}</Text>
+      ) : null}
+      {visibleSections.map(function (section, sectionIndex) {
         return (
           <SettingsSection
             key={section.id}
@@ -495,6 +523,16 @@ export function KeyboardShortcutsSection() {
 }
 
 const styles = StyleSheet.create((theme) => ({
+  search: {
+    flexDirection: "row",
+    marginBottom: theme.spacing[6],
+  },
+  empty: {
+    paddingVertical: theme.spacing[6],
+    textAlign: "center",
+    fontSize: theme.fontSize.base,
+    color: theme.colors.foregroundMuted,
+  },
   row: {
     flexDirection: "row",
     justifyContent: "space-between",

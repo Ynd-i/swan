@@ -1,8 +1,31 @@
 import { parseAgentDeepLink, type AgentDeepLinkTarget } from "@getpaseo/protocol/agent-deep-link";
 
-export function parseAgentDeepLinkFromArgv(argv: string[]): AgentDeepLinkTarget | null {
+/** Custom external links share the canonical agent route and all its validation. */
+export function parseDesktopAgentDeepLink(
+  input: string,
+  appName = "Paseo",
+): AgentDeepLinkTarget | null {
+  if (appName === "Swan") {
+    let url: URL;
+    try {
+      url = new URL(input);
+    } catch {
+      return null;
+    }
+    if (url.protocol === "paseo-custom:") {
+      url.protocol = "paseo:";
+      return parseAgentDeepLink(url.href);
+    }
+  }
+  return parseAgentDeepLink(input);
+}
+
+export function parseAgentDeepLinkFromArgv(
+  argv: string[],
+  appName = "Paseo",
+): AgentDeepLinkTarget | null {
   for (const arg of argv) {
-    const target = parseAgentDeepLink(arg);
+    const target = parseDesktopAgentDeepLink(arg, appName);
     if (target) {
       return target;
     }

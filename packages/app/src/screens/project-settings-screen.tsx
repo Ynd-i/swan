@@ -25,18 +25,14 @@ import { ExternalLink } from "@/components/ui/external-link";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Switch } from "@/components/ui/switch";
 import { AdaptiveModalSheet, type SheetHeader } from "@/components/adaptive-modal-sheet";
-import { ProjectEditSheet } from "@/components/project-edit-sheet";
+import { ProjectEditSheet, useProjectEditSnapshot } from "@/components/project-edit-sheet";
 import { EditingTextInput as TextInput } from "@/components/ui/text-input";
 import { SettingsTextAreaCard } from "@/components/settings-textarea";
 import { SettingsGroup } from "@/components/settings/headings/settings-group";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
 import { settingsStyles } from "@/styles/settings";
 import { useProjects } from "@/hooks/use-projects";
-import type { ProjectEditFormSnapshot } from "@/projects/edit-form";
-import { useProjectIcons } from "@/projects/icons";
-import { createProjectIconTarget } from "@/projects/icon-target";
 import { useHostRuntimeClient, useHostRuntimeSnapshot } from "@/runtime/host-runtime";
-import { useHostFeature } from "@/runtime/host-features";
 import { useToast } from "@/contexts/toast-context";
 import { confirmDialog } from "@/utils/confirm-dialog";
 import {
@@ -229,31 +225,11 @@ function ProjectSettingsBody({
   );
 
   const data = readQuery.data;
-  const supportsCustomIcon = useHostFeature(selectedHost.serverId, "projectCustomIcon");
-  const customIconRevision = selectedHost.customIconRevision ?? null;
-  const projectIconTargets = useMemo(() => {
-    const target = createProjectIconTarget({
-      projectViewKey: project.viewKey,
-      placement: { ...selectedHost, iconWorkingDir: selectedHost.repoRoot },
-    });
-    return target ? [target] : [];
-  }, [project.viewKey, selectedHost]);
-  const projectIcons = useProjectIcons({ projects: projectIconTargets });
-  const projectIconDataUri = projectIcons.get(project.viewKey) ?? null;
-  const editSnapshot = useMemo<ProjectEditFormSnapshot>(
-    () => ({
-      projectName: selectedHost.projectName,
-      projectCustomName: selectedHost.projectCustomName,
-      hasCustomIcon: customIconRevision !== null,
-      currentIconDataUri: projectIconDataUri,
-    }),
-    [
-      customIconRevision,
-      projectIconDataUri,
-      selectedHost.projectCustomName,
-      selectedHost.projectName,
-    ],
-  );
+  const {
+    snapshot: editSnapshot,
+    supportsCustomIcon,
+    iconDataUri: projectIconDataUri,
+  } = useProjectEditSnapshot(project, selectedHost);
   const loadedConfig: PaseoConfigRaw | null = data?.ok ? (data.config ?? {}) : null;
   const loadedRevision: PaseoConfigRevision | null = data?.ok ? data.revision : null;
   const hasUncommittedWorktreeSetupChanges =
@@ -302,6 +278,8 @@ function ProjectSettingsBody({
         client={client}
         supportsCustomIcon={supportsCustomIcon}
         snapshot={editSnapshot}
+        sourceDirectory={selectedHost.repoRoot}
+        hostName={selectedHost.serverName}
       />
 
       {renderContent({

@@ -1,4 +1,5 @@
 import type {
+  AgentContextUsage,
   AgentFeature,
   AgentFeatureSelect,
   AgentFeatureToggle,
@@ -13,6 +14,7 @@ import type { AgentAttachment } from "@getpaseo/protocol/messages";
 import type { PaseoToolCatalog } from "./tools/types.js";
 
 export type {
+  AgentContextUsage,
   AgentFeature,
   AgentFeatureSelect,
   AgentFeatureToggle,
@@ -179,6 +181,7 @@ export interface AgentCapabilityFlags {
   supportsRewindConversation?: boolean;
   supportsRewindFiles?: boolean;
   supportsRewindBoth?: boolean;
+  supportsNativeFork?: boolean;
 }
 
 export interface AgentPersistenceHandle {
@@ -221,6 +224,12 @@ export interface AgentUsage {
   totalCostUsd?: number;
   contextWindowMaxTokens?: number;
   contextWindowUsedTokens?: number;
+}
+
+/** Work the agent left running in the background, such as a shell command or a monitor. */
+export interface AgentBackgroundTask {
+  id: string;
+  description: string;
 }
 
 export const TOOL_CALL_ICON_NAMES = [
@@ -461,6 +470,12 @@ export type AgentStreamEvent =
       type: "provider_subagent";
       provider: AgentProvider;
       event: import("./provider-subagents/store.js").ProviderSubagentInputEvent;
+    }
+  | {
+      /** Every live background task after a change. Replaces the previous set. */
+      type: "background_tasks_changed";
+      provider: AgentProvider;
+      tasks: AgentBackgroundTask[];
     };
 
 export function getAgentStreamEventTurnId(event: AgentStreamEvent): string | undefined {
@@ -697,12 +712,19 @@ export interface AgentSession {
   /** Release live runtime resources without archiving or deleting the durable native session. */
   close(): Promise<void>;
   listCommands?(): Promise<AgentSlashCommand[]>;
+  /** What fills the context window right now; null when there is no live runtime to ask. */
+  getContextUsage?(): Promise<AgentContextUsage | null>;
   setModel?(modelId: string | null): Promise<void>;
   setThinkingOption?(thinkingOptionId: string | null): Promise<void | AgentProviderNotice>;
   setFeature?(featureId: string, value: unknown): Promise<void>;
   revertConversation?(input: { messageId: string }): Promise<void>;
   revertFiles?(input: { messageId: string }): Promise<void>;
   revertBoth?(input: { messageId: string }): Promise<void>;
+  /**
+   * Copy the durable conversation through the turn started by `messageId`, inclusive, into a
+   * new native session and return its handle. This session keeps its handle and keeps running.
+   */
+  forkConversation?(input: { messageId: string }): Promise<AgentPersistenceHandle>;
   /**
    * Out-of-band prompt handler. When non-null, the manager runs the returned
    * handler instead of allocating a turn. The handler emits stream events

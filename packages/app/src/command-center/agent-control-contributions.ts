@@ -8,9 +8,10 @@ import type { ProviderSelectorProvider } from "@/provider-selection/provider-sel
 import { formatAgentModeLabel, formatThinkingOptionLabel } from "@/agent-controls/labels";
 import {
   FAST_MODE_FEATURE_ID,
+  getDisplayedModeId,
   isPlanningAgentMode,
-  PLAN_MODE_FEATURE_ID,
-  resolveNonPlanningModeId,
+  resolvePlanToggle,
+  selectPermissionMode,
 } from "@/agent-controls/policy";
 import type { CommandCenterContribution, CommandCenterIcon } from "./contributions";
 
@@ -196,17 +197,20 @@ function buildThinkingGroup(source: AgentControlContributionSource): CommandCent
 
 function buildModeGroup(source: AgentControlContributionSource): CommandCenterChoiceGroup {
   const modes = source.modes;
+  const selectedId = modes
+    ? getDisplayedModeId(source.ownerKey, modes.options, modes.selectedId)
+    : null;
   const choices = modes
     ? modes.options
         .filter((mode) => !isPlanningAgentMode(mode))
         .map(
           (mode): CommandCenterChoice => ({
             id: mode.id,
-            path: [formatAgentModeLabel(mode)],
+            path: [formatAgentModeLabel(mode, source.provider)],
             icon: source.icons.mode(mode.id),
-            selected: mode.id === modes.selectedId,
+            selected: mode.id === selectedId,
             testId: `command-center-mode-${source.serverId}:${source.ownerKey}:${mode.id}`,
-            select: () => modes.select(mode.id),
+            select: () => selectPermissionMode(source.ownerKey, modes, mode.id),
           }),
         )
     : [];
@@ -242,34 +246,22 @@ function toggleChoices(input: {
 }
 
 function buildPlanModeGroup(source: AgentControlContributionSource): CommandCenterChoiceGroup {
-  const planFeature = source.features.list.find(
-    (feature) => feature.id === PLAN_MODE_FEATURE_ID && feature.type === "toggle",
-  );
-  let choices: CommandCenterChoice[] = [];
-  if (planFeature?.type === "toggle") {
-    choices = toggleChoices({
-      source,
-      key: "plan",
-      icon: source.icons.feature(planFeature),
-      isOn: planFeature.value,
-      turnOn: () => source.features.set(PLAN_MODE_FEATURE_ID, true),
-      turnOff: () => source.features.set(PLAN_MODE_FEATURE_ID, false),
-    });
-  } else if (source.modes) {
-    const modes = source.modes;
-    const planMode = modes.options.find(isPlanningAgentMode);
-    const offModeId = resolveNonPlanningModeId(modes.options, modes.defaultModeId);
-    if (planMode && offModeId) {
-      choices = toggleChoices({
+  const plan = resolvePlanToggle({
+    ownerKey: source.ownerKey,
+    features: source.features.list,
+    setFeature: source.features.set,
+    modes: source.modes,
+  });
+  const choices = plan
+    ? toggleChoices({
         source,
         key: "plan",
-        icon: source.icons.planMode,
-        isOn: modes.selectedId === planMode.id,
-        turnOn: () => modes.select(planMode.id),
-        turnOff: () => modes.select(offModeId),
-      });
-    }
-  }
+        icon: plan.feature ? source.icons.feature(plan.feature) : source.icons.planMode,
+        isOn: plan.isOn,
+        turnOn: plan.turnOn,
+        turnOff: plan.turnOff,
+      })
+    : [];
   return {
     id: "plan-mode",
     rank: GROUP_RANK.planMode,

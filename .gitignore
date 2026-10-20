@@ -95,6 +95,8 @@ app.json
 
 # Heap snapshots dumped by --heapsnapshot-near-heap-limit; keep them for debugging.
 *.heapsnapshot
+/codex-extracted/
+/context-images/
 
 # Project-local Serena configuration and memories.
 .serena/

@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import * as platform from "@/constants/platform";
 import { formatAgentModeLabel, formatThinkingOptionLabel } from "./labels";
 
 describe("formatAgentModeLabel", () => {
@@ -12,6 +13,26 @@ describe("formatAgentModeLabel", () => {
 
   it("splits compact mode ids when no provider label is available", () => {
     expect(formatAgentModeLabel({ id: "auto-review" })).toBe("Auto review");
+  });
+
+  describe("on the Mac desktop", () => {
+    afterEach(() => vi.restoreAllMocks());
+
+    it("names Codex modes the way the Codex app does and keeps other provider labels", () => {
+      vi.spyOn(platform, "getIsElectronMac").mockReturnValue(true);
+      const codex = (id: string) => formatAgentModeLabel({ id, label: id }, "codex");
+      expect(
+        formatAgentModeLabel({ id: "acceptEdits", label: "Accept File Edits" }, "claude"),
+      ).toBe("Accept file edits");
+      expect(codex("auto")).toBe("Ask for review");
+      expect(codex("auto-review")).toBe("Auto-review");
+      expect(formatAgentModeLabel({ id: "build", label: "Build" }, "opencode")).toBe("Build");
+    });
+
+    it("keeps provider labels elsewhere", () => {
+      vi.spyOn(platform, "getIsElectronMac").mockReturnValue(false);
+      expect(formatAgentModeLabel({ id: "auto", label: "Auto mode" }, "claude")).toBe("Auto mode");
+    });
   });
 });
 

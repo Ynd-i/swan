@@ -1,9 +1,19 @@
 import path from "node:path";
 import { expect, type Locator, type Page } from "@playwright/test";
 import { openSettings } from "./app";
+import { isMacUserAgent } from "../../../src/utils/mac-user-agent";
+import { formatShortcut, type ShortcutKey } from "../../../src/utils/format-shortcut";
 import { clickSettingsBackToWorkspace, openSettingsSection } from "./settings";
 
 const APP_SETTINGS_KEY = "@paseo:app-settings";
+
+/** Match the runtime shortcut policy, not the operating system running Playwright. */
+export async function sidebarShortcutLabel(page: Page, keys: ShortcutKey[]): Promise<string> {
+  const mac =
+    (await page.evaluate(() => window.paseoDesktop?.platform === "darwin")) ||
+    (await page.evaluate(isMacUserAgent));
+  return formatShortcut(keys, mac ? "mac" : "non-mac");
+}
 
 /** Persisted nav key -> the testID the app shell renders that item with. */
 const SHELL_ROW_TEST_IDS = {
@@ -17,7 +27,7 @@ export type SidebarNavKey = keyof typeof SHELL_ROW_TEST_IDS;
 
 export interface SidebarNavPreference {
   key: string;
-  visible: boolean;
+  visible?: boolean;
 }
 
 function shellRow(page: Page, key: SidebarNavKey): Locator {
@@ -288,7 +298,9 @@ export async function hoverFooterAddProject(page: Page): Promise<void> {
   await page.locator('[data-testid="sidebar-add-project"]:visible').hover();
   const tooltip = page.getByTestId("sidebar-add-project-tooltip");
   await expect(tooltip.getByText("Add project", { exact: true })).toBeVisible();
-  await expect(tooltip.getByText("Ctrl+O", { exact: true })).toBeVisible();
+  await expect(
+    tooltip.getByText(await sidebarShortcutLabel(page, ["mod", "o"]), { exact: true }),
+  ).toBeVisible();
 }
 
 export async function footerScreenshot(page: Page, name: string): Promise<void> {

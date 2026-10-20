@@ -1,14 +1,23 @@
 import { Text } from "react-native";
-import { forwardRef, useCallback, useMemo, useState, type ComponentProps } from "react";
+import {
+  forwardRef,
+  useCallback,
+  useMemo,
+  useState,
+  type ComponentProps,
+  type MouseEvent,
+} from "react";
 import type {
   CodeBlockRendererProps,
   LinkRendererProps,
   MarkdownRenderers,
 } from "react-native-enriched-markdown";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
-import { useFileLink } from "@/assistant-file-links";
+import { useAssistantFileLinkEnvironment, useFileLink } from "@/assistant-file-links";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { HighlightedCodeBlock } from "@/components/highlighted-code-block";
+import { PullRequestChip, PullRequestHoverCard } from "@/pull-request-links/link";
+import { parsePullRequestLink, type PullRequestLinkTarget } from "@/pull-request-links/parse";
 import type { Theme } from "@/styles/theme";
 import { MermaidFence } from "./fence/mermaid";
 import { markdownLinkSource } from "./source";
@@ -30,7 +39,51 @@ function WebCodeBlock({ code, language }: CodeBlockRendererProps) {
 // The library styles links inline, so a stylesheet :hover rule cannot underline them.
 const LINK_HOVER_STYLE = { textDecoration: "underline" } as const;
 
-function WebLink({ link, anchorProps, children }: LinkRendererProps) {
+function WebLink(props: LinkRendererProps) {
+  // Only a bare URL becomes a chip; authored link text stays as written.
+  const pullRequest =
+    props.link.sourceType === "text" ? parsePullRequestLink(props.link.url) : null;
+  if (pullRequest) return <WebPullRequestLink {...props} target={pullRequest} />;
+  return <WebTextLink {...props} />;
+}
+
+// The chip keeps its anchor so copied Markdown still carries the URL.
+const PULL_REQUEST_ANCHOR_STYLE = { display: "contents" } as const;
+
+function preventAnchorNavigation(event: MouseEvent<HTMLAnchorElement>): void {
+  event.preventDefault();
+}
+
+function WebPullRequestLink({
+  link,
+  anchorProps,
+  target,
+}: LinkRendererProps & { target: PullRequestLinkTarget }) {
+  const { onPress } = useFileLink(markdownLinkSource(link.url, link.sourceType));
+  const { serverId, workspaceRoot } = useAssistantFileLinkEnvironment();
+  const host = useMemo(
+    () => ({ serverId: serverId ?? "", cwd: workspaceRoot ?? "" }),
+    [serverId, workspaceRoot],
+  );
+  return (
+    <PullRequestHoverCard host={host} target={target}>
+      <a
+        {...anchorProps}
+        style={PULL_REQUEST_ANCHOR_STYLE}
+        onClickCapture={preventAnchorNavigation}
+      >
+        <PullRequestChip
+          host={host}
+          target={target}
+          linkStyle={styles.pullRequestLink}
+          onPress={onPress}
+        />
+      </a>
+    </PullRequestHoverCard>
+  );
+}
+
+function WebTextLink({ link, anchorProps, children }: LinkRendererProps) {
   const { tooltipPath, onHoverIn } = useFileLink(markdownLinkSource(link.url, link.sourceType));
   const [hovered, setHovered] = useState(false);
   const handleMouseEnter = useCallback(() => setHovered(true), []);
@@ -86,6 +139,9 @@ const InlineLinkTrigger = forwardRef<HTMLSpanElement, ComponentProps<"span">>(
   },
 );
 const styles = StyleSheet.create((theme) => ({
+  pullRequestLink: {
+    color: theme.colors.link,
+  },
   tooltipPath: {
     color: theme.colors.foreground,
     fontSize: theme.fontSize.sm,

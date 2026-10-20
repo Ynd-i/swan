@@ -4,6 +4,9 @@ import type { Page } from "@playwright/test";
 import { test, expect } from "../../app/e2e/support/fixtures";
 import { gotoAppShell, openSettings } from "../../app/e2e/support/helpers/app";
 import { openSettingsSection } from "../../app/e2e/support/helpers/settings";
+import { getServerId } from "../../app/e2e/support/helpers/server-id";
+import { getE2EDaemonPort } from "../../app/e2e/support/helpers/daemon-port";
+import { installDesktopRuntime } from "./support/runtime";
 
 // Settings > Keyboard Shortcuts is desktop-only (`desktopOnly` in
 // settings-screen.tsx), and the gate reads `getIsElectronRuntime()`, which only
@@ -11,34 +14,22 @@ import { openSettingsSection } from "../../app/e2e/support/helpers/settings";
 // though no `.electron.*` module sits in the surface's import path.
 const SHORTCUTS_ROW = "show-shortcuts";
 
-/**
- * The smallest bridge that makes the app believe it is Electron. The built-in
- * daemon is left unmanaged so the app talks to the E2E daemon instead of trying
- * to start one of its own.
- */
-async function installDesktopBridge(
-  page: Page,
-  platform: "darwin" | "win32" = "darwin",
-): Promise<void> {
-  await page.addInitScript((desktopPlatform) => {
-    window.paseoDesktop = {
-      platform: desktopPlatform,
-      events: { on: () => () => {} },
-      invoke: async (command: string) => {
-        if (command === "get_desktop_settings") {
-          return {
-            releaseChannel: "stable",
-            daemon: { manageBuiltInDaemon: false, keepRunningAfterQuit: true },
-          };
-        }
-        return null;
-      },
-    };
-  }, platform);
-}
-
 async function openShortcutsSettings(page: Page, platform: "darwin" | "win32" = "darwin") {
-  await installDesktopBridge(page, platform);
+  await installDesktopRuntime(page, {
+    platform,
+    serverId: getServerId(),
+    manageBuiltInDaemon: false,
+    daemonListen: `127.0.0.1:${getE2EDaemonPort()}`,
+  });
+  if (platform === "win32") {
+    // Keep the browser half of shortcut-platform consistent with the bridge.
+    await page.addInitScript(() => {
+      Object.defineProperty(navigator, "platform", { get: () => "Win32" });
+      Object.defineProperty(navigator, "userAgent", {
+        get: () => "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+      });
+    });
+  }
   await gotoAppShell(page);
   await openSettings(page);
   await openSettingsSection(page, "shortcuts");
@@ -59,7 +50,7 @@ async function openRowMenu(page: Page) {
 /** Reachable from the sidebar even when the cheat sheet's own shortcut is gone. */
 async function openCheatSheet(page: Page) {
   await gotoAppShell(page);
-  await page.getByTestId("sidebar-help").click();
+  await page.getByTestId("desktop-shell-rail").getByTestId("sidebar-help").click();
   await expect(page.getByTestId("sidebar-help-menu")).toBeVisible();
   await page.getByTestId("sidebar-help-shortcuts").click();
   const dialog = page.getByTestId("keyboard-shortcuts-dialog");
@@ -153,6 +144,7 @@ test("unassigning a shortcut leaves it inert until it is reset", async ({ page }
     await expect(row.getByText("Not set", { exact: true })).toBeVisible();
     await expect(help.getByText("?", { exact: true })).toHaveCount(0);
     await page.keyboard.press("Escape");
+    await expect(dialog).not.toBeVisible();
     await openSettings(page);
     await openSettingsSection(page, "shortcuts");
 
@@ -166,6 +158,7 @@ test("unassigning a shortcut leaves it inert until it is reset", async ({ page }
     await expect(reboundRow.getByText("⌥⇧K", { exact: true })).toBeVisible();
     await expect(reboundRow.getByText("?", { exact: true })).toHaveCount(0);
     await page.keyboard.press("Escape");
+    await expect(dialog).not.toBeVisible();
     await openSettings(page);
     await openSettingsSection(page, "shortcuts");
   });
@@ -260,4 +253,54 @@ test("rebinding Jump to tab preserves the number group after reload", async ({
   await openSettings(page);
   await openSettingsSection(page, "shortcuts");
   await expectTabNumberRange(page);
+});
+
+test("shortcut settings search follows current bindings and retains editing controls", async ({
+  page,
+}, testInfo) => {
+  await openShortcutsSettings(page);
+  const search = page.getByTestId("settings-shortcuts-search");
+  const clearSearch = page.getByTestId("settings-shortcuts-search-clear");
+  const interrupt = page.getByText("Interrupt agent", { exact: true });
+  const row = interrupt.locator("..");
+  const initialRows = await page.getByRole("button", { name: /^Actions for / }).count();
+  const defaultRow = await row.innerText();
+  await expect(search).toBeVisible();
+  await search.fill("Interrupt agent");
+  await expect(interrupt).toBeVisible();
+  await expect(page.getByText("Archive workspace", { exact: true })).toHaveCount(0);
+
+  await captureShortcut(page, "Interrupt agent", "agent-interrupt", "Alt+Shift+J");
+  await finishInterruptCapture(page, "Done");
+  await search.fill("alt+shift+j");
+  await expect(interrupt).toBeVisible();
+  await captureShortcut(page, "Interrupt agent", "agent-interrupt", "Alt+Shift+L");
+  await finishInterruptCapture(page, "Done");
+  await expect(interrupt).toHaveCount(0);
+  await expect(page.getByText("No results found", { exact: true })).toBeVisible();
+  await search.fill("alt+shift+l");
+  await expect(interrupt).toBeVisible();
+  await clearSearch.click();
+  await expect(search).toHaveValue("");
+  await expect(page.getByRole("button", { name: /^Actions for / })).toHaveCount(initialRows);
+
+  await search.fill("no-such-shortcut-qa");
+  await expect(page.getByText("No results found", { exact: true })).toBeVisible();
+  await clearSearch.click();
+  await search.fill("Interrupt agent");
+  await page.getByRole("button", { name: "Actions for Interrupt agent" }).click();
+  await page.getByTestId("shortcut-reset-agent-interrupt").click();
+  await expect(row).toHaveText(defaultRow, { useInnerText: true });
+
+  await captureShortcut(page, "Interrupt agent", "agent-interrupt", "Alt+Shift+L");
+  await search.click();
+  await expect(row.getByRole("button", { name: "Cancel", exact: true })).toHaveCount(0);
+  await search.fill("alt+shift+l");
+  await expect(interrupt).toHaveCount(0);
+  await clearSearch.click();
+  await expect(row).toHaveText(defaultRow, { useInnerText: true });
+  await expect(
+    page.getByText("Unable to load desktop daemon status.", { exact: true }),
+  ).toHaveCount(0);
+  await page.screenshot({ path: testInfo.outputPath("settings-shortcuts-search.png") });
 });

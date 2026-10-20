@@ -1,7 +1,7 @@
 import React, { memo, useCallback, useMemo, type ReactNode } from "react";
 import { View } from "react-native";
-import { StyleSheet, withUnistyles } from "react-native-unistyles";
-import { SPACING, type Theme } from "@/styles/theme";
+import { StyleSheet } from "react-native-unistyles";
+import { CHAT_MESSAGE_HORIZONTAL_PADDING, SPACING } from "@/styles/theme";
 import type { TurnTiming } from "@/timeline/turn-time";
 import type { StreamItem } from "@/types/stream";
 import {
@@ -20,8 +20,6 @@ import { AssistantForkMenu } from "@/components/assistant-fork-menu";
 import { SyncedLoader } from "@/components/synced-loader";
 import { useRetainedPanelActive } from "@/components/retained-panel";
 
-const ThemedSyncedLoader = withUnistyles(SyncedLoader);
-const workingIndicatorColorMapping = (theme: Theme) => ({ color: theme.colors.foreground });
 export const TURN_FOOTER_BOTTOM_SPACING = SPACING[8];
 
 export type TurnContentStrategy = StreamStrategy;
@@ -123,7 +121,7 @@ const WorkingIndicator = memo(function WorkingIndicator({
   return (
     <View style={stylesheet.turnFooterContent}>
       <View style={stylesheet.workingLoader}>
-        <ThemedSyncedLoader size={14} uniProps={workingIndicatorColorMapping} />
+        <SyncedLoader />
       </View>
       {/* Match the completed-turn footer: actions precede timing metadata. */}
       {onForkInFlightTurn ? <AssistantForkMenu onFork={onForkInFlightTurn} /> : null}
@@ -216,7 +214,7 @@ const stylesheet = StyleSheet.create((theme) => ({
     width: "100%",
     maxWidth: theme.contentMaxWidth,
     alignSelf: "center",
-    paddingHorizontal: theme.spacing[2],
+    paddingHorizontal: CHAT_MESSAGE_HORIZONTAL_PADDING,
   },
   turnFooterRow: {
     marginTop: theme.spacing[2] + 5,

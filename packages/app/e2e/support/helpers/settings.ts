@@ -225,7 +225,13 @@ export async function expectSettingsBackButton(page: Page): Promise<void> {
 }
 
 export async function clickSettingsBackToWorkspace(page: Page): Promise<void> {
-  await page.getByTestId("settings-back-to-workspace").click();
+  // The Mac settings header has no back button; the titlebar Back leaves settings.
+  await page
+    .getByTestId("settings-back-to-workspace")
+    .or(page.getByTestId("desktop-shell-back"))
+    .filter({ visible: true })
+    .first()
+    .click();
 }
 
 export async function expectHostSettingsUrl(page: Page, serverId: string): Promise<void> {

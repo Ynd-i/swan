@@ -91,7 +91,11 @@ import {
   type CodexThreadRollbackResponse,
   type CodexAppServerTraceContext,
 } from "./codex/app-server-transport.js";
-import { type CodexUserMessageTurnIndex, revertCodexConversation } from "./codex/rewind.js";
+import {
+  type CodexUserMessageTurnIndex,
+  forkCodexConversation,
+  revertCodexConversation,
+} from "./codex/rewind.js";
 import {
   materializeProviderImage,
   renderProviderImageOutputAsAssistantMarkdown,
@@ -239,6 +243,7 @@ const CODEX_APP_SERVER_CAPABILITIES: AgentCapabilityFlags = {
   supportsRewindConversation: true,
   supportsRewindFiles: false,
   supportsRewindBoth: false,
+  supportsNativeFork: true,
 };
 
 const CODEX_MODES: AgentMode[] = [
@@ -4972,6 +4977,45 @@ export class CodexAppServerAgentSession implements AgentSession {
         this.reconcileAsyncQuestionsAfterRewind();
       },
     });
+  }
+
+  async forkConversation(input: { messageId: string }): Promise<AgentPersistenceHandle> {
+    await this.connect();
+    const source = this.describePersistence();
+    if (!source) {
+      throw new Error("Codex thread is not ready for fork");
+    }
+    const turnId = this.codexUserMessageTurns().resolve(input.messageId)?.turnId;
+    if (!turnId) {
+      throw new Error(`Codex could not find the turn containing user message ${input.messageId}`);
+    }
+    // The process that forks keeps the new thread loaded as its writer, which blocks the child
+    // agent's own resume. Fork in a short-lived process so its exit releases the thread.
+    const client = new CodexAppServerClient(await this.spawnAppServer(), this.logger);
+    let threadId: string;
+    try {
+      await client.request("initialize", buildCodexAppServerInitializeParams());
+      client.notify("initialized", {});
+      threadId = await forkCodexConversation({
+        client,
+        threadId: source.sessionId,
+        lastTurnId: turnId,
+        cwd: this.config.cwd ?? null,
+        model: this.config.model ?? null,
+        serviceTier: this.serviceTier,
+        config: this.buildCodexInnerConfig(),
+      });
+    } finally {
+      await client.dispose();
+    }
+    // Pending async questions belong to the source thread.
+    const { asyncQuestions: _asyncQuestions, ...metadata } = source.metadata;
+    return {
+      provider: CODEX_PROVIDER,
+      sessionId: threadId,
+      nativeHandle: threadId,
+      metadata: { ...metadata, threadId },
+    };
   }
 
   async interrupt(): Promise<void> {

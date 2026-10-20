@@ -2,6 +2,7 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { UUID } from "builder-util-runtime";
+import { app } from "electron";
 import { describe, expect, it, vi } from "vitest";
 
 const { autoUpdaterMock } = vi.hoisted(() => {
@@ -29,6 +30,7 @@ vi.mock("electron", () => ({
   app: {
     getPath: vi.fn(),
     isPackaged: true,
+    getName: vi.fn(() => "Paseo"),
   },
 }));
 
@@ -40,6 +42,9 @@ import {
   bucketFromStagingUserId,
   checkForAppUpdate,
   createAppUpdateLifecycleLogger,
+  downloadAndInstallUpdate,
+  installAppUpdateOnQuit,
+  releaseTagOfUpdateVersion,
   resolveStagingUserId,
   rolloutManifestSchema,
   shouldAdmitToRollout,
@@ -47,6 +52,48 @@ import {
 } from "./auto-updater";
 
 describe("checkForAppUpdate", () => {
+  it("blocks custom builds before checking, downloading, stopping the daemon or installing", async () => {
+    // Even an already downloaded upstream artifact must never be installed.
+    autoUpdaterMock.checkForUpdates.mockResolvedValueOnce({
+      isUpdateAvailable: true,
+      updateInfo: { version: "1.2.4" },
+    });
+    await checkForAppUpdate({
+      currentVersion: "1.2.3",
+      releaseChannel: "stable",
+      intent: "manual",
+    });
+    autoUpdaterMock.handlers.get("update-downloaded")?.({ version: "1.2.4" });
+    vi.mocked(app.getName).mockReturnValue("Swan");
+    autoUpdaterMock.checkForUpdates.mockClear();
+    autoUpdaterMock.downloadUpdate.mockClear();
+    autoUpdaterMock.quitAndInstall.mockClear();
+    const beforeQuit = vi.fn();
+    const input = { currentVersion: "1.2.3", releaseChannel: "stable" as const };
+    try {
+      const check = await checkForAppUpdate({ ...input, intent: "manual" });
+      expect(check.hasUpdate).toBe(false);
+      expect(check.readyToInstall).toBe(false);
+      expect(check.errorMessage).toBe(
+        "Automatic updates are disabled for custom builds. Install a new custom build manually.",
+      );
+      expect(await downloadAndInstallUpdate(input, beforeQuit)).toEqual({
+        installed: false,
+        version: "1.2.3",
+        message: check.errorMessage,
+      });
+      expect(await installAppUpdateOnQuit({ ...input, signal: new AbortController().signal })).toBe(
+        false,
+      );
+      expect(autoUpdaterMock.checkForUpdates).not.toHaveBeenCalled();
+      expect(autoUpdaterMock.downloadUpdate).not.toHaveBeenCalled();
+      expect(autoUpdaterMock.quitAndInstall).not.toHaveBeenCalled();
+      expect(beforeQuit).not.toHaveBeenCalled();
+    } finally {
+      vi.mocked(app.getName).mockReturnValue("Paseo");
+    }
+  });
+
   it("treats an unpublished channel manifest as an unavailable update", async () => {
     const error = Object.assign(new Error("Cannot find latest-mac.yml"), {
       code: "ERR_UPDATER_CHANNEL_FILE_NOT_FOUND",
@@ -139,6 +186,17 @@ describe("checkForAppUpdate", () => {
       isSilent: false,
       isForceRunAfter: true,
     });
+  });
+});
+
+describe("releaseTagOfUpdateVersion", () => {
+  it("reverses the stamps of custom-release.mjs", () => {
+    expect(releaseTagOfUpdateVersion("0.11.0-beta.3.custom.1.beta.7")).toBe(
+      "v0.11.0-beta.3-v1-beta7",
+    );
+    expect(releaseTagOfUpdateVersion("0.11.0-custom.2.beta.1")).toBe("v0.11.0-v2-beta1");
+    expect(releaseTagOfUpdateVersion("0.11.0-custom.2.stable")).toBe("v0.11.0-v2");
+    expect(releaseTagOfUpdateVersion("0.11.0-beta.3")).toBeNull();
   });
 });
 

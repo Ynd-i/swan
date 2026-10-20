@@ -31,7 +31,7 @@ import { HorizontalScroll } from "./horizontal-scroll.web";
 import { buildDiffDocumentModel, FILE_HEADER_HEIGHT, resolveRelayoutScrollTop } from "./model";
 import { paintWebFileHeader, paintWebViewport } from "./paint.web";
 import { hasPointerDragStarted } from "./pointer-gesture";
-import { createMeasuredAdvances } from "./text-measurement";
+import { createWebTextMeasurer, webDiffFont } from "./typography.web";
 import { retainDiffViewport } from "./viewport";
 import type {
   DiffHit,
@@ -39,7 +39,6 @@ import type {
   DiffSelection,
   DiffSurfaceProps,
   DiffTypography,
-  TextMeasurer,
 } from "./types";
 import { useDiffDocumentWorkspaceCache } from "./workspace-cache";
 
@@ -125,10 +124,11 @@ export function DiffSurface(props: DiffSurfaceProps) {
   const desiredTypography = useMemo<DiffTypography>(
     () => ({
       family,
+      weight: props.codeFontWeight ?? "400",
       size: props.displayPreferences.codeFontSize,
       lineHeight: Math.round(props.displayPreferences.codeFontSize * 1.5),
     }),
-    [family, props.displayPreferences.codeFontSize],
+    [family, props.codeFontWeight, props.displayPreferences.codeFontSize],
   );
   const typographyResource = useMemo(
     () =>
@@ -136,7 +136,7 @@ export function DiffSurface(props: DiffSurfaceProps) {
         typography: desiredTypography,
         load: async () => {
           await Promise.all([
-            document.fonts.load(`400 ${desiredTypography.size}px ${desiredTypography.family}`),
+            document.fonts.load(webDiffFont(desiredTypography)),
             document.fonts.load(`600 ${desiredTypography.size}px ${desiredTypography.family}`),
             document.fonts.load(
               `400 ${props.headerTypography.size}px ${props.headerTypography.family}`,
@@ -797,6 +797,7 @@ export function DiffSurface(props: DiffSurfaceProps) {
       ...CANVAS_STYLE,
       fontFamily: (loadedTypography ?? desiredTypography).family,
       fontSize: (loadedTypography ?? desiredTypography).size,
+      fontWeight: (loadedTypography ?? desiredTypography).weight,
     }),
     [desiredTypography, loadedTypography],
   );
@@ -1154,17 +1155,4 @@ function emptyDiffDocumentModel(input: {
     viewportWidth: input.viewportWidth,
     reviewGeometryKey: "",
   };
-}
-
-function createWebTextMeasurer(typography: DiffTypography): TextMeasurer {
-  const canvas = document.createElement("canvas");
-  const context = canvas.getContext("2d");
-  if (!context) return { measure: () => 0 };
-  const measure = (text: string, weight: "regular" | "semibold" = "regular") => {
-    context.font = `${weight === "semibold" ? 600 : 400} ${typography.size}px ${typography.family}`;
-    return context.measureText(text).width;
-  };
-  // Canvas exposes no glyph coverage, so `requiresShaping` alone decides which
-  // runs a shaper has to see -- there is no `glyphIds` to fall back on.
-  return { measure, measureAdvances: createMeasuredAdvances((text) => measure(text)) };
 }

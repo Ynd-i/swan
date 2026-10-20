@@ -35,6 +35,7 @@ vi.mock("react-native-unistyles", () => ({
 vi.mock("@/constants/platform", () => ({
   isWeb: true,
   isNative: false,
+  getIsElectronMac: () => false,
 }));
 
 vi.mock("@/components/adaptive-modal-sheet", async () => {

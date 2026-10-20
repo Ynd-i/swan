@@ -137,7 +137,7 @@ function visible(page: Page, testID: string): Locator {
   return page.locator(`[data-testid="${testID}"]:visible`).first();
 }
 
-/** The sidebar footer's Usage item: each summary window with data. */
+/** The sidebar footer's Usage item: the most constrained summary window with data. */
 export function usageItem(page: Page): Locator {
   return visible(page, "sidebar-usage");
 }
@@ -147,10 +147,12 @@ export function usageModal(page: Page): Locator {
   return visible(page, "usage-modal-body");
 }
 
-/** Each pinned window as it reads: its percent and short label, "31% 5h". */
-export async function expectPinnedUsage(page: Page, windows: string[]): Promise<void> {
-  const pinned = usageItem(page).getByTestId("sidebar-usage-pinned-window");
-  await expect(pinned).toHaveText(windows);
+/** The summary as it reads: the most constrained window, "54% wk", and "+N" other sources. */
+export async function expectPinnedUsage(page: Page, top: string, more = 0): Promise<void> {
+  await expect(usageItem(page).getByTestId("sidebar-usage-pinned-window")).toHaveText(top);
+  const extra = usageItem(page).getByTestId("sidebar-usage-more");
+  if (more > 0) await expect(extra).toHaveText(`+${more}`);
+  else await expect(extra).toHaveCount(0);
 }
 
 /** Without a summary window with data the footer has no Usage item, only the Usage icon. */

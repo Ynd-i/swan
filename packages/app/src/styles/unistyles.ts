@@ -1,5 +1,5 @@
 import { StyleSheet } from "react-native-unistyles";
-import { REGISTERED_THEMES } from "./theme";
+import { REGISTERED_THEMES } from "./registered-themes";
 
 StyleSheet.configure({
   themes: REGISTERED_THEMES,

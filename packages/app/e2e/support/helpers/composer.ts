@@ -6,7 +6,7 @@ import { gotoAppShell } from "./app";
 import { connectWorkspaceSetupClient } from "./workspace-setup";
 import { selectWorkspaceInSidebar } from "./sidebar";
 import { getServerId } from "./server-id";
-import { waitForTabBar } from "./launcher";
+import { waitForWorkspaceReady } from "./launcher";
 import { waitForSettledPosition } from "./sheet-layout";
 import { installDaemonWebSocketGate } from "./daemon-websocket-gate";
 
@@ -314,7 +314,7 @@ export async function openGithubWorkspace(
   const workspace = createdWorkspace.workspace;
   await gotoAppShell(page);
   await selectWorkspaceInSidebar(page, workspace.id);
-  await waitForTabBar(page);
+  await waitForWorkspaceReady(page);
   return {
     cleanup: async () => {
       await client.removeProject(workspace.projectId).catch(() => undefined);

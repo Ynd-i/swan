@@ -1,8 +1,149 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { createWebTextMeasurer, webDiffFont } from "./typography.web";
 import { paintWebViewport } from "./paint.web";
 import type { DiffCell, DiffDocumentModel, DiffLineRow, DiffPalette, DiffSelection } from "./types";
 
+describe("web diff typography", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("measures code and grapheme advances using the same selected face as painting", () => {
+    const context = {
+      font: "",
+      measureText(text: string) {
+        return { width: (text.length * Number.parseInt(this.font, 10)) / 100 };
+      },
+    };
+    vi.stubGlobal("document", { createElement: () => ({ getContext: () => context }) });
+    const typography = { family: "monospace", size: 12, lineHeight: 18, weight: "500" as const };
+    const measurer = createWebTextMeasurer(typography);
+    expect(measurer.measure("fi")).toBe(10);
+    expect(context.font).toBe(webDiffFont(typography));
+    expect(measurer.measureAdvances?.(["a", "b"])).toEqual([5, 10]);
+    expect(measurer.measure("fi", "semibold")).toBe(12);
+    expect(context.font).toBe("600 12px monospace");
+    expect(webDiffFont({ family: "monospace", size: 12, lineHeight: 18 })).toBe(
+      "400 12px monospace",
+    );
+  });
+});
+
 describe("web diff text shaping", () => {
+  it("paints measured intraline spans behind text without entering inline-review space", () => {
+    const fills: Array<[string, number, number, number, number]> = [];
+    const context = {
+      fillStyle: "",
+      font: "",
+      textBaseline: "alphabetic",
+      setTransform() {},
+      clearRect() {},
+      save() {},
+      restore() {},
+      beginPath() {},
+      rect() {},
+      clip() {},
+      fillText() {},
+      fillRect(x: number, y: number, width: number, height: number) {
+        fills.push([this.fillStyle, x, y, width, height]);
+      },
+    };
+    const row = modelWithReview.rows[0] as DiffLineRow;
+    const cell = row.cells[0]!;
+    paintWebViewport({
+      context: context as unknown as CanvasRenderingContext2D,
+      model: {
+        ...modelWithReview,
+        rows: [{ ...row, cells: [{ ...cell, intralineRanges: [{ start: 0, end: 1 }] }] }],
+      },
+      palette: { ...palette, additionInlineBackground: "inline" },
+      typography: { family: "monospace", size: 12, lineHeight: 18 },
+      headerTypography,
+      measureText: { measure: () => 0 },
+      scrollTop: 0,
+      viewportWidth: 200,
+      viewportHeight: 100,
+      horizontalOffsets: new Map(),
+      selection: null,
+      activeHeaderPath: null,
+      devicePixelRatio: 1,
+    });
+    expect(fills.filter(([color]) => color === "inline")).toEqual([["inline", 28, 0, 10, 18]]);
+  });
+
+  it("paints changed gutters and clips empty-side stripes above inline reviews", () => {
+    const fills: Array<[string, number, number, number, number]> = [];
+    const clips: number[][] = [];
+    const strokes: string[] = [];
+    const context = {
+      fillStyle: "",
+      strokeStyle: "",
+      font: "",
+      textBaseline: "alphabetic",
+      lineWidth: 1,
+      setTransform() {},
+      clearRect() {},
+      save() {},
+      restore() {},
+      beginPath() {},
+      clip() {},
+      fillText() {},
+      moveTo() {},
+      lineTo() {},
+      fillRect(x: number, y: number, width: number, height: number) {
+        fills.push([this.fillStyle, x, y, width, height]);
+      },
+      rect(...bounds: number[]) {
+        clips.push(bounds);
+      },
+      stroke() {
+        strokes.push(this.strokeStyle);
+      },
+    };
+    const base = createSelectionModel("split");
+    const first = base.rows[0] as DiffLineRow;
+    const decorated: DiffDocumentModel = {
+      ...base,
+      rows: [
+        first,
+        {
+          ...first,
+          index: 1,
+          top: 18,
+          height: 28,
+          reviewHeight: 10,
+          cells: [null, selectionCell("new")],
+        },
+      ],
+      files: [{ ...base.files[0]!, bodyHeight: 46, bottom: 46, rowEnd: 2 }],
+      height: 46,
+    };
+    paintWebViewport({
+      context: context as unknown as CanvasRenderingContext2D,
+      model: decorated,
+      palette: {
+        ...palette,
+        additionGutterBackground: "green-gutter",
+        deletionGutterBackground: "red-gutter",
+        emptyStripe: "stripe",
+      },
+      typography: { family: "monospace", size: 12, lineHeight: 18 },
+      headerTypography,
+      measureText: { measure: () => 6 },
+      scrollTop: 0,
+      viewportWidth: 200,
+      viewportHeight: 60,
+      horizontalOffsets: new Map(),
+      selection: null,
+      activeHeaderPath: null,
+      devicePixelRatio: 1,
+    });
+    expect(fills).toContainEqual(["red-gutter", 0, 0, 20, 18]);
+    expect(fills).toContainEqual(["red", 0, 0, 4, 18]);
+    expect(fills).toContainEqual(["green-gutter", 100, 18, 20, 18]);
+    expect(fills).toContainEqual(["green", 100, 18, 4, 18]);
+    expect(strokes).toContain("stripe");
+    expect(clips).toContainEqual([0, 18, 100, 18]);
+  });
+
   it("matches the 30px file-header alignment rails exactly", () => {
     const fills: Array<{ color: string; x: number; y: number; width: number; height: number }> = [];
     const labels: Array<{ text: string; x: number; y: number; color: string; font: string }> = [];
@@ -69,7 +210,7 @@ describe("web diff text shaping", () => {
         height: 48,
       },
       palette,
-      typography: { family: "monospace", size: 12, lineHeight: 18 },
+      typography: { family: "monospace", size: 12, lineHeight: 18, weight: "600" },
       headerTypography: { family: "system-ui", size: 14, statSize: 12 },
       measureText: { measure: () => 0 },
       scrollTop: 0,
@@ -81,6 +222,10 @@ describe("web diff text shaping", () => {
       activeHeaderPath: null,
     });
 
+    expect(labels.filter((label) => label.text === "fi")).toEqual([
+      expect.objectContaining({ font: "600 12px monospace" }),
+      expect.objectContaining({ font: "600 12px monospace" }),
+    ]);
     expect(
       fills.filter((fill) => fill.color === "header" || fill.color === "header-border"),
     ).toEqual([

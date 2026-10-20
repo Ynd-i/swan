@@ -39,6 +39,7 @@ import {
 import { useWorkspaceSetupStore } from "@/stores/workspace-setup-store";
 import { sendOsNotification } from "@/utils/os-notifications";
 import { getIsAppActivelyVisible, getIsAppVisible } from "@/utils/app-visibility";
+import { getIsElectron } from "@/constants/platform";
 import {
   getInitKey,
   getInitDeferred,
@@ -279,7 +280,8 @@ function SessionProviderInternal({ children, serverId, client }: SessionProvider
       }
       const isActivelyVisible = getIsAppActivelyVisible(appState);
       const isAwayFromAgent = !isActivelyVisible || attentionFocusedAgentId !== params.agentId;
-      if (!isAwayFromAgent) {
+      // Desktop notifies like Codex: whether or not the chat is in view.
+      if (!isAwayFromAgent && !getIsElectron()) {
         return;
       }
 
@@ -527,7 +529,9 @@ function SessionProviderInternal({ children, serverId, client }: SessionProvider
     const unsubAgentAttention = onFeed("agent_attention_required", (message) => {
       if (message.type !== "agent_attention_required") return;
       const notification = message.payload;
-      if (notification.shouldNotify) {
+      // The daemon picks one present, unfocused client; desktop ignores that so it also
+      // notifies while idle or viewing the chat. The main process collapses repeats per window.
+      if (notification.shouldNotify || getIsElectron()) {
         notifyAgentAttention(notification);
       }
     });

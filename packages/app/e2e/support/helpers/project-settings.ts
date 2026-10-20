@@ -36,7 +36,11 @@ function getSessionMessage(message: WebSocketMessage): Record<string, unknown> |
 export async function openProjects(page: Page): Promise<void> {
   await gotoAppShell(page);
   await openSettings(page);
-  await page.getByRole("button", { name: "Projects", exact: true }).click();
+  // The macOS chat sidebar also has a Projects section toggle.
+  await page
+    .getByTestId("settings-sidebar")
+    .getByRole("button", { name: "Projects", exact: true })
+    .click();
   await expect(page).toHaveURL(buildProjectsSettingsRoute(getServerId()));
 }
 

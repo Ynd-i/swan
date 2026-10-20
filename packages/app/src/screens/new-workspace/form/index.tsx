@@ -1,11 +1,19 @@
-import { useCallback, useMemo, type ReactElement, type ReactNode, type RefObject } from "react";
-import { View } from "react-native";
+import {
+  useCallback,
+  useMemo,
+  useState,
+  type ReactElement,
+  type ReactNode,
+  type RefObject,
+} from "react";
+import { Pressable, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import { StyleSheet } from "react-native-unistyles";
 import type { TerminalProfile } from "@getpaseo/protocol/messages";
 import { Combobox, type ComboboxOption, type ComboboxProps } from "@/components/ui/combobox";
 import { HostStatusDot } from "@/components/host-status-dot";
 import { HostPicker } from "@/components/hosts/host-picker";
+import { getIsElectronMac } from "@/constants/platform";
 import type { LaunchTarget } from "@/new-workspace-launch/target";
 import type { HostProjectListItem } from "@/projects/host-projects";
 import type { HostProfile } from "@/types/host-connection";
@@ -16,9 +24,15 @@ import {
   FieldTrigger,
   type FieldTriggerVariant,
 } from "./field-trigger";
-import { branchIcon, folderIcon, ProjectIcon, pullRequestIcon } from "./icons";
+import { branchIcon, clearIcon, folderIcon, ProjectIcon, pullRequestIcon } from "./icons";
 import { LaunchControl } from "./launch-control";
-import { AddProjectOption, IsolationOption, ProjectOption, RefOption } from "./options";
+import {
+  AddProjectOption,
+  IsolationOption,
+  LocalBranchOption,
+  ProjectOption,
+  RefOption,
+} from "./options";
 
 type Isolation = "local" | "worktree";
 type RenderOption = NonNullable<ComboboxProps["renderOption"]>;
@@ -45,6 +59,10 @@ export interface NewWorkspaceFormProps {
     supportsWorkspaceMultiplicity: boolean;
     onSelect: (id: string) => void;
     onAddProject: () => void;
+    /** No project chosen: the chat gets its own folder. */
+    cleared: boolean;
+    canClear: boolean;
+    onClear: () => void;
   };
   host: PickerControl & {
     allHosts: HostProfile[];
@@ -69,6 +87,17 @@ export interface NewWorkspaceFormProps {
     emptyText: string;
     showRefPicker: boolean;
   };
+  /** Local isolation: switches the project checkout's branch. Null when not on a branch. */
+  localBranch:
+    | (PickerControl & {
+        currentBranch: string;
+        /** The current branch, or the target branch while a switch is in flight. */
+        triggerLabel: string;
+        disabled: boolean;
+        options: ComboboxOption[];
+        onSelect: (id: string) => void;
+      })
+    | null;
   launch: {
     serverId: string;
     target: LaunchTarget;
@@ -150,6 +179,67 @@ function useIsolationPicker(
   return { options, onSelect: handleSelect, renderOption };
 }
 
+/** The Mac desktop clears the project from its badge on hover, so the chat gets its own folder. */
+function ProjectField({
+  project,
+  isPending,
+  variant,
+  icon,
+}: {
+  project: NewWorkspaceFormProps["project"];
+  isPending: boolean;
+  variant: FieldTriggerVariant;
+  icon: ReactNode;
+}): ReactElement {
+  const { t } = useTranslation();
+  // Hover lives on the plain wrapper (docs/hover.md) so the clear button inside the badge keeps it.
+  const [hovered, setHovered] = useState(false);
+  const handlePointerEnter = useCallback(() => setHovered(true), []);
+  const handlePointerLeave = useCallback(() => setHovered(false), []);
+  const { onClear } = project;
+  const clearLabel = t("newWorkspace.fields.clearProject");
+  const clearButton = useMemo(
+    () => (
+      <Pressable
+        testID="new-workspace-project-clear"
+        onPress={onClear}
+        accessibilityRole="button"
+        accessibilityLabel={clearLabel}
+      >
+        {clearIcon}
+      </Pressable>
+    ),
+    [clearLabel, onClear],
+  );
+  // Chat folders are only hidden from the Mac desktop sidebar.
+  const showClear =
+    project.canClear &&
+    getIsElectronMac() &&
+    hovered &&
+    !isPending &&
+    project.selectedProject !== null;
+  return (
+    <View
+      style={styles.projectField}
+      onPointerEnter={handlePointerEnter}
+      onPointerLeave={handlePointerLeave}
+    >
+      <FieldTrigger
+        ref={project.anchorRef}
+        variant={variant}
+        label={t("newWorkspace.fields.project")}
+        accessibilityLabel="Workspace project"
+        tooltip={t("newWorkspace.tooltips.project")}
+        icon={showClear ? clearButton : icon}
+        value={project.cleared ? t("newWorkspace.fields.noProject") : project.triggerLabel}
+        onPress={project.open}
+        disabled={isPending}
+        testID="new-workspace-project-picker-trigger"
+      />
+    </View>
+  );
+}
+
 function useRefRenderOption(itemById: Map<string, PickerItem>, isPending: boolean): RenderOption {
   return useCallback<RenderOption>(
     (row) => <RefOption {...row} item={itemById.get(row.option.id)} disabled={isPending} />,
@@ -162,13 +252,20 @@ function useRefRenderOption(itemById: Map<string, PickerItem>, isPending: boolea
  * of full-width fields with the label inside. Desktop: one meta row of badges. Either way, a field
  * that does not apply to the selected project is left out, and Host only shows with a second host.
  */
+// oxlint-disable-next-line complexity -- upstream fields plus the Mac branch, placement and launch branches
 export function useNewWorkspaceForm(props: NewWorkspaceFormProps): ReactElement {
   const { t } = useTranslation();
-  const { isCompact, isPending, project, host, isolation, base, launch } = props;
+  const { isCompact, isPending, project, host, isolation, base, localBranch, launch } = props;
   const variant: FieldTriggerVariant = isCompact ? "field" : "badge";
+  const macDesktop = getIsElectronMac();
+  const desktopPlacement = macDesktop ? "top-start" : "bottom-start";
   const projectPicker = useProjectPicker(project, isPending);
   const isolationPicker = useIsolationPicker(isolation, isPending);
   const renderRefOption = useRefRenderOption(base.itemById, isPending);
+  const renderLocalBranchOption = useCallback<RenderOption>(
+    (row) => <LocalBranchOption {...row} disabled={isPending} />,
+    [isPending],
+  );
 
   const showHost = host.allHosts.length > 1;
   const selectedHostLabel =
@@ -179,7 +276,8 @@ export function useNewWorkspaceForm(props: NewWorkspaceFormProps): ReactElement 
     : null;
   const projectIcon = useMemo(
     () =>
-      selectedProject ? (
+      // Like Codex, the Mac desktop shows a project's favicon or a folder.
+      selectedProject && (selectedProjectIconUri || !macDesktop) ? (
         <ProjectIcon
           projectViewKey={selectedProject.viewKey}
           projectName={selectedProject.projectName}
@@ -188,7 +286,7 @@ export function useNewWorkspaceForm(props: NewWorkspaceFormProps): ReactElement 
       ) : (
         folderIcon
       ),
-    [selectedProject, selectedProjectIconUri],
+    [macDesktop, selectedProject, selectedProjectIconUri],
   );
   const hostIcon = useMemo(
     () => <HostStatusDot serverId={host.selectedServerId} />,
@@ -201,18 +299,7 @@ export function useNewWorkspaceForm(props: NewWorkspaceFormProps): ReactElement 
   const refIcon = base.selectedItem?.kind === "github-pr" ? pullRequestIcon : branchIcon;
 
   const projectField = (
-    <FieldTrigger
-      ref={project.anchorRef}
-      variant={variant}
-      label={t("newWorkspace.fields.project")}
-      accessibilityLabel="Workspace project"
-      tooltip={t("newWorkspace.tooltips.project")}
-      icon={projectIcon}
-      value={project.triggerLabel}
-      onPress={project.open}
-      disabled={isPending}
-      testID="new-workspace-project-picker-trigger"
-    />
+    <ProjectField project={project} isPending={isPending} variant={variant} icon={projectIcon} />
   );
   const hostField = showHost ? (
     <HostPicker
@@ -226,7 +313,7 @@ export function useNewWorkspaceForm(props: NewWorkspaceFormProps): ReactElement 
       onAddHost={host.onAddHost}
       searchable={false}
       title={t("newWorkspace.fields.host")}
-      desktopPlacement="bottom-start"
+      desktopPlacement={desktopPlacement}
       desktopMinWidth={200}
       hostOptionTestID={hostOptionTestID}
     >
@@ -257,6 +344,23 @@ export function useNewWorkspaceForm(props: NewWorkspaceFormProps): ReactElement 
       testID="workspace-create-isolation-trigger"
     />
   ) : null;
+  // Local isolation has no starting ref; its Branch field switches the project checkout instead.
+  const localBranchField = localBranch ? (
+    <FieldTrigger
+      ref={localBranch.anchorRef}
+      variant={variant}
+      label={t("newWorkspace.fields.branch")}
+      accessibilityLabel={t("branchSwitcher.currentBranch", {
+        branchName: localBranch.triggerLabel,
+      })}
+      tooltip={t("branchSwitcher.triggerTooltip")}
+      icon={branchIcon}
+      value={localBranch.triggerLabel}
+      onPress={localBranch.open}
+      disabled={localBranch.disabled}
+      testID="new-workspace-local-branch-trigger"
+    />
+  ) : null;
   const baseField = base.showRefPicker ? (
     <FieldTrigger
       ref={base.anchorRef}
@@ -270,8 +374,11 @@ export function useNewWorkspaceForm(props: NewWorkspaceFormProps): ReactElement 
       disabled={isPending || !base.selectedSourceDirectory}
       testID="new-workspace-ref-picker-trigger"
     />
-  ) : null;
-  const launchField = (
+  ) : (
+    localBranchField
+  );
+  // Like Codex, the Mac desktop always launches a chat, so it has no Chat/Terminal choice.
+  const launchField = macDesktop ? null : (
     <LaunchControl
       variant={variant}
       serverId={launch.serverId}
@@ -293,7 +400,7 @@ export function useNewWorkspaceForm(props: NewWorkspaceFormProps): ReactElement 
         title={t("newWorkspace.fields.project")}
         open={project.openState}
         onOpenChange={project.onOpenChange}
-        desktopPlacement="bottom-start"
+        desktopPlacement={desktopPlacement}
         desktopMinWidth={360}
         anchorRef={project.anchorRef}
         emptyText="No projects available."
@@ -307,7 +414,7 @@ export function useNewWorkspaceForm(props: NewWorkspaceFormProps): ReactElement 
         title={t("newWorkspace.isolation.label")}
         open={isolation.openState}
         onOpenChange={isolation.onOpenChange}
-        desktopPlacement="bottom-start"
+        desktopPlacement={desktopPlacement}
         anchorRef={isolation.anchorRef}
         renderOption={isolationPicker.renderOption}
       />
@@ -321,11 +428,27 @@ export function useNewWorkspaceForm(props: NewWorkspaceFormProps): ReactElement 
         open={base.openState}
         onOpenChange={base.onOpenChange}
         onSearchQueryChange={base.setSearchQuery}
-        desktopPlacement="bottom-start"
+        desktopPlacement={desktopPlacement}
         anchorRef={base.anchorRef}
         emptyText={base.emptyText}
         renderOption={renderRefOption}
       />
+      {localBranch ? (
+        <Combobox
+          options={localBranch.options}
+          value={localBranch.currentBranch}
+          onSelect={localBranch.onSelect}
+          searchable
+          searchPlaceholder={t("branchSwitcher.searchPlaceholder")}
+          emptyText={t("branchSwitcher.empty")}
+          title={t("branchSwitcher.title")}
+          open={localBranch.openState}
+          onOpenChange={localBranch.onOpenChange}
+          desktopPlacement={desktopPlacement}
+          anchorRef={localBranch.anchorRef}
+          renderOption={renderLocalBranchOption}
+        />
+      ) : null}
     </>
   );
 
@@ -352,12 +475,15 @@ export function useNewWorkspaceForm(props: NewWorkspaceFormProps): ReactElement 
       {hostField ? <View style={styles.desktopControl}>{hostField}</View> : null}
       {isolationField ? <View style={styles.desktopControl}>{isolationField}</View> : null}
       {baseField ? <View style={styles.desktopControl}>{baseField}</View> : null}
-      <View style={styles.launchSpacer} pointerEvents="none" />
+      {launchField ? <View style={styles.launchSpacer} pointerEvents="none" /> : null}
       {launchField}
       {pickers}
     </View>
   );
 }
+
+// Matches the Mac composer radius, so its corners cover the tray bottom.
+const MAC_SETUP_TRAY_OVERLAP = 24;
 
 const styles = StyleSheet.create((theme) => ({
   compactStack: {
@@ -380,8 +506,26 @@ const styles = StyleSheet.create((theme) => ({
     // rather than running out to the composer's border.
     paddingHorizontal: theme.spacing[4],
     gap: theme.spacing[2],
+    // Like Codex, a narrower tray tucked behind the composer: the inset keeps its
+    // edges inside the composer's 24pt corners and the overlap hides its bottom.
+    ...(getIsElectronMac()
+      ? {
+          marginHorizontal: theme.spacing[3],
+          marginBottom: -MAC_SETUP_TRAY_OVERLAP,
+          backgroundColor: theme.colors.surface1,
+          borderTopLeftRadius: 16,
+          borderTopRightRadius: 16,
+          paddingHorizontal: theme.spacing[1],
+          paddingTop: theme.spacing[1],
+          paddingBottom: theme.spacing[1] + MAC_SETUP_TRAY_OVERLAP,
+        }
+      : {}),
   },
   desktopControl: {
+    minWidth: 0,
+    flexShrink: 1,
+  },
+  projectField: {
     minWidth: 0,
     flexShrink: 1,
   },

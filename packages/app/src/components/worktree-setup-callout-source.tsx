@@ -6,13 +6,19 @@ import { useStableEvent } from "@/hooks/use-stable-event";
 import { useHostRuntimeClient } from "@/runtime/host-runtime";
 import { useActiveWorkspaceSelection } from "@/stores/navigation-active-workspace-store";
 import { useWorkspaceFields } from "@/stores/session-store-hooks";
+import { usesDesktopShell } from "@/components/desktop/desktop-shell";
 import {
   buildWorktreeSetupCalloutPolicy,
   selectActiveGitWorkspaceProject,
   shouldShowWorktreeSetupCallout,
 } from "./worktree-setup-callout-policy";
 
+// Codex has no setup prompt; Mac reaches worktree scripts through project settings.
 export function WorktreeSetupCalloutSource() {
+  return usesDesktopShell ? null : <WorktreeSetupCallout />;
+}
+
+function WorktreeSetupCallout() {
   const selection = useActiveWorkspaceSelection();
   const selectedWorkspaceProject = useWorkspaceFields(
     selection?.serverId ?? null,

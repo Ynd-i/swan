@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import * as platform from "@/constants/platform";
 import {
   explorerSidebarCloseButtonLayout,
   resolveExplorerSidebarDockSizes,
@@ -6,6 +7,17 @@ import {
 } from "@/components/explorer-sidebar-layout";
 
 describe("Explorer sidebar layout", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it("uses the Mac tool width only when no width is saved and the workspace has room", () => {
+    const mac = vi.spyOn(platform, "getIsElectronMac").mockReturnValue(true);
+    expect(resolveExplorerSidebarWidth({ containerWidth: 1000 })).toBe(576);
+    expect(resolveExplorerSidebarWidth({ requestedWidth: 320, containerWidth: 1000 })).toBe(320);
+    expect(resolveExplorerSidebarWidth({ containerWidth: 520 })).toBe(240);
+    mac.mockReturnValue(false);
+    expect(resolveExplorerSidebarWidth({ containerWidth: 1000 })).toBe(320);
+  });
+
   it("keeps the sidebar width fixed when the workspace body changes size", () => {
     const narrow = resolveExplorerSidebarDockSizes({ requestedWidth: 320, containerWidth: 1200 });
     const wide = resolveExplorerSidebarDockSizes({ requestedWidth: 320, containerWidth: 1520 });

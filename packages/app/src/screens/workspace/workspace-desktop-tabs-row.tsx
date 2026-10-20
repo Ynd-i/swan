@@ -33,7 +33,7 @@ import type {
   DraggableListDragHandleProps,
   DraggableRenderItemInfo,
 } from "@/components/draggable-list.types";
-import { isNative, isWeb } from "@/constants/platform";
+import { getIsElectronMac, isNative, isWeb } from "@/constants/platform";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -109,9 +109,9 @@ const TAB_ICON_WIDTH = 14;
 const TAB_CONTENT_GAP = 4;
 const TAB_DROP_INDICATOR_WIDTH = 4;
 const TAB_MODIFIED_DOT_SIZE = 8;
-const TAB_MIN_WIDTH = 64;
-const TAB_MAX_WIDTH = 160;
-const TAB_CLOSE_BUTTON_RESERVED_WIDTH = 0;
+const TAB_MIN_WIDTH = 96;
+const TAB_MAX_WIDTH = getIsElectronMac() ? 240 : 160;
+const TAB_CLOSE_BUTTON_RESERVED_WIDTH = getIsElectronMac() ? 20 : 0;
 const TAB_LABEL_LAYOUT_ALLOWANCE = 4;
 const AGENT_TOOLTIP_TITLE_MAX_LENGTH = 80;
 
@@ -666,7 +666,8 @@ function resolveChipBackdrop({
   isFilled: boolean;
 }): SurfaceBackdrop {
   if (isActiveFocused) return "surface2";
-  return isFilled ? "surface1" : "surface0";
+  if (isFilled) return "surface1";
+  return getIsElectronMac() ? "surfaceSidebar" : "surface0";
 }
 
 function TabHandleContent({
@@ -716,6 +717,10 @@ function TabHandleContent({
       ) : null}
     </View>
   );
+}
+
+function hasPersistentCloseControl(isCompact: boolean, isClosing: boolean, isActive: boolean) {
+  return isNative || isCompact || isClosing || (getIsElectronMac() && isActive);
 }
 
 function TabChip({
@@ -773,7 +778,8 @@ function TabChip({
     isActiveFocused,
     isFilled: isActive || isHovered,
   });
-  const showCloseControl = showCloseButton && (isHovered || isNative || isCompact || isClosingTab);
+  const showCloseControl =
+    showCloseButton && (isHovered || hasPersistentCloseControl(isCompact, isClosingTab, isActive));
   const closeButtonDragBlockers = isWeb
     ? ({
         onPointerDown: (event: { stopPropagation?: () => void }) => {
@@ -788,6 +794,7 @@ function TabChip({
   const tabChipStyle = useCallback(
     () => [
       styles.tab,
+      getIsElectronMac() && showCloseButton && styles.tabCloseSpace,
       isActiveFocused && styles.tabActive,
       isActive && !isFocused && styles.tabActiveUnfocused,
       !isActive && isHovered && styles.tabHovered,
@@ -798,7 +805,15 @@ function TabChip({
         maxWidth: resolvedTabWidth,
       },
     ],
-    [isActive, isActiveFocused, isDragging, isFocused, isHovered, resolvedTabWidth],
+    [
+      isActive,
+      isActiveFocused,
+      isDragging,
+      isFocused,
+      isHovered,
+      resolvedTabWidth,
+      showCloseButton,
+    ],
   );
 
   const handleTabPointerEnter = useCallback(() => {
@@ -1567,7 +1582,7 @@ const styles = StyleSheet.create((theme) => ({
     height: WORKSPACE_SECONDARY_HEADER_HEIGHT,
     borderBottomWidth: 1,
     borderBottomColor: theme.colors.border,
-    backgroundColor: theme.colors.surface0,
+    backgroundColor: getIsElectronMac() ? theme.colors.surfaceSidebar : theme.colors.surface0,
     flexDirection: "row",
     alignItems: "center",
     overflow: "visible",
@@ -1607,6 +1622,7 @@ const styles = StyleSheet.create((theme) => ({
   inlineNewTabButton: {
     width: buttonControlHeight.xs,
     height: buttonControlHeight.xs,
+    borderRadius: getIsElectronMac() ? 8 : theme.borderRadius.md,
   },
   paneSplitActions: {
     paddingHorizontal: PANE_SPLIT_ACTIONS_HORIZONTAL_PADDING,
@@ -1615,17 +1631,23 @@ const styles = StyleSheet.create((theme) => ({
   tab: {
     height: buttonControlHeight.xs,
     paddingHorizontal: TAB_CHIP_HORIZONTAL_PADDING,
-    borderRadius: theme.borderRadius.md,
+    borderRadius: getIsElectronMac() ? 8 : theme.borderRadius.md,
+    borderWidth: getIsElectronMac() ? 1 : 0,
+    borderColor: "transparent",
     flexDirection: "row",
     alignItems: "center",
     gap: theme.spacing[1],
     userSelect: "none",
+  },
+  tabCloseSpace: {
+    paddingRight: TAB_CHIP_HORIZONTAL_PADDING + TAB_CLOSE_BUTTON_RESERVED_WIDTH,
   },
   tabHovered: {
     backgroundColor: theme.colors.surface1,
   },
   tabActive: {
     backgroundColor: theme.colors.surface2,
+    borderColor: getIsElectronMac() ? theme.colors.borderAccent : "transparent",
   },
   tabActiveUnfocused: {
     backgroundColor: theme.colors.surface1,
@@ -1709,8 +1731,8 @@ const styles = StyleSheet.create((theme) => ({
     right: 0,
     bottom: 0,
     width: 48,
-    borderTopRightRadius: theme.borderRadius.md,
-    borderBottomRightRadius: theme.borderRadius.md,
+    borderTopRightRadius: getIsElectronMac() ? 8 : theme.borderRadius.md,
+    borderBottomRightRadius: getIsElectronMac() ? 8 : theme.borderRadius.md,
     alignItems: "center",
     justifyContent: "center",
     zIndex: 2,

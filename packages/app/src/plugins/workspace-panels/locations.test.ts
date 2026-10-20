@@ -1,9 +1,18 @@
 import appPackage from "../../../package.json";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
 import { pluginRegistry } from "../registry";
 import { panelTargetSupportsHost, resolvePluginPanelOpenLocation } from "./locations";
 
+const desktop = vi.hoisted(() => ({ mac: false }));
+vi.mock("@/constants/platform", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/constants/platform")>()),
+  getIsElectronMac: () => desktop.mac,
+}));
+afterEach(() => {
+  desktop.mac = false;
+  pluginRegistry.removeHost("host-1");
+});
 const audio = { play: async () => 0 };
 
 vi.mock("../navigation", () => ({
@@ -46,6 +55,24 @@ function install(locations: readonly ("workspace" | "explorer")[]) {
 }
 
 describe("plugin workspace panel locations", () => {
+  it("docks a workspace plugin on Mac without changing its declared open location", () => {
+    const panel = install(["workspace"]).workspacePanels[0]!;
+    const target = {
+      kind: "plugin",
+      pluginId: "review",
+      panelId: "details",
+      context: "agent",
+      agentId: "agent-1",
+    } as const;
+    expect(panelTargetSupportsHost("host-1", target, "explorer")).toBe(false);
+    desktop.mac = true;
+    expect(panelTargetSupportsHost("host-1", target, "explorer")).toBe(true);
+    expect(panelTargetSupportsHost("host-1", target, "main")).toBe(true);
+    expect(resolvePluginPanelOpenLocation(panel)).toBe("workspace");
+    expect(() => resolvePluginPanelOpenLocation(panel, "explorer")).toThrow(
+      "does not support explorer location",
+    );
+  });
   it("applies the same host contract to agent panel instances", () => {
     install(["workspace", "explorer"]);
     const target = {

@@ -70,7 +70,52 @@ function input(overrides: Partial<BuildDiffDocumentModelInput> = {}): BuildDiffD
   };
 }
 
+function changedCells(model: ReturnType<typeof buildDiffDocumentModel>) {
+  return model.rows.flatMap((row) =>
+    row.kind === "line"
+      ? row.cells.filter((cell) => cell?.type === "add" || cell?.type === "remove")
+      : [],
+  );
+}
+
 describe("diff document model", () => {
+  it.each([
+    { layout: "unified" as const, wrapLines: false },
+    { layout: "split" as const, wrapLines: false },
+    { layout: "unified" as const, wrapLines: true },
+    { layout: "split" as const, wrapLines: true },
+  ])(
+    "prepares intraline ranges only inside the materialization window ($layout, wrap=$wrapLines)",
+    ({ layout, wrapLines }) => {
+      const options = input({ layout, wrapLines });
+      const enabled = {
+        ...options,
+        palette: {
+          ...options.palette,
+          additionInlineBackground: "bright-green",
+          deletionInlineBackground: "bright-red",
+        },
+      };
+      const lazy = buildDiffDocumentModel({
+        ...enabled,
+        materializationWindow: { top: 100_000, height: 100 },
+      });
+      expect(changedCells(lazy).every((cell) => cell?.intralineRanges === undefined)).toBe(true);
+      const measured = buildDiffDocumentModel({ ...enabled, reuseFrom: [lazy] });
+      expect(
+        changedCells(measured).every((cell) => cell && (cell.intralineRanges?.length ?? 0) > 0),
+      ).toBe(true);
+      expect(changedCells(measured).map((cell) => [cell?.content, cell?.sourceIdentity])).toEqual(
+        changedCells(lazy).map((cell) => [cell?.content, cell?.sourceIdentity]),
+      );
+      expect(
+        changedCells(buildDiffDocumentModel(options)).every(
+          (cell) => cell?.intralineRanges === undefined,
+        ),
+      ).toBe(true);
+    },
+  );
+
   it("preserves shaped wrap breaks when joining makes a longer prefix narrower", () => {
     const measure = (text: string) => {
       if (text === "لا") return 30;

@@ -8,12 +8,14 @@ import {
   type SheetHeader,
 } from "@/components/adaptive-modal-sheet";
 import { Button } from "@/components/ui/button";
-import { isWeb } from "@/constants/platform";
+import { getIsElectronMac, isWeb } from "@/constants/platform";
 import type { EditingTextInputHandle } from "@/components/ui/text-input";
 
 export interface AdaptiveRenameModalProps {
   visible: boolean;
   title: string;
+  /** A line under the title, such as what the named thing is for. */
+  description?: string;
   initialValue: string;
   placeholder?: string;
   submitLabel?: string;
@@ -27,6 +29,7 @@ export interface AdaptiveRenameModalProps {
 export function AdaptiveRenameModal({
   visible,
   title,
+  description,
   initialValue,
   placeholder,
   submitLabel,
@@ -114,8 +117,13 @@ export function AdaptiveRenameModal({
   const errorTestID = testID ? `${testID}-error` : undefined;
   const submitTestID = testID ? `${testID}-submit` : undefined;
   const cancelTestID = testID ? `${testID}-cancel` : undefined;
-  const sheetHeader = useMemo<SheetHeader>(() => ({ title }), [title]);
+  const sheetHeader = useMemo<SheetHeader>(
+    () => ({ title, subtitle: description }),
+    [description, title],
+  );
 
+  // The macOS desktop puts compact actions at the bottom right, as its system dialogs do.
+  const compactActions = getIsElectronMac();
   return (
     <AdaptiveModalSheet
       visible={visible}
@@ -142,11 +150,11 @@ export function AdaptiveRenameModal({
             {error}
           </Text>
         ) : null}
-        <View style={styles.actions}>
+        <View style={[styles.actions, compactActions && styles.actionsEnd]}>
           <Button
             variant="secondary"
             size="sm"
-            style={styles.actionButton}
+            style={compactActions ? undefined : styles.actionButton}
             onPress={handleCancel}
             disabled={isPending}
             testID={cancelTestID}
@@ -156,7 +164,7 @@ export function AdaptiveRenameModal({
           <Button
             variant="default"
             size="sm"
-            style={styles.actionButton}
+            style={compactActions ? undefined : styles.actionButton}
             onPress={handleSubmitVoid}
             disabled={submitDisabled}
             testID={submitTestID}
@@ -192,6 +200,9 @@ const styles = StyleSheet.create((theme) => ({
     flexDirection: "row",
     alignItems: "center",
     gap: theme.spacing[2],
+  },
+  actionsEnd: {
+    justifyContent: "flex-end",
   },
   actionButton: {
     flex: 1,

@@ -254,6 +254,10 @@ function shouldEmitPlanApprovalPrompt(prompt: AgentPromptInput): boolean {
   return /emit\s+(?:a\s+)?synthetic\s+plan\s+approval/i.test(promptToText(prompt));
 }
 
+function shouldEmitToolPermissionPrompt(prompt: AgentPromptInput): boolean {
+  return promptToText(prompt) === "Emit synthetic tool permission.";
+}
+
 function shouldEmitTurnFailure(prompt: AgentPromptInput): boolean {
   return /emit\s+(?:a\s+)?synthetic\s+turn\s+failure/i.test(promptToText(prompt));
 }
@@ -286,6 +290,34 @@ function parseMockQuestionPrompt(prompt: AgentPromptInput): MockQuestionPromptRe
   const text = promptToText(prompt);
   if (!/emit\s+(?:a\s+)?synthetic\s+questions?/i.test(text)) {
     return null;
+  }
+
+  if (/single[-\s]?choice/i.test(text)) {
+    return {
+      questions: [
+        {
+          question: "Which implementation path should we take?",
+          header: "path",
+          options: [{ label: "Use the existing component" }, { label: "Build a new component" }],
+          multiSelect: false,
+        },
+      ],
+    };
+  }
+
+  if (/multi[-\s]?select/i.test(text)) {
+    return {
+      questions: [
+        {
+          question: "Which checks should run?",
+          header: "checks",
+          options: [{ label: "Lint" }, { label: "Typecheck" }, { label: "UI regression" }],
+          multiSelect: true,
+          allowOther: true,
+          placeholder: "Add another check...",
+        },
+      ],
+    };
   }
 
   if (/free[-\s]?write|freeform|text[-\s]?only/i.test(text)) {
@@ -885,6 +917,8 @@ export class MockLoadTestAgentSession implements AgentSession {
         this.scheduleSettledAssistantTurn(turn, JSON.stringify(structuredBranchName));
       } else if (settledAssistantImageMarkdown) {
         this.scheduleSettledAssistantTurn(turn, settledAssistantImageMarkdown);
+      } else if (shouldEmitToolPermissionPrompt(prompt)) {
+        this.scheduleToolPermissionTurn(turn);
       } else if (shouldEmitPlanApprovalPrompt(prompt)) {
         this.schedulePlanApprovalTurn(turn);
       } else if (questionPrompt) {
@@ -1027,12 +1061,13 @@ export class MockLoadTestAgentSession implements AgentSession {
     });
 
     if (turn) {
-      this.finishTurnWithText(
-        turn,
-        request.kind === "question"
-          ? "Synthetic questions resolved"
-          : "Synthetic plan approval resolved",
-      );
+      let finalText = "Synthetic plan approval resolved";
+      if (request.kind === "tool") {
+        finalText = `Synthetic tool permission resolved: ${response.selectedActionId ?? "none"}`;
+      } else if (request.kind === "question") {
+        finalText = "Synthetic questions resolved";
+      }
+      this.finishTurnWithText(turn, finalText);
     }
     return undefined;
   }
@@ -1241,6 +1276,13 @@ export class MockLoadTestAgentSession implements AgentSession {
     turn.timer.unref?.();
   }
 
+  private scheduleToolPermissionTurn(turn: ActiveTurn): void {
+    turn.timer = setTimeout(() => {
+      this.emitToolPermissionTurn(turn);
+    }, 0);
+    turn.timer.unref?.();
+  }
+
   private scheduleQuestionPromptTurn(
     turn: ActiveTurn,
     questionPrompt: MockQuestionPromptRequest,
@@ -1358,6 +1400,46 @@ export class MockLoadTestAgentSession implements AgentSession {
       metadata: {
         source: "mock_plan_approval",
       },
+    };
+
+    this.pendingPermissions.set(request.id, request);
+    this.emit({
+      type: "permission_requested",
+      provider: this.provider,
+      request,
+      turnId: turn.turnId,
+    });
+  }
+
+  private emitToolPermissionTurn(turn: ActiveTurn): void {
+    if (this.activeTurn !== turn) {
+      return;
+    }
+
+    this.clearTurnTimer(turn);
+    this.emitTurnStarted(turn);
+
+    const command = "/bin/echo permission-fixture";
+    const request: AgentPermissionRequest = {
+      id: `mock-tool-${turn.turnId}`,
+      provider: this.provider,
+      name: "MockToolPermission",
+      kind: "tool",
+      title: "Shell access",
+      description: "Allow this command to run?",
+      input: { command },
+      detail: { type: "shell", command },
+      actions: [
+        { id: "allow-once", label: "Allow once", behavior: "allow", variant: "primary" },
+        {
+          id: "allow-session",
+          label: "Allow for session",
+          behavior: "allow",
+          variant: "secondary",
+        },
+        { id: "deny-once", label: "Deny", behavior: "deny", variant: "secondary" },
+      ],
+      metadata: { source: "mock_tool_permission" },
     };
 
     this.pendingPermissions.set(request.id, request);

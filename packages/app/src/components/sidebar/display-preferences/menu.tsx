@@ -161,7 +161,9 @@ const TRAILING_LABEL_KEYS: Record<SidebarTrailingChoice, string> = {
  * shape is deliberate — every option of every decision on one surface is what this menu used to
  * be, and it grew a row for each host on top of that.
  */
-export function SidebarDisplayPreferencesMenu(): ReactElement {
+export function SidebarDisplayPreferencesMenu({
+  chatMode = false,
+}: { chatMode?: boolean } = {}): ReactElement | null {
   const { t } = useTranslation();
   const preferences = useSidebarDisplayPreferences();
   const hosts = useHosts();
@@ -269,7 +271,7 @@ export function SidebarDisplayPreferencesMenu(): ReactElement {
         ),
       });
     }
-    return definitions;
+    return chatMode ? definitions.filter((page) => page.id.endsWith("Filter")) : definitions;
   }, [
     t,
     preferences,
@@ -281,7 +283,10 @@ export function SidebarDisplayPreferencesMenu(): ReactElement {
     showLabelFilter,
     labels,
     openManager,
+    chatMode,
   ]);
+
+  if (chatMode && !showHostFilter && !showProjectFilter && !showLabelFilter) return null;
 
   return (
     <>
@@ -301,26 +306,30 @@ export function SidebarDisplayPreferencesMenu(): ReactElement {
           sheetTitle={t("sidebar.display.heading")}
           testID="sidebar-display-preferences-content"
         >
-          <MenuSubTrigger
-            id="grouping"
-            value={t(GROUPING_LABEL_KEYS[preferences.grouping])}
-            testID="sidebar-display-grouping"
-          >
-            {t("sidebar.display.grouping.label")}
-          </MenuSubTrigger>
-          <MenuSubTrigger
-            id="titleSource"
-            value={t(TITLE_SOURCE_LABEL_KEYS[preferences.titleSource])}
-            testID="sidebar-display-title-source"
-          >
-            {t("sidebar.display.titleSource.label")}
-          </MenuSubTrigger>
-          <MenuSubTrigger id="show" testID="sidebar-display-show">
-            {t("sidebar.display.show.label")}
-          </MenuSubTrigger>
+          {!chatMode ? (
+            <>
+              <MenuSubTrigger
+                id="grouping"
+                value={t(GROUPING_LABEL_KEYS[preferences.grouping])}
+                testID="sidebar-display-grouping"
+              >
+                {t("sidebar.display.grouping.label")}
+              </MenuSubTrigger>
+              <MenuSubTrigger
+                id="titleSource"
+                value={t(TITLE_SOURCE_LABEL_KEYS[preferences.titleSource])}
+                testID="sidebar-display-title-source"
+              >
+                {t("sidebar.display.titleSource.label")}
+              </MenuSubTrigger>
+              <MenuSubTrigger id="show" testID="sidebar-display-show">
+                {t("sidebar.display.show.label")}
+              </MenuSubTrigger>
+            </>
+          ) : null}
           {showHostFilter ? (
             <>
-              <MenuSeparator />
+              {!chatMode ? <MenuSeparator /> : null}
               {/* A filtered sidebar looks like workspaces went missing, so the branch says so
                 from the root rather than making you open it to find out. */}
               <MenuSubTrigger
@@ -337,7 +346,7 @@ export function SidebarDisplayPreferencesMenu(): ReactElement {
               {/* Host and Project narrow the same list, so they read as one block. The separator
                 belongs above whichever of the two is showing first — with a single host there is
                 no Host row and Project is what has to carry it. */}
-              {showHostFilter ? null : <MenuSeparator />}
+              {showHostFilter || chatMode ? null : <MenuSeparator />}
               <MenuSubTrigger
                 id="projectFilter"
                 indicator={resolvedProjectFilters.length > 0}
@@ -349,7 +358,7 @@ export function SidebarDisplayPreferencesMenu(): ReactElement {
           ) : null}
           {showLabelFilter ? (
             <>
-              <MenuSeparator />
+              {!chatMode || showHostFilter || showProjectFilter ? <MenuSeparator /> : null}
               <MenuSubTrigger
                 id="labelFilter"
                 indicator={hasActiveSidebarLabelFilter(preferences.labelFilter)}

@@ -1,6 +1,7 @@
 import { useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { SettingsSection, SettingsCard, SettingsSelect } from "@/components/settings";
+import { getIsElectronMac } from "@/constants/platform";
 import {
   useAppSettings,
   type OpenInSidePanePreferences,
@@ -102,20 +103,24 @@ export function OpenLocationSection() {
   return (
     <SettingsSection title={t("settings.layout.openInSidePane.title")}>
       <SettingsCard>
-        {SOURCES.map((source) => (
-          <OpenLocationRow
-            key={source}
-            source={source}
-            destination={settings.openInSidePane[source] ? "side" : "main"}
-            onDestinationChange={handleDestinationChange}
-          />
-        ))}
-        <OpenLocationRow
-          source="pullRequests"
-          destination={settings.pullRequestOpenLocation}
-          allowExplorer
-          onDestinationChange={handleDestinationChange}
-        />
+        {!getIsElectronMac() && (
+          <>
+            {SOURCES.map((source) => (
+              <OpenLocationRow
+                key={source}
+                source={source}
+                destination={settings.openInSidePane[source] ? "side" : "main"}
+                onDestinationChange={handleDestinationChange}
+              />
+            ))}
+            <OpenLocationRow
+              source="pullRequests"
+              destination={settings.pullRequestOpenLocation}
+              allowExplorer
+              onDestinationChange={handleDestinationChange}
+            />
+          </>
+        )}
         <ServiceUrlRow />
       </SettingsCard>
     </SettingsSection>

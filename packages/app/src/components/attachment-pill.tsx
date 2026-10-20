@@ -2,7 +2,7 @@ import { type ReactNode, useCallback, useMemo, useState } from "react";
 import { Image, Pressable, Text, View } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { X } from "lucide-react-native";
-import { isNative } from "@/constants/platform";
+import { getIsElectronMac, isNative } from "@/constants/platform";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import type { AttachmentMetadata } from "@/attachments/types";
 import { useAttachmentPreviewUrl } from "@/attachments/use-attachment-preview-url";
@@ -11,6 +11,8 @@ import type { Theme } from "@/styles/theme";
 // Every attachment pill body — image thumbnail or labelled — renders at this
 // height so mixed attachment trays line up.
 const ATTACHMENT_CONTENT_HEIGHT = 48;
+// Codex desktop shows larger image previews than the labelled pill height.
+const MAC_THUMBNAIL_SIZE = 72;
 
 interface AttachmentPillProps {
   onOpen: () => void;
@@ -135,11 +137,14 @@ export function AttachmentLabel({ icon, title, subtitle }: AttachmentLabelProps)
 export function AttachmentThumbnail({ metadata }: { metadata: AttachmentMetadata }) {
   const uri = useAttachmentPreviewUrl(metadata);
   const source = useMemo(() => ({ uri: uri ?? "" }), [uri]);
+  const sizeStyle = getIsElectronMac() ? macThumbnailSize : undefined;
   if (!uri) {
-    return <View style={styles.thumbnailPlaceholder} />;
+    return <View style={[styles.thumbnailPlaceholder, sizeStyle]} />;
   }
-  return <Image source={source} style={styles.thumbnail} />;
+  return <Image source={source} style={[styles.thumbnail, sizeStyle]} />;
 }
+
+const macThumbnailSize = { width: MAC_THUMBNAIL_SIZE, height: MAC_THUMBNAIL_SIZE };
 
 const ThemedX = withUnistyles(X);
 const iconForegroundMutedMapping = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
@@ -192,7 +197,7 @@ const styles = StyleSheet.create((theme) => ({
   closeButton: {
     position: "absolute",
     top: -8,
-    left: -8,
+    right: -8,
     width: 24,
     height: 24,
     borderRadius: 12,

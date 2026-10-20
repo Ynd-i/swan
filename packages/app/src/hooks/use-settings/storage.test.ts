@@ -1,4 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import * as platform from "@/constants/platform";
+import { SYNTAX_THEME_IDS } from "@getpaseo/highlight";
 import { QueryClient } from "@tanstack/react-query";
 import {
   APP_SETTINGS_KEY,
@@ -28,6 +30,8 @@ import { DEFAULT_CONTENT_MAX_WIDTH, THEME_OPTIONS } from "@/styles/theme";
 
 const LEGACY_SETTINGS_KEY = "@paseo:settings";
 
+afterEach(() => vi.restoreAllMocks());
+
 function makeDeps(
   overrides: {
     storage?: ReturnType<typeof createInMemoryKeyValueStorage>;
@@ -44,6 +48,66 @@ function makeDeps(
 }
 
 describe("loadAppSettingsFromStorage", () => {
+  it.each(["codeFontWeight", "contentFontWeight", "uiFontWeight"] as const)(
+    "round-trips %s with safe defaults independently of platform",
+    async (field) => {
+      for (const value of [undefined, "heavy", 500, false]) {
+        const deps = makeDeps({
+          storage: createInMemoryKeyValueStorage({
+            [APP_SETTINGS_KEY]: JSON.stringify({ [field]: value }),
+          }),
+        });
+        expect((await loadAppSettingsFromStorage(deps))[field]).toBeNull();
+      }
+      vi.spyOn(platform, "getIsElectronMac").mockReturnValue(false);
+      const deps = makeDeps();
+      const queryClient = new QueryClient();
+      for (const value of ["400", "500", "600", null] as const) {
+        await saveAppSettings({ deps, queryClient, updates: { [field]: value } });
+        expect((await loadAppSettingsFromStorage(deps))[field]).toBe(value);
+      }
+    },
+  );
+
+  it("defaults reduced motion to System and persists explicit overrides", async () => {
+    for (const reducedMotion of [undefined, "future-value", null]) {
+      const deps = makeDeps({
+        storage: createInMemoryKeyValueStorage({
+          [APP_SETTINGS_KEY]: JSON.stringify({ reducedMotion }),
+        }),
+      });
+      expect((await loadAppSettingsFromStorage(deps)).reducedMotion).toBe("system");
+    }
+    const deps = makeDeps();
+    const queryClient = new QueryClient();
+    for (const reducedMotion of ["on", "off", "system"] as const) {
+      await saveAppSettings({ deps, queryClient, updates: { reducedMotion } });
+      expect((await loadAppSettingsFromStorage(deps)).reducedMotion).toBe(reducedMotion);
+    }
+  });
+
+  it("defaults missing macOS syntax preferences to Codex without changing explicit choices", async () => {
+    vi.spyOn(platform, "getIsElectronMac").mockReturnValue(true);
+    expect((await loadAppSettingsFromStorage(makeDeps())).syntaxTheme).toBe("codex");
+    for (const syntaxTheme of [undefined, ...SYNTAX_THEME_IDS, "codex"] as const) {
+      const deps = makeDeps({
+        storage: createInMemoryKeyValueStorage({
+          [APP_SETTINGS_KEY]: JSON.stringify({ syntaxTheme }),
+        }),
+      });
+      expect((await loadAppSettingsFromStorage(deps)).syntaxTheme).toBe(syntaxTheme ?? "codex");
+    }
+  });
+
+  it("persists Codex as a named preset and restores an explicit One selection", async () => {
+    const deps = makeDeps();
+    const queryClient = new QueryClient();
+    await saveAppSettings({ deps, queryClient, updates: { syntaxTheme: "codex" } });
+    expect((await loadAppSettingsFromStorage(deps)).syntaxTheme).toBe("codex");
+    await saveAppSettings({ deps, queryClient, updates: { syntaxTheme: "one" } });
+    expect((await loadAppSettingsFromStorage(deps)).syntaxTheme).toBe("one");
+  });
+
   it("preserves a persisted steer send behavior", async () => {
     const deps = makeDeps({
       storage: createInMemoryKeyValueStorage({
@@ -70,6 +134,7 @@ describe("loadAppSettingsFromStorage", () => {
     const result = await loadAppSettingsFromStorage(deps);
 
     expect(result.theme).toBe("dark");
+    expect(result.contentFontFamily).toBe("");
     expect(result.sendBehavior).toBe(DEFAULT_CLIENT_SETTINGS.sendBehavior);
     expect(result.sidebarRowItems.host).toBe(false);
     expect(JSON.parse(deps.storage.entries.get(APP_SETTINGS_KEY) ?? "null")).toEqual(stored);
@@ -149,6 +214,40 @@ describe("loadAppSettingsFromStorage", () => {
     const result = await loadAppSettingsFromStorage(deps);
 
     expect(result.theme).toBe(name);
+  });
+
+  it("keeps valid theme colors and drops invalid ones", async () => {
+    const deps = makeDeps({
+      storage: createInMemoryKeyValueStorage({
+        [APP_SETTINGS_KEY]: JSON.stringify({
+          themeColors: {
+            dark: { sidebar: "#000000", main: "red", accent: "#D97757" },
+            light: "not an object",
+          },
+        }),
+      }),
+    });
+
+    const result = await loadAppSettingsFromStorage(deps);
+
+    expect(result.themeColors).toEqual({
+      dark: { sidebar: "#000000", accent: "#D97757" },
+      light: {},
+    });
+  });
+
+  it("drops theme colors stored under an unknown theme", async () => {
+    const deps = makeDeps({
+      storage: createInMemoryKeyValueStorage({
+        [APP_SETTINGS_KEY]: JSON.stringify({
+          themeColors: { retired: { main: "#000000" }, dark: { sidebar: "#000000" } },
+        }),
+      }),
+    });
+
+    expect((await loadAppSettingsFromStorage(deps)).themeColors).toEqual({
+      dark: { sidebar: "#000000" },
+    });
   });
 
   it("seeds storage with the client defaults when nothing is persisted", async () => {
@@ -973,11 +1072,16 @@ describe("appearance settings", () => {
   it("trims an accepted font family", async () => {
     const deps = makeDeps({
       storage: createInMemoryKeyValueStorage({
-        [APP_SETTINGS_KEY]: JSON.stringify({ uiFontFamily: "  Menlo  " }),
+        [APP_SETTINGS_KEY]: JSON.stringify({
+          uiFontFamily: "  Menlo  ",
+          contentFontFamily: "  Charter  ",
+        }),
       }),
     });
 
-    expect((await loadAppSettingsFromStorage(deps)).uiFontFamily).toBe("Menlo");
+    const settings = await loadAppSettingsFromStorage(deps);
+    expect(settings.uiFontFamily).toBe("Menlo");
+    expect(settings.contentFontFamily).toBe("Charter");
   });
 
   it("keeps an explicit empty font family as the default sentinel", async () => {

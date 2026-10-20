@@ -1,0 +1,73 @@
+# Opens a pull request into main for each new upstream Paseo stable release.
+# See docs/release.md#custom-releases.
+# The head branch is the upstream tag's commit, so a conflict shows on the pull request
+# instead of failing the run.
+name: Upstream PR
+
+on:
+  schedule:
+    - cron: "17 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: upstream-pr
+  cancel-in-progress: false
+
+env:
+  BRANCH: main
+  UPSTREAM: https://github.com/getpaseo/paseo.git
+
+jobs:
+  open:
+    if: github.repository == 'Ynd-i/swan'
+    runs-on: ubuntu-latest
+    env:
+      # The GITHUB_TOKEN can't open pull requests in this repository or push upstream's
+      # workflow changes, so a fine-grained token with Contents, Pull requests and
+      # Workflows write access does both.
+      GH_TOKEN: ${{ secrets.UPSTREAM_PR_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.BRANCH }}
+          fetch-depth: 0
+          # Runs with nothing to open need no secret.
+          token: ${{ secrets.UPSTREAM_PR_TOKEN || github.token }}
+      - name: Fetch upstream releases
+        run: git fetch --no-tags "$UPSTREAM" "+refs/tags/v*:refs/tags/v*"
+      - name: Find a newer upstream stable release
+        id: plan
+        run: node scripts/custom-release.mjs sync | tee -a "$GITHUB_OUTPUT"
+      - name: Open the pull request
+        if: steps.plan.outputs.merge != ''
+        env:
+          MERGE: ${{ steps.plan.outputs.merge }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::error::Add the UPSTREAM_PR_TOKEN secret to open a pull request for $MERGE; see docs/release.md#custom-releases."
+            exit 1
+          fi
+          head="upstream-pr/$MERGE"
+          # Any earlier pull request counts, so closing one without merging skips that release.
+          if [ -n "$(gh pr list --head "$head" --state all --json number --jq '.[].number')" ]; then
+            echo "A pull request for $MERGE already exists."
+            exit 0
+          fi
+          git push origin "$(git rev-parse "$MERGE^{commit}"):refs/heads/$head"
+          cat > body.md <<BODY
+          Upstream Paseo [$MERGE](https://github.com/getpaseo/paseo/releases/tag/$MERGE), opened by the Upstream PR workflow.
+
+          - Merge with **Create a merge commit**. A squash or rebase merge leaves the upstream tag out of \`$BRANCH\`, so betas stay on the old backend.
+          - If GitHub reports conflicts, resolve them on this branch in a full clone: \`git fetch origin && git switch $head && git merge origin/$BRANCH\`, then push.
+          - After merging, \`gh workflow run custom-release.yml -R $GH_REPO -f mode=beta\` tests and publishes \`$MERGE-v1-beta1\`.
+          BODY
+          url=$(gh pr create --base "$BRANCH" --head "$head" \
+            --title "chore: merge upstream Paseo $MERGE" --body-file body.md)
+          # The new branch holds every older upstream release too.
+          gh pr list --state open --json number,headRefName \
+            --jq ".[] | select(.headRefName | startswith(\"upstream-pr/\")) | select(.headRefName != \"$head\") | .number" |
+            while read -r number; do gh pr close "$number" --comment "Superseded by $url."; done

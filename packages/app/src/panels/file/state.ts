@@ -3,6 +3,7 @@ import { z } from "zod";
 export const fileStateSchema = z.strictObject({
   treeVisible: z.boolean(),
   treeWidth: z.number().optional(),
+  treeFilter: z.string().optional(),
 });
 
 export type FileState = z.infer<typeof fileStateSchema>;

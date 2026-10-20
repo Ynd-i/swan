@@ -248,6 +248,8 @@ import type {
   ToolCallDetail,
   ToolCallTimelineItem,
   AgentUsage,
+  AgentBackgroundTask,
+  AgentContextUsage,
   JsonValue,
 } from "./agent-types.js";
 
@@ -380,6 +382,7 @@ const AgentCapabilityFlagsSchema: z.ZodType<AgentCapabilityFlags> = z
     supportsRewindFiles: z.boolean().optional().default(false),
     // COMPAT(rewind): added in v0.1.X, drop when floor >= v0.1.X.
     supportsRewindBoth: z.boolean().optional().default(false),
+    supportsNativeFork: z.boolean().optional(),
   })
   .catchall(z.boolean());
 
@@ -390,6 +393,18 @@ const AgentUsageSchema: z.ZodType<AgentUsage> = z.object({
   totalCostUsd: z.number().optional(),
   contextWindowMaxTokens: z.number().optional(),
   contextWindowUsedTokens: z.number().optional(),
+});
+
+const AgentBackgroundTaskSchema: z.ZodType<AgentBackgroundTask> = z.object({
+  id: z.string(),
+  description: z.string(),
+});
+
+const AgentContextUsageSchema: z.ZodType<AgentContextUsage> = z.object({
+  maxTokens: z.number(),
+  usedTokens: z.number(),
+  bufferTokens: z.number(),
+  categories: z.array(z.object({ name: z.string(), tokens: z.number() })),
 });
 
 const McpStdioServerConfigSchema = z.object({
@@ -831,6 +846,8 @@ export const AgentSnapshotPayloadSchema = z.object({
   persistence: AgentPersistenceHandleSchema.nullable(),
   runtimeInfo: AgentRuntimeInfoSchema.optional(),
   lastUsage: AgentUsageSchema.optional(),
+  /** The live set, empty included. Absent from daemons that predate it and from stored agents. */
+  backgroundTasks: z.array(AgentBackgroundTaskSchema).optional(),
   lastError: z.string().optional(),
   title: z.string().nullable(),
   labels: z.record(z.string(), z.string()).default({}),
@@ -1895,6 +1912,13 @@ export const AgentTimelineListPromptsRequestMessageSchema = z.object({
   requestId: z.string(),
 });
 
+// Gated by features.agentContextUsage.
+export const AgentGetContextUsageRequestMessageSchema = z.object({
+  type: z.literal("agent.get_context_usage.request"),
+  agentId: z.string(),
+  requestId: z.string(),
+});
+
 export const ProviderSubagentListRequestMessageSchema = z.object({
   type: z.literal("agent.provider_subagents.list.request"),
   parentAgentId: z.string(),
@@ -2040,6 +2064,25 @@ export const AgentRewindResponseMessageSchema = z.object({
   payload: z.object({
     requestId: z.string(),
     agentId: z.string(),
+    ok: z.boolean(),
+    error: z.string().nullable(),
+  }),
+});
+
+// Native fork: the daemon picks the latest completed turn when boundaryCursor is omitted.
+export const AgentForkRequestMessageSchema = z.object({
+  type: z.literal("agent.fork.request"),
+  agentId: z.string(),
+  boundaryCursor: AgentTimelineCursorSchema.optional(),
+  requestId: z.string(),
+});
+
+export const AgentForkResponseMessageSchema = z.object({
+  type: z.literal("agent.fork.response"),
+  payload: z.object({
+    requestId: z.string(),
+    agentId: z.string(),
+    childAgentId: z.string().nullable(),
     ok: z.boolean(),
     error: z.string().nullable(),
   }),
@@ -2473,6 +2516,13 @@ export const ForgeSearchRequestSchema = z.object({
   requestId: z.string(),
 });
 
+export const ForgeChangeRequestGetRequestSchema = z.object({
+  type: z.literal("forge.change_request.get.request"),
+  cwd: z.string(),
+  url: z.string(),
+  requestId: z.string(),
+});
+
 // COMPAT(githubSearchRpc): legacy RPC retained when forge.search.* shipped in
 // v0.2.0-beta.1. Stop serving and consuming it after 2027-01-17 once client
 // and daemon floors are >= v0.2.0.
@@ -2597,6 +2647,8 @@ export const ProjectCreateDirectoryRequestSchema = z.object({
   type: z.literal("project.create_directory.request"),
   parentPath: z.string(),
   name: z.string(),
+  // Creates missing parent directories first; gated by features.projectCreateDirectoryParents.
+  createParents: z.boolean().optional(),
   requestId: z.string(),
 });
 
@@ -3288,6 +3340,7 @@ export const SessionInboundMessageSchema = z.discriminatedUnion("type", [
   FetchAgentTimelineRequestMessageSchema,
   AgentTimelineSearchRequestMessageSchema,
   AgentTimelineListPromptsRequestMessageSchema,
+  AgentGetContextUsageRequestMessageSchema,
   ProviderSubagentListRequestMessageSchema,
   ProviderSubagentTimelineRequestMessageSchema,
   SetAgentTimelineSubscriptionRequestMessageSchema,
@@ -3299,6 +3352,7 @@ export const SessionInboundMessageSchema = z.discriminatedUnion("type", [
   AgentConfigApplyRequestMessageSchema,
   AgentDetachRequestMessageSchema,
   AgentRewindRequestMessageSchema,
+  AgentForkRequestMessageSchema,
   AgentPermissionResponseMessageSchema,
   CheckoutStatusRequestSchema,
   CheckoutDiffGetRequestSchema,
@@ -3329,6 +3383,7 @@ export const SessionInboundMessageSchema = z.discriminatedUnion("type", [
   ValidateBranchRequestSchema,
   BranchSuggestionsRequestSchema,
   ForgeSearchRequestSchema,
+  ForgeChangeRequestGetRequestSchema,
   GitHubSearchRequestSchema,
   DirectorySuggestionsRequestSchema,
   PaseoWorktreeListRequestSchema,
@@ -3616,6 +3671,8 @@ export const ServerInfoStatusPayloadSchema = z
         // and github_search fallback after 2027-01-17 once the supported daemon
         // floor is >= v0.2.0.
         forgeSearch: z.boolean().optional(),
+        // COMPAT(forgeChangeRequestGet): added in v0.11.4 (fork), remove gate after 2027-04-16.
+        forgeChangeRequestGet: z.boolean().optional(),
         // COMPAT(daemonStatusRpc): added in v0.1.76, remove gate after 2026-11-18.
         daemonStatusRpc: z.boolean().optional(),
         // COMPAT(daemonConfigReload): added in v0.4.0, remove gate after 2027-02-14.
@@ -3684,6 +3741,8 @@ export const ServerInfoStatusPayloadSchema = z
         agentForkContext: z.boolean().optional(),
         // COMPAT(agentForkContextCursor): added in v0.1.108, remove gate after 2027-01-14.
         agentForkContextCursor: z.boolean().optional(),
+        // COMPAT(agentNativeFork): added in v0.11.0, remove gate after 2027-04-03.
+        agentNativeFork: z.boolean().optional(),
         // COMPAT(providerSubagents): added in v0.1.107, remove gate after 2027-01-12.
         providerSubagents: z.boolean().optional(),
         // COMPAT(projectedSubagentTimeline): added after v0.8.0, remove gates after 2027-03-14; retain wire field.
@@ -3702,6 +3761,10 @@ export const ServerInfoStatusPayloadSchema = z
         workspaceGithubRepositorySearch: z.boolean().optional(),
         // COMPAT(projectCreateDirectory): added in v0.1.108, remove gate after 2027-01-15.
         projectCreateDirectory: z.boolean().optional(),
+        // COMPAT(projectCreateDirectoryParents): added in Paseo Custom v0.11.0-beta.3-v1-beta4, remove gate after 2027-04-01.
+        projectCreateDirectoryParents: z.boolean().optional(),
+        // COMPAT(agentContextUsage): added in Paseo Custom v0.11.0-beta.3-v1-beta6, remove gate after 2027-04-04.
+        agentContextUsage: z.boolean().optional(),
         // COMPAT(projectList): added in v0.2.4, drop the gate when floor >= v0.2.4.
         projectList: z.boolean().optional(),
         // COMPAT(commitsList): added in v0.1.110, remove gate after 2027-01-16.
@@ -4676,6 +4739,17 @@ export const AgentTimelineSearchResponseMessageSchema = z.object({
       }),
     ),
     nextCursor: z.number().int().nonnegative().nullable(),
+    error: z.string().nullable(),
+  }),
+});
+
+export const AgentGetContextUsageResponseMessageSchema = z.object({
+  type: z.literal("agent.get_context_usage.response"),
+  payload: z.object({
+    requestId: z.string(),
+    agentId: z.string(),
+    // Null when the agent has no live runtime or its provider cannot attribute its usage.
+    usage: AgentContextUsageSchema.nullable(),
     error: z.string().nullable(),
   }),
 });
@@ -5918,6 +5992,33 @@ export const ForgeSearchResponseSchema = z.object({
   payload: ForgeSearchResponsePayloadSchema,
 });
 
+export const ForgeChangeRequestPreviewSchema = z.object({
+  forge: z.string(),
+  number: z.number(),
+  title: z.string(),
+  url: z.string(),
+  state: z.string(),
+  isDraft: z.boolean(),
+  authorLogin: z.string().nullable(),
+  additions: z.number(),
+  deletions: z.number(),
+  changedFiles: z.number(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  mergedAt: z.string().nullable(),
+  closedAt: z.string().nullable(),
+});
+
+export const ForgeChangeRequestGetResponseSchema = z.object({
+  type: z.literal("forge.change_request.get.response"),
+  payload: z.object({
+    url: z.string(),
+    changeRequest: ForgeChangeRequestPreviewSchema.nullable(),
+    error: z.string().nullable(),
+    requestId: z.string(),
+  }),
+});
+
 // COMPAT(githubSearchRpc): legacy RPC retained when forge.search.* shipped in
 // v0.2.0-beta.1. Stop serving and consuming it after 2027-01-17 once client
 // and daemon floors are >= v0.2.0.
@@ -6933,6 +7034,7 @@ export const SessionOutboundMessageSchema = z.discriminatedUnion("type", [
   AgentTimelineReplacementMessageSchema,
   AgentTimelineSearchResponseMessageSchema,
   AgentTimelineListPromptsResponseMessageSchema,
+  AgentGetContextUsageResponseMessageSchema,
   ProviderSubagentListResponseMessageSchema,
   ProviderSubagentTimelineResponseMessageSchema,
   ProviderSubagentUpdateMessageSchema,
@@ -6969,6 +7071,7 @@ export const SessionOutboundMessageSchema = z.discriminatedUnion("type", [
   AgentConfigApplyResponseMessageSchema,
   AgentDetachResponseMessageSchema,
   AgentRewindResponseMessageSchema,
+  AgentForkResponseMessageSchema,
   UpdateAgentResponseMessageSchema,
   ProjectRenameResponseSchema,
   ProjectIconSetResponseSchema,
@@ -7013,6 +7116,7 @@ export const SessionOutboundMessageSchema = z.discriminatedUnion("type", [
   ValidateBranchResponseSchema,
   BranchSuggestionsResponseSchema,
   ForgeSearchResponseSchema,
+  ForgeChangeRequestGetResponseSchema,
   GitHubSearchResponseSchema,
   DirectorySuggestionsResponseSchema,
   PaseoWorktreeListResponseSchema,
@@ -7170,6 +7274,7 @@ export type SetAgentFeatureResponseMessage = z.infer<typeof SetAgentFeatureRespo
 export type AgentConfigApplyResponseMessage = z.infer<typeof AgentConfigApplyResponseMessageSchema>;
 export type AgentDetachResponseMessage = z.infer<typeof AgentDetachResponseMessageSchema>;
 export type AgentRewindResponseMessage = z.infer<typeof AgentRewindResponseMessageSchema>;
+export type AgentForkResponseMessage = z.infer<typeof AgentForkResponseMessageSchema>;
 export type UpdateAgentResponseMessage = z.infer<typeof UpdateAgentResponseMessageSchema>;
 export type ProjectRenameResponse = z.infer<typeof ProjectRenameResponseSchema>;
 export type ProjectIconSetResponse = z.infer<typeof ProjectIconSetResponseSchema>;
@@ -7426,6 +7531,9 @@ export type ForgeSearchItem = z.infer<typeof ForgeSearchItemSchema>;
 export type ForgeSearchKind = "issue" | "change_request";
 export type ForgeSearchRequest = z.infer<typeof ForgeSearchRequestSchema>;
 export type ForgeSearchResponse = z.infer<typeof ForgeSearchResponseSchema>;
+export type ForgeChangeRequestPreview = z.infer<typeof ForgeChangeRequestPreviewSchema>;
+export type ForgeChangeRequestGetRequest = z.infer<typeof ForgeChangeRequestGetRequestSchema>;
+export type ForgeChangeRequestGetResponse = z.infer<typeof ForgeChangeRequestGetResponseSchema>;
 export type GitHubSearchItem = z.infer<typeof GitHubSearchItemSchema>;
 export type GitHubSearchKind = z.infer<typeof GitHubSearchKindSchema>;
 export type GitHubSearchRequest = z.infer<typeof GitHubSearchRequestSchema>;

@@ -47,7 +47,12 @@ async function openAddProjectFlowSurface(
   page: Page,
   expectedPage: "host" | "method",
 ): Promise<void> {
-  await page.locator('[data-testid="sidebar-add-project"]:visible').click();
+  // The Mac chat sidebar adds projects from its Projects header; other sidebars have a footer button.
+  await page
+    .locator(
+      '[data-testid="sidebar-add-project"]:visible, [data-testid="desktop-section-projects-add"]:visible',
+    )
+    .click();
   await expect(addProjectFlow(page)).toBeVisible({ timeout: 30_000 });
   await expectAddProjectPage(page, expectedPage);
 }

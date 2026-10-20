@@ -69,6 +69,8 @@ the marker. Closing a tab sets that client's label to `false`. Any `true` client
 open. Detach clears the parent and every open-tab label. The surviving child therefore becomes a
 normal root agent immediately, and closing its still-open tab archives it.
 
+A native fork is not parentage. The child carries `paseo.forked-from-agent-id` for its origin and no `paseo.parent-agent-id`, so it is a root agent: it never appears in the source's subagents track and archiving either agent leaves the other alone. An [auto handoff](auto-handoff.md) links its child the same way, with `paseo.handoff-from-agent-id`. A chat started from a [chat proposal](chat-proposals.md) carries the app label `codex-ui.started-from-agent-id` instead of a parent.
+
 Runtime ownership is resolved from explicit workspace ID and caller context, never from `cwd`. Workspace creation is a separate operation with `local | worktree` isolation; agent creation reuses that workspace unless a new workspace is explicitly requested.
 
 Users can also detach an existing subagent from the subagents track. Detach is deliberately a manual lifecycle gesture, not an agent-facing MCP tool. It removes the parent and open-tab lifecycle labels: it does not stop, archive, move, or restart the agent. The agent keeps its current `cwd` and `workspaceId`, leaves the former parent's track, and behaves like a root agent for tab close, workspace activity, and future parent archive.

@@ -2,6 +2,116 @@ import { en, type TranslationResources } from "./en";
 import { pluginSettings } from "./plugin-settings";
 
 export const ar: TranslationResources = {
+  usage: {
+    options: "خيارات الاستخدام",
+    displayAs: "عرض",
+    showInSidebar: "إظهار في الشريط الجانبي",
+    showInSidebarHint: "النوافذ المثبتة تظهر في تذييل الشريط الجانبي",
+    hostUnavailableNamed: "اتصل بـ {{host}} لعرض الاستخدام",
+    hostUpgradeRequiredNamed: "حدّث {{host}} لعرض الاستخدام",
+    pin: "تثبيت",
+    unpin: "إلغاء التثبيت",
+    displayUsed: "المستخدَم",
+    displayRemaining: "المتبقي",
+    title: "الاستخدام",
+    planUsage: "استخدام الخطة",
+    refresh: "تحديث",
+    refreshing: "جارٍ التحديث…",
+    refreshFailed: "تعذر تحديث الاستخدام",
+    refreshAll: "تحديث الكل",
+    agentError: "تعذر تحميل الاستخدام: {{reason}}",
+    updated: "آخر تحديث {{time}}",
+    updatedNow: "تم التحديث الآن",
+    lastUpdated: "آخر تحديث ناجح {{time}}",
+    lastUpdatedNow: "آخر تحديث ناجح الآن",
+    noSuccessfulUpdate: "لا يوجد تحديث ناجح",
+    loading: "جارٍ تحميل الاستخدام…",
+    empty: "لا توجد بيانات استخدام",
+    noHosts: "لا توجد أجهزة مضيفة متصلة",
+    errorTitle: "تعذر تحميل الاستخدام",
+    hostUnavailable: "اتصل بهذا الجهاز المضيف لعرض الاستخدام",
+    hostUpgradeRequired: "حدّث الجهاز المضيف لعرض الاستخدام",
+    clientUnavailable: "اتصال الجهاز المضيف غير جاهز",
+    unavailable: "غير متاح",
+    remainingPercent: "المتبقي {{percent}}",
+    usedPercent: "المستخدم {{percent}}",
+    remainingBalance: "المتبقي {{amount}}",
+    resetsIn: "إعادة التعيين بعد {{duration}}",
+    resetDue: "حان وقت إعادة التعيين",
+    resetPassed: "انقضى وقت إعادة التعيين",
+    runsOutIn: "ينفد خلال {{duration}}",
+    runsOutNow: "يوشك على النفاد",
+    durationMinutes: "{{count}} د",
+    durationHours: "{{count}} س",
+    durationDays: "{{count}} ي",
+    ago: "قبل {{duration}}",
+    lessThanMinute: "أقل من دقيقة",
+    problemExpired: "انتهت صلاحية تسجيل الدخول {{ago}}. {{remedy}}",
+    problemRejected: "تم رفض تسجيل الدخول (HTTP {{status}}). {{remedy}}",
+    problemRunToRefresh: "شغّل {{command}} لتحديثه.",
+    problemSignInAgain: "سجّل الدخول مرة أخرى.",
+  },
+  chatProposals: {
+    suggested: "محادثة مقترحة",
+    start: "بدء",
+    startFailed: "تعذّر البدء: {{error}}",
+    unknownModel: "نموذج غير معروف: {{model}}",
+    unknownThinking: "مستوى تفكير غير معروف: {{thinking}}",
+    open: "فتح {{title}}",
+    archived: "مؤرشف",
+    task: "المهمة",
+    context: "السياق",
+    startedFrom: "بدأت من",
+    reportFrom: "تقرير من",
+    reportFailed: "فشل الدور في",
+    reply: "الرد",
+  },
+  desktopChat: {
+    handoffs: { toggle: "عمليات التسليم السابقة ({{count}})" },
+    activity: "النشاط",
+    workedFor: "المدة: {{duration}}",
+    failedCount: "فشل: {{count}}",
+    thinking: "يفكر",
+    startWork: "على ماذا نعمل؟",
+    startInProject: "على ماذا نعمل في {{project}}؟",
+    resetReasoning: "إعادة ضبط مستوى الاستدلال",
+    newChat: "محادثة جديدة",
+    actions: "إجراءات المحادثة",
+    markRead: "وضع علامة كمقروءة",
+    markUnread: "وضع علامة كغير مقروءة",
+    fork: "تفرع",
+    forkNewChat: "تفرع إلى محادثة جديدة",
+    sections: {
+      actions: "إجراءات القسم",
+      sortLatest: "المحدّثة مؤخرًا",
+      sortManual: "ترتيب يدوي",
+      chatSort: "ترتيب المحادثات",
+      show: "إظهار",
+      projects: "المشاريع",
+      newSection: "قسم جديد",
+      newSectionMenu: "قسم جديد…",
+      section: "القسم",
+      edit: "تعديل",
+      markAllRead: "تعليم الكل كمقروء",
+      archiveChats: "أرشفة المحادثات",
+      archiveConfirm: "أرشفة {{count}} من المحادثات في هذا القسم؟",
+      archiveProjectConfirm: "أرشفة {{count}} من المحادثات في هذا المشروع؟",
+      removeSection: "إزالة القسم",
+      createDescription: "نظّم المحادثات والمشاريع على طريقتك",
+      namePlaceholder: "اسم القسم",
+      create: "إنشاء القسم",
+      editTitle: "تعديل القسم",
+      save: "حفظ",
+      notifications: "الإشعارات",
+      priority: "الأولوية",
+      priorityEmpty: "لا توجد مهام تحتاج إلى انتباه",
+      organize: "تنظيم الشريط الجانبي",
+      byProject: "حسب المشروع",
+      merged: "مدمج",
+      revealInFinder: "إظهار في Finder",
+      removeProject: "إزالة المشروع",
+    },
+  },
   paneFind: {
     connectionFailure: "تعذر البحث في هذه المحادثة. تحقق من الاتصال بالمضيف وأعد المحاولة.",
     historyChangedFailure: "تغيّرت المحادثة أثناء البحث. أعد البحث.",
@@ -84,6 +194,10 @@ export const ar: TranslationResources = {
       close: "إغلاق القائمة",
     },
     commandCenter: {
+      chatPlaceholder: "البحث في المحادثات",
+      chats: "المحادثات",
+      quickActions: "إجراءات سريعة",
+      openFolder: "فتح مجلد",
       placeholder: "ابحث في الأوامر والملفات ومساحات العمل والوكلاء...",
       filePlaceholder: "البحث في الملفات...",
       searchingFiles: "جارٍ البحث في الملفات...",
@@ -115,7 +229,19 @@ export const ar: TranslationResources = {
     },
   },
   composer: {
+    queue: {
+      steer: "توجيه",
+      delete: "حذف",
+      more: "المزيد",
+      edit: "تعديل الرسالة",
+      turnOff: "إيقاف قائمة الانتظار",
+    },
+    goalMode: {
+      label: "الهدف",
+      placeholder: "صف هدفك ونتيجة قابلة للقياس للحصول على أفضل النتائج",
+    },
     placeholders: {
+      chat: "اسأل عن أي شيء",
       desktop: "أرسل رسالة إلى الوكيل أو ضع علامة على @files أو استخدم /commands و /skills",
       mobile: "الرسالة، @files ، /commands",
       fallback: "رسالة...",
@@ -156,7 +282,7 @@ export const ar: TranslationResources = {
     attachments: {
       addImage: "أضف صورة",
       pasteImage: "لصق صورة",
-      addFile: "Upload file",
+      addFile: "رفع ملف",
       addIssueOrPr: "أضف مشكلة أو PR",
       addIssueOrPr_mr: "أضف مشكلة أو MR",
       dropImagesHere: "إسقاط الصور هنا",
@@ -223,6 +349,11 @@ export const ar: TranslationResources = {
       title: "وضع",
       searchPlaceholder: "أوضاع البحث...",
       selectWithValue: "حدد وضع الوكيل ({{value}})",
+      desktop: {
+        askForReview: "طلب المراجعة",
+        autoReview: "مراجعة تلقائية",
+        fullAccess: "وصول كامل",
+      },
     },
     hints: {
       thinking: "وضع التفكير",
@@ -247,6 +378,8 @@ export const ar: TranslationResources = {
       implement: "ينفذ",
       question: "كيف تريد المتابعة؟",
       proposedPlan: "الخطة المقترحة",
+      waiting: "بانتظار الموافقة",
+      responseFailed: "تعذرت الاستجابة: {{message}}",
     },
   },
   agentPanel: {
@@ -328,6 +461,8 @@ export const ar: TranslationResources = {
     },
     actions: {
       copyCode: "نسخ الرمز",
+      runInTerminal: "تشغيل في الطرفية",
+      plainText: "نص عادي",
       copyTurn: "نسخ بدوره",
       copyMessage: "انسخ الرسالة",
       forkMenu: "تفريع الرسالة",
@@ -336,6 +471,7 @@ export const ar: TranslationResources = {
       forkUnavailable: "حدّث المضيف لاستخدام هذا.",
       forkMissingWorkspace: "هذا الوكيل ليس في مساحة عمل.",
       forkFailed: "فشل تفريع المحادثة",
+      forkOrigin: "متابعة من المحادثة",
       openFile: "افتح الملف",
       copied: "منقول",
     },
@@ -371,6 +507,9 @@ export const ar: TranslationResources = {
     },
     question: {
       responseFailed: "تعذر إرسال ردك. حاول مرة أخرى.",
+      title: "سؤال",
+      skip: "تخطي",
+      send: "إرسال",
       submit: "يُقدِّم",
       next: "التالي",
       answerPlaceholder: "اكتب إجابتك...",
@@ -516,6 +655,10 @@ export const ar: TranslationResources = {
         hideHiddenFiles: "إخفاء الملفات المخفية",
         showHiddenFiles: "إظهار الملفات المخفية",
       },
+      filter: {
+        placeholder: "تصفية الملفات...",
+        noResults: "لا توجد ملفات مطابقة",
+      },
       empty: {
         noFiles: "لا توجد ملفات",
         noVisibleFiles: "لا توجد ملفات مرئية",
@@ -572,6 +715,11 @@ export const ar: TranslationResources = {
       },
     },
     browser: {
+      newTab: {
+        tools: "الأدوات",
+        moreTools: "المزيد من الأدوات",
+        openPages: "الصفحات المفتوحة",
+      },
       unavailable: {
         title: "المتصفح مخصص لسطح المكتب فقط",
         subtitle: "افتح مساحة العمل هذه في Electron لاستخدام المتصفح المدمج.",
@@ -705,8 +853,6 @@ export const ar: TranslationResources = {
         close: "يغلق",
         cancel: "يلغي",
         archive: "أرشيف",
-        closeTerminalTitle: "إغلاق المحطة؟",
-        closeTerminalMessage: "سيتم إيقاف أي عملية جارية في هذه المحطة على الفور.",
         archiveRunningAgentTitle: "وكيل تشغيل الأرشيف؟",
         archiveRunningAgentMessage:
           "هذا الوكيل لا يزال قيد التشغيل. ستؤدي أرشفته إلى إيقاف الوكيل وإغلاق علامة التبويب.",
@@ -882,8 +1028,7 @@ export const ar: TranslationResources = {
           updateDirty: "التحديث غير متاح أثناء وجود تغييرات محلية، لذا قم بتنفيذها أو تخزينها أولاً",
           updateCurrent: "التحديث غير متاح لأن هذا الفرع محدث بالفعل باستخدام{{baseRef}}",
           mergePrNoGithub: "دمج PR غير متاح الآن لأن GitHub غير متصل",
-          archiveNotWorktree:
-            "الأرشيف غير متاح هنا لأنه لم يتم إنشاء مساحة العمل هذه كشجرة عمل Paseo",
+          archiveNotWorktree: "الأرشيف غير متاح هنا لأنه لم يتم إنشاء مساحة العمل هذه كشجرة عمل Swan",
           mergePrNoForge: "دمج {{noun}} غير متاح الآن لأن {{brand}} غير متصل",
           mergePrMissing: "دمج PR غير متاح لأنه لا يوجد طلب سحب حتى الآن",
           mergePrDraft: "دمج PR غير متاح لأن طلب السحب لا يزال مسودة",
@@ -964,6 +1109,7 @@ export const ar: TranslationResources = {
         modifiedFile: "معدّل",
         commits: {
           title: "الإيداعات",
+          baseHint: "يستخدم السجل {{baseRef}}",
           countLabel: "{{count}} من إيداعات مساحة العمل",
           noneAhead: "لا توجد إيداعات متقدمة على {{baseRef}} بعد",
           fileDiffEmpty: "لا توجد تغييرات لعرضها",
@@ -1064,6 +1210,8 @@ export const ar: TranslationResources = {
             cancelled: "تم الإلغاء",
           },
         },
+        previewFiles_one: "{{count}} ملف",
+        previewFiles_other: "{{count}} ملفات",
         states: {
           draft: "مسودة",
           merged: "تم الدمج",
@@ -1230,7 +1378,7 @@ export const ar: TranslationResources = {
       discord: "Discord",
       github: "إنشاء مشكلة على GitHub",
       whatsNew: "ما الجديد",
-      appName: "Paseo",
+      appName: "Swan",
     },
     sections: {
       sessions: "السجل",
@@ -1335,6 +1483,9 @@ export const ar: TranslationResources = {
     fields: {
       project: "المشروع",
       branch: "الفرع",
+      noProject: "بلا مشروع",
+      clearProject: "إزالة المشروع",
+      base: "الأساس",
       baseNotApplicable: "غير قابل للتطبيق",
       host: "المضيف",
     },
@@ -1378,7 +1529,7 @@ export const ar: TranslationResources = {
       close: "إغلاق النافذة",
     },
     quitting: {
-      title: "جارٍ إنهاء Paseo...",
+      title: "جارٍ إنهاء Swan...",
       detail: "إيقاف البرنامج الخفي المحلي.",
     },
     daemon: {
@@ -1393,20 +1544,20 @@ export const ar: TranslationResources = {
       },
       management: {
         title: "إدارة البرنامج الخفي المدمج",
-        hint: "اسمح لـ Paseo ببدء تشغيل البرنامج الخفي المدمج وإيقافه",
+        hint: "اسمح لـ Swan ببدء تشغيل البرنامج الخفي المدمج وإيقافه",
         pauseTitle: "وقفة المدمج في البرنامج الخفي",
         pauseMessage:
           "سيؤدي هذا إلى إيقاف البرنامج الخفي المدمج على الفور. سيتم إيقاف تشغيل الوكلاء والمحطات الطرفية المتصلة بالبرنامج الخفي المدمج.",
         pauseAndStop: "وقفة وتوقف",
         registrationFailed:
-          "Built-in daemon started, but Paseo could not save the localhost connection. Toggle daemon management off and on again, or add localhost manually.",
+          "Built-in daemon started, but Swan could not save the localhost connection. Toggle daemon management off and on again, or add localhost manually.",
         pausedStopFailed:
-          "تم إيقاف إدارة البرنامج الخفي المضمنة مؤقتًا، لكن لم يتمكن Paseo من إيقاف البرنامج الخفي.",
+          "تم إيقاف إدارة البرنامج الخفي المضمنة مؤقتًا، لكن لم يتمكن Swan من إيقاف البرنامج الخفي.",
         updateFailed: "غير قادر على تحديث إدارة البرنامج الخفي المضمنة.",
       },
       keepRunning: {
         title: "استمر في تشغيل البرنامج الخفي بعد الإقلاع عن التدخين",
-        hint: "يستمر تشغيل Daemon عند إنهاء Paseo",
+        hint: "يستمر تشغيل Daemon عند إنهاء Swan",
       },
       logs: {
         title: "ملف السجل",
@@ -1472,7 +1623,7 @@ export const ar: TranslationResources = {
     },
     rosetta: {
       title: "قم بتنزيل نسخة Apple Silicon",
-      runningIntel: "أنت تقوم بتشغيل إصدار Intel من Paseo ضمن Rosetta على Apple Silicon.",
+      runningIntel: "أنت تقوم بتشغيل إصدار Intel من Swan ضمن Rosetta على Apple Silicon.",
       highCpu:
         "يؤدي هذا إلى ارتفاع استخدام وحدة المعالجة المركزية. قم بتنزيل إصدار Apple Silicon لإصلاحه.",
       download: "تحميل",
@@ -1515,7 +1666,7 @@ export const ar: TranslationResources = {
         microphone: "لم يتم التحقق من حالة الميكروفون بعد.",
       },
       testNotification: {
-        title: "اختبار الإخطار Paseo",
+        title: "اختبار الإخطار Swan",
         body: "إذا كان بإمكانك رؤية ذلك، فهذا يعني أن إشعارات سطح المكتب تعمل.",
         notDelivered: "لم يتم تسليم الإخطار. تحقق من إعدادات النظام > الإشعارات.",
         failed: "فشل في إرسال الإخطار.",
@@ -1529,7 +1680,7 @@ export const ar: TranslationResources = {
     },
   },
   rootError: {
-    title: "واجه Paseo مشكلة.",
+    title: "واجه Swan مشكلة.",
     body: "جرّب مرة أخرى لإعادة تحميل التطبيق. إذا استمر حدوث ذلك، فأرفق التفاصيل أدناه عند الإبلاغ عنه.",
     details: "التفاصيل",
   },
@@ -1593,6 +1744,12 @@ export const ar: TranslationResources = {
     later: "لاحقاً",
     stashRestored: "تمت استعادة التغييرات المخفية",
   },
+  diffBaseSelector: {
+    compareAgainst: "المقارنة مع {{ref}}",
+    workspaceDefault: "إعداد مساحة العمل الافتراضي",
+    worktreeFixed: "قاعدة المقارنة لشجرة العمل هذه ثابتة.",
+    unableToResolve: "تعذر تحليل {{ref}}",
+  },
   agentAutocomplete: {
     searchingWorkspace: "جارٍ البحث في مساحة العمل...",
     loadingCommands: "جارٍ تحميل الأوامر...",
@@ -1625,7 +1782,7 @@ export const ar: TranslationResources = {
     },
   },
   onboarding: {
-    title: "مرحبا بكم في Paseo",
+    title: "مرحبا بكم في Swan",
     subtitle: "قم بتوصيل جهاز الكمبيوتر الخاص بك للبدء",
     actions: {
       settings: "إعدادات",
@@ -1733,7 +1890,7 @@ export const ar: TranslationResources = {
     },
     direct: {
       title: "اتصال مباشر",
-      helper: "أدخل عنوان خادم Paseo.",
+      helper: "أدخل عنوان خادم Swan.",
       fields: {
         host: "Host",
         port: "ميناء",
@@ -1776,7 +1933,7 @@ export const ar: TranslationResources = {
     },
     remoteSsh: {
       title: "SSH عن بُعد",
-      helper: "الاتصال بخادم Paseo يعمل على المضيف البعيد.",
+      helper: "الاتصال بخادم Swan يعمل على المضيف البعيد.",
       fields: {
         target: "مضيف SSH",
         password: "كلمة مرور الدايمون",
@@ -1837,15 +1994,15 @@ export const ar: TranslationResources = {
       enableDescription:
         "يتيح التتابع لهذا الجهاز الاتصال من أي مكان. حركة مرور الإقران مشفرة من طرف إلى طرف.",
       relayDocs: "كيفية عمل التتابع",
-      relayDocsAccessibility: "اقرأ كيفية عمل تتابع Paseo",
+      relayDocsAccessibility: "اقرأ كيفية عمل تتابع Swan",
       enableRelay: "تمكين التتابع",
       enablingRelay: "جارٍ التمكين...",
       notNow: "ليس الآن",
       directConnectionHint:
         "بدون التتابع، اتصل مباشرة عبر TCP أو Tailscale أو شبكة VPN أخرى. لن يتم إنشاء رمز QR.",
-      updateRequired: "حدّث المضيف لتمكين التتابع من Paseo Desktop.",
+      updateRequired: "حدّث المضيف لتمكين التتابع من Swan Desktop.",
       unavailable: "عرض الاقتران غير متاح.",
-      hint: "قم بمسح رمز QR هذا باستخدام Paseo على هاتفك، أو انسخ الرابط أدناه.",
+      hint: "قم بمسح رمز QR هذا باستخدام Swan على هاتفك، أو انسخ الرابط أدناه.",
       securityWarning:
         "تعامل مع رابط الاقتران هذا ككلمة مرور. يمكن لأي شخص يملكه الوصول إلى هذا البرنامج الخفي.",
       qrUnavailable: "رمز QR غير متاح.",
@@ -1880,7 +2037,7 @@ export const ar: TranslationResources = {
   serviceUrl: {
     title: "افتح الخدمة URL",
     message: "افتح{{url}}؟",
-    inPaseo: "في Paseo",
+    inPaseo: "في Swan",
     externalBrowser: "متصفح خارجي",
     dontAskAgain: "لا تسأل مرة أخرى",
   },
@@ -1894,6 +2051,11 @@ export const ar: TranslationResources = {
   },
   menu: {
     backdrop: "خلفية القائمة",
+  },
+  backgroundTasks: {
+    title: "المهام في الخلفية",
+    pillLabelOne: "مهمة واحدة في الخلفية",
+    pillLabelMany: "{{count}} مهام في الخلفية",
   },
   subagents: {
     title: "الوكلاء الفرعيون",
@@ -1951,6 +2113,7 @@ export const ar: TranslationResources = {
       subtitle: "ملفات مساحة العمل",
       tooltip: "تصفح ملفات مساحة العمل",
       chooseFile: "اختر ملفًا",
+      emptyDescription: "اختر ملفًا من شجرة مساحة العمل",
     },
     pullRequest: {
       label: "طلب السحب",
@@ -2000,10 +2163,35 @@ export const ar: TranslationResources = {
       other: "استخدم {{count}} أدوات أخرى",
     },
     paseoCalls: {
-      one: "استدعى Paseo {{count}} مرة",
-      other: "استدعى Paseo {{count}} مرات",
+      one: "استدعى Swan {{count}} مرة",
+      other: "استدعى Swan {{count}} مرات",
     },
     and: "و",
+    verbSeparator: "، ",
+    verbs: {
+      loadTools: "تحميل الأدوات",
+      skill: "استخدام المهارات",
+      read: "قراءة الملفات",
+      search: "البحث",
+      edit: "تعديل الملفات",
+      command: "تشغيل الأوامر",
+      paseo: "استدعاء Swan",
+      other: "استخدام الأدوات",
+    },
+    done: {
+      read: "تمت القراءة",
+      edit: "تم التعديل",
+      shell: "تم التشغيل",
+      search: "تم البحث",
+      fetch: "تم الجلب",
+    },
+    running: {
+      read: "يقرأ",
+      edit: "يحرر",
+      shell: "يشغّل",
+      search: "يبحث",
+      fetch: "يجلب",
+    },
   },
   renameModal: {
     rename: "إعادة تسمية",
@@ -2016,8 +2204,10 @@ export const ar: TranslationResources = {
     noData: "لا توجد بيانات للسياق",
     accessibilityNoData: "نافذة السياق: لا توجد بيانات للسياق",
     title: "نافذة السياق",
-    used: "تم استخدام{{percentage}}%",
-    tokens: "رموز{{used}}/{{max}}",
+    summary: "{{used}} / {{max}} ({{percentage}}%)",
+    used: "مستخدم",
+    free: "مساحة فارغة",
+    buffer: "احتياطي الضغط التلقائي",
     sessionCost: "تكلفة الجلسة{{cost}}",
     accessibility: "تم استخدام نافذة السياق{{percentage}}%",
   },
@@ -2098,7 +2288,7 @@ export const ar: TranslationResources = {
       send: "إرسال",
       sending: "جارٍ الإرسال...",
       sentTitle: "تم إرسال إشعار الاختبار",
-      sentDescription: "سلّم Paseo الإشعار إلى نظام التشغيل.",
+      sentDescription: "سلّم Swan الإشعار إلى نظام التشغيل.",
       sendFailedTitle: "تعذر إرسال إشعار الاختبار",
     },
     hostSections: {
@@ -2117,14 +2307,14 @@ export const ar: TranslationResources = {
     metadataGeneration: {
       title: "إنشاء البيانات الوصفية",
       description:
-        "اختر النموذج الذي يستخدمه Paseo لعناوين مساحات العمل وأسماء الفروع ورسائل الالتزام ومسودات طلبات السحب",
+        "اختر النموذج الذي يستخدمه Swan لعناوين مساحات العمل وأسماء الفروع ورسائل الالتزام ومسودات طلبات السحب",
       selection: "اختيار النموذج",
       automatic: "تلقائي",
       preferred: "يدوي",
-      automaticHint: "يختار Paseo نموذجًا سريعًا متاحًا",
-      preferredHint: "اختر النموذج الذي يستخدمه Paseo",
+      automaticHint: "يختار Swan نموذجًا سريعًا متاحًا",
+      preferredHint: "اختر النموذج الذي يستخدمه Swan",
       model: "النموذج",
-      fallbackHint: "إذا لم يكن متاحًا، يستخدم Paseo نموذجًا آخر متاحًا",
+      fallbackHint: "إذا لم يكن متاحًا، يستخدم Swan نموذجًا آخر متاحًا",
       docs: "الوثائق",
       saveError: "تعذر تحديث إنشاء البيانات الوصفية",
     },
@@ -2134,7 +2324,7 @@ export const ar: TranslationResources = {
       browserData: {
         title: "بيانات المتصفح",
         siteData: "ملفات تعريف الارتباط وبيانات المواقع",
-        description: "تتشارك علامات تبويب المتصفح تسجيلات الدخول وبيانات المواقع عبر Paseo.",
+        description: "تتشارك علامات تبويب المتصفح تسجيلات الدخول وبيانات المواقع عبر Swan.",
         clear: "مسح بيانات المتصفح",
         clearing: "جارٍ المسح...",
         confirmTitle: "هل تريد مسح بيانات المتصفح؟",
@@ -2160,7 +2350,7 @@ export const ar: TranslationResources = {
       serviceUrls: {
         options: {
           ask: "بسأل",
-          inApp: "في Paseo",
+          inApp: "في Swan",
           external: "متصفح خارجي",
         },
       },
@@ -2244,7 +2434,7 @@ export const ar: TranslationResources = {
         label: "تحديثات التطبيق",
         readyToInstall: "جاهز للتثبيت:{{version}}",
         installTitle: "تثبيت تحديث سطح المكتب",
-        installMessage: "يؤدي هذا إلى تحديث Paseo على هذا الكمبيوتر",
+        installMessage: "يؤدي هذا إلى تحديث Swan على هذا الكمبيوتر",
         installConfirm: "تثبيت التحديث",
         update: "تحديث",
         updateTo: "التحديث إلى{{version}}",
@@ -2256,7 +2446,21 @@ export const ar: TranslationResources = {
       },
     },
     appearance: {
+      advanced: {
+        title: "إعدادات متقدمة",
+        reset: "استعادة الإعدادات الافتراضية",
+        resetLabel: "إعادة ضبط إعدادات المظهر المتقدمة",
+      },
+      motion: {
+        title: "تقليل الحركة",
+        hint: "تقليل الرسوم المتحركة أو اتباع إعداد النظام.",
+        system: "النظام",
+        on: "تشغيل",
+        off: "إيقاف",
+      },
       theme: {
+        visualStyle: "النمط المرئي",
+        mode: "الوضع",
         title: "سمة",
         accessibilityLabel: "الموضوع:{{value}}",
         options: {
@@ -2268,6 +2472,44 @@ export const ar: TranslationResources = {
           ghostty: "شبحي",
           pureBlack: "أسود خالص",
           auto: "نظام",
+        },
+      },
+      colors: {
+        title: "ألوان {{theme}}",
+        info: "اختر ألوان الأجزاء الرئيسية في التطبيق. اترك الحقل فارغًا لاستخدام لون السمة.",
+        reset: "إعادة تعيين",
+        resetLabel: "إعادة تعيين ألوان {{theme}}",
+        pickerAccessibility: "اختيار لون {{role}}",
+        fieldAccessibility: "لون {{role}} بالنظام الست عشري",
+        roles: {
+          main: {
+            title: "الشاشة الرئيسية",
+            hint: "خلفية المحادثة ومساحة العمل",
+          },
+          sidebar: {
+            title: "الشريط الجانبي",
+            hint: "خلفية الشريط الجانبي",
+          },
+          selection: {
+            title: "الصف المحدد",
+            hint: "تمييز الصف المحدد في الشريط الجانبي",
+          },
+          accent: {
+            title: "لون التمييز",
+            hint: "الأزرار ومفاتيح التبديل وعناصر التمييز الأخرى",
+          },
+          text: {
+            title: "النص",
+            hint: "النص الأساسي",
+          },
+          mutedText: {
+            title: "النص الثانوي",
+            hint: "التسميات والأوصاف",
+          },
+          border: {
+            title: "الحدود",
+            hint: "الفواصل والحواف",
+          },
         },
       },
       detailLevel: {
@@ -2299,6 +2541,9 @@ export const ar: TranslationResources = {
         interfaceSize: "حجم الواجهة",
         interfaceSizeHint: "يُستخدم للتنقل وعناصر التحكم والتسميات",
         interfaceSizeAccessibility: "حجم خط الواجهة",
+        contentFont: "خط المحتوى",
+        contentFontHint: "يُستخدم لنص الدردشة وMarkdown وحقل الإدخال. اتركه فارغًا لاستخدام خط الواجهة",
+        contentFontAccessibility: "عائلة خطوط المحتوى",
         contentSize: "حجم المحتوى",
         contentSizeHint: "يُستخدم لنص الدردشة وملفات Markdown المعروضة",
         contentSizeAccessibility: "حجم خط المحتوى",
@@ -2306,6 +2551,16 @@ export const ar: TranslationResources = {
         codeFontHint:
           "تستخدم في الكود والاختلافات والمخرجات الطرفية. اتركه فارغًا للإعداد الافتراضي للنظام",
         codeFontAccessibility: "عائلة خطوط الكود",
+        interfaceStyle: "نمط خط الواجهة",
+        interfaceWeightAccessibility: "سُمك خط الواجهة: {{value}}",
+        contentWeightAccessibility: "سُمك خط المحتوى: {{value}}",
+        codeWeightAccessibility: "سُمك خط الكود: {{value}}",
+        weightOptions: {
+          default: "الافتراضي",
+          regular: "عادي",
+          medium: "متوسط",
+          semibold: "شبه عريض",
+        },
         codeSize: "حجم الكود",
         codeSizeHint: "يُستخدم للكود والفروقات ومخرجات الطرفية",
         codeSizeAccessibility: "حجم خط الكود",
@@ -2492,10 +2747,10 @@ export const ar: TranslationResources = {
         title: "مهارات التنسيق",
         description: "قم بتعليم عملائك كيفية التنسيق من خلال CLI",
         updateAvailable: "التحديث متاح",
-        updateTitle: "تحديث مهارات Paseo ؟",
+        updateTitle: "تحديث مهارات Swan ؟",
         updateFallback: "مزامنة المهارات المجمعة لجهازك.",
-        uninstallTitle: "إلغاء تثبيت مهارات Paseo ؟",
-        uninstallMessage: "يزيل جميع مهارات تنسيق Paseo من ~/.agents ، ~/.claude ، ~/.codex.",
+        uninstallTitle: "إلغاء تثبيت مهارات Swan ؟",
+        uninstallMessage: "يزيل جميع مهارات تنسيق Swan من ~/.agents ، ~/.claude ، ~/.codex.",
         choose: "اختيار المهارات",
         chooseAll: "كل المهارات",
         chooseAllHint: "أبقِ جميع المهارات المرفقة مثبتة، بما فيها ما يُضاف لاحقًا.",
@@ -2531,9 +2786,9 @@ export const ar: TranslationResources = {
         title: "التنسيق",
         unavailable: "اتصل بهذا المضيف لإدارة التنسيق",
         enableTools: {
-          title: "تمكين أدوات Paseo",
+          title: "تمكين أدوات Swan",
           hint: "سيتمكن الوكلاء من إدارة أشجار العمل والوكلاء والجداول الزمنية",
-          accessibilityLabel: "حقن أدوات Paseo",
+          accessibilityLabel: "حقن أدوات Swan",
         },
         systemPrompt: {
           title: "موجه النظام",
@@ -2635,15 +2890,14 @@ export const ar: TranslationResources = {
             "هذا المضيف غير متصل. انتظر حتى يصبح متصلاً بالإنترنت قبل إعادة التشغيل.",
           offlineTitle: "Host غير متصل",
           offlineMessage:
-            "هذا المضيف غير متصل.  يقوم Paseo بإعادة الاتصال تلقائيًا - انتظر حتى يتم الاتصال بالإنترنت مرة أخرى قبل إعادة التشغيل.",
+            "هذا المضيف غير متصل.  يقوم Swan بإعادة الاتصال تلقائيًا - انتظر حتى يتم الاتصال بالإنترنت مرة أخرى قبل إعادة التشغيل.",
           requestFailedTitle: "خطأ",
           requestFailedMessage:
-            "فشل في إرسال طلب إعادة التشغيل.  يقوم Paseo بإعادة الاتصال تلقائيًا - حاول مرة أخرى بمجرد ظهور المضيف على أنه متصل بالإنترنت.",
+            "فشل في إرسال طلب إعادة التشغيل.  يقوم Swan بإعادة الاتصال تلقائيًا - حاول مرة أخرى بمجرد ظهور المضيف على أنه متصل بالإنترنت.",
           dialogFailedMessage: "غير قادر على فتح مربع حوار تأكيد إعادة التشغيل.",
         },
         update: {
-          desktopManagedHint:
-            "يدير Paseo Desktop هذا البرنامج الخفي. حدّث Paseo Desktop على المضيف.",
+          desktopManagedHint: "يدير Swan Desktop هذا البرنامج الخفي. حدّث Swan Desktop على المضيف.",
           title: "Update daemon",
           hint: "Update the daemon to the latest version and restart it",
           confirm: "Update",
@@ -2751,6 +3005,7 @@ export const ar: TranslationResources = {
       noEditableTarget: "هذا المشروع غير متاح للتحرير على هذا المضيف.",
       backToProjects: "العودة إلى المشاريع",
       edit: {
+        sourceFolder: "مجلد المصدر",
         title: "تعديل المشروع",
         name: "الاسم",
         nameLabel: "اسم المشروع",
@@ -2803,7 +3058,7 @@ export const ar: TranslationResources = {
         newScript: "نص جديد",
         editScript: "تحرير{{name}}",
         runAsService: "تشغيل كخدمة",
-        serviceHint: "يشرف Paseo على العملية ويعين منفذًا عبر $PASEO_PORT",
+        serviceHint: "يشرف Swan على العملية ويعين منفذًا عبر $PASEO_PORT",
         actions: {
           add: "إضافة البرنامج النصي",
           edit: "يحرر",
@@ -2812,7 +3067,7 @@ export const ar: TranslationResources = {
       },
       metadata: {
         title: "توليد البيانات الوصفية",
-        info: "تعليمات خاصة بالمشروع يتم إدخالها في الذكاء الاصطناعي الذي يستخدمه Paseo لإنشاء بيانات التعريف - استخدمها لفرض اصطلاحات فريقك مثل تسمية الفرع أو نمط الالتزام أو تنسيق PR",
+        info: "تعليمات خاصة بالمشروع يتم إدخالها في الذكاء الاصطناعي الذي يستخدمه Swan لإنشاء بيانات التعريف - استخدمها لفرض اصطلاحات فريقك مثل تسمية الفرع أو نمط الالتزام أو تنسيق PR",
         branchName: "اسماء الفروع",
         branchNamePlaceholder: "بادئة الفروع بـ fet/ أو Fix/, mb/ للفروع الشخصية",
         commitMessage: "ارتكاب الرسائل",

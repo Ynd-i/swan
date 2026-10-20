@@ -13,6 +13,7 @@ import {
 } from "./real-provider-test-config.js";
 import {
   closeRewindSession,
+  expectRealNativeFork,
   fetchTimelineItems,
   fileExists,
   tmpRewindCwd,
@@ -353,4 +354,18 @@ describe("daemon E2E (real claude) - rewind", () => {
       await closeClaudeRewindSession(session);
     }
   }, 420_000);
+
+  test("forks a real conversation through a completed turn into an independent agent", async () => {
+    const session = await launchClaudeRewindSession(harness, "claude-native-fork-real");
+    try {
+      await expectRealNativeFork({
+        client: harness.client,
+        agentId: session.agentId,
+        turnTimeoutMs: TURN_TIMEOUT_MS,
+        releaseRuntime: (agentId) => harness.daemon.daemon.agentManager.closeAgent(agentId),
+      });
+    } finally {
+      await closeClaudeRewindSession(session);
+    }
+  }, 900_000);
 });

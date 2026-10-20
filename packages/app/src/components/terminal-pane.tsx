@@ -68,7 +68,7 @@ import {
   type TerminalResizeRequest,
 } from "./terminal-resize-debouncer";
 import { useIsCompactFormFactor } from "@/constants/layout";
-import { isNative } from "@/constants/platform";
+import { getIsElectronMac, isNative } from "@/constants/platform";
 import {
   applyTerminalRendererReadyChange,
   resolveTerminalStreamTarget,
@@ -1066,7 +1066,12 @@ export function TerminalPane({
   return (
     <Animated.View style={containerStyle}>
       <View style={styles.outputContainer}>
-        <View style={styles.terminalGestureContainer}>
+        <View
+          style={[
+            styles.terminalGestureContainer,
+            getIsElectronMac() && styles.desktopTerminalInset,
+          ]}
+        >
           <TerminalEmulator
             ref={emulatorRef}
             dom={TERMINAL_EMULATOR_DOM_PROPS}
@@ -1169,6 +1174,11 @@ const styles = StyleSheet.create((theme) => ({
   terminalGestureContainer: {
     flex: 1,
     minHeight: 0,
+  },
+  desktopTerminalInset: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: theme.colors.terminal.background,
   },
   attachOverlay: {
     ...StyleSheet.absoluteFillObject,

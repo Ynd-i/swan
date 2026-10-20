@@ -1,3 +1,5 @@
+import { getIsElectronMac } from "@/constants/platform";
+import { useIsCompactFormFactor } from "@/constants/layout";
 import { View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { settingsStyles } from "@/styles/settings";
@@ -16,11 +18,13 @@ export function UsageList({
   reports: UsageReportEntry[];
   display: UsageDisplay;
 }) {
+  const isCompact = useIsCompactFormFactor();
+  const overview = getIsElectronMac() && !isCompact;
   const { inSidebar } = useUsageInSidebar();
   return (
-    <View style={styles.list}>
+    <View style={styles.list(overview)}>
       {reports.map((entry) => (
-        <View key={entry.id} style={settingsStyles.card}>
+        <View key={entry.id} style={overview ? undefined : settingsStyles.card}>
           <UsageCard
             serverId={serverId}
             entry={entry}
@@ -35,7 +39,7 @@ export function UsageList({
 }
 
 const styles = StyleSheet.create((theme) => ({
-  list: {
-    gap: theme.spacing[3],
-  },
+  list: (overview: boolean) => ({
+    gap: overview ? theme.spacing[4] : theme.spacing[3],
+  }),
 }));

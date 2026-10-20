@@ -132,6 +132,44 @@ interface HelpSectionCase {
 }
 
 describe("keyboard-shortcuts", () => {
+  it("excludes voice execution and help only in the custom macOS desktop", () => {
+    const overrides = { "message-input-voice-toggle-cmd-shift-d-mac": "Cmd+Shift+Y" };
+    const bindings = buildEffectiveBindings(overrides);
+    for (const platform of [
+      { isMac: true, isDesktop: true },
+      { isMac: true, isDesktop: false },
+      { isMac: false, isDesktop: true },
+    ]) {
+      const voiceAvailable = !(platform.isMac && platform.isDesktop);
+      const rows = new Set(
+        buildKeyboardShortcutHelpSections(platform, bindings)
+          .flatMap((section) => section.rows)
+          .map((row) => row.id),
+      );
+      for (const action of ["voice-toggle", "dictation-toggle", "voice-mute-toggle"]) {
+        expect(rows.has(action)).toBe(voiceAvailable);
+        expect(resolveShortcutKeysForAction(action, overrides, platform) !== null).toBe(
+          voiceAvailable,
+        );
+      }
+      for (const event of [
+        { key: "d", code: "KeyD", metaKey: platform.isMac, ctrlKey: !platform.isMac },
+        {
+          key: platform.isMac ? "y" : "d",
+          code: platform.isMac ? "KeyY" : "KeyD",
+          metaKey: platform.isMac,
+          ctrlKey: !platform.isMac,
+          shiftKey: true,
+        },
+        { key: " ", code: "Space" },
+        { key: "Enter", code: "Enter" },
+      ]) {
+        const result = resolveShortcut({ event, context: platform, bindings });
+        expect(result.match !== null).toBe(voiceAvailable);
+      }
+    }
+  });
+
   const matchingCases: MatchingShortcutCase[] = [
     {
       name: "matches Cmd+O to open project",

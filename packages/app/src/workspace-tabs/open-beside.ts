@@ -11,6 +11,7 @@ import {
 import { getPanelInstanceAttributes } from "@/panels/panel-instance-attributes";
 import { workspaceTabTargetsEqual } from "@/workspace-tabs/identity";
 import type { WorkspaceTabTarget } from "@/workspace-tabs/model";
+import { getIsElectronMac } from "@/constants/platform";
 
 export type OpenInSidePaneSource = keyof OpenInSidePanePreferences;
 export type WorkspaceTargetOpenLocation = "main" | "side";
@@ -150,10 +151,12 @@ export function openPreferredWorkspacePreview(
     explorerSidebarPaneId: input.explorerSidebarPaneId,
     lastMainPaneId: input.lastMainPaneId,
   });
-  const destinationPaneId =
-    canOpenBeside() && input.preferences[input.source]
-      ? store.ensureSidePane(input.workspaceKey)
-      : mainPane?.id;
+  let destinationPaneId = mainPane?.id;
+  if (getIsElectronMac()) {
+    destinationPaneId = store.showExplorerSidebar(input.workspaceKey) ?? undefined;
+  } else if (canOpenBeside() && input.preferences[input.source]) {
+    destinationPaneId = store.ensureSidePane(input.workspaceKey) ?? undefined;
+  }
   if (!destinationPaneId) return null;
   const nextLayout = useWorkspaceLayoutStore.getState().layoutByWorkspace[input.workspaceKey];
   const destinationPane = nextLayout ? findPaneById(nextLayout.root, destinationPaneId) : null;

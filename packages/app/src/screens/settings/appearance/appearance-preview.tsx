@@ -6,7 +6,7 @@ import type { HighlightToken } from "@getpaseo/highlight";
 import { isWeb } from "@/constants/platform";
 import { CODE_SURFACE_DATASET } from "@/styles/code-surface";
 import { syntaxTokenStyleFor } from "@/styles/syntax-token-styles";
-import { DEFAULT_MONO_FONT_STACK } from "@/styles/theme";
+import { DEFAULT_MONO_FONT_STACK, getContentLineHeight } from "@/styles/theme";
 import { inlineUnistylesStyle } from "@/styles/unistyles-inline-style";
 import { tokenizeToLines } from "@/utils/highlight-cache";
 import { CHANGED_LINE_INDICES, PREVIEW_AFTER, PREVIEW_BEFORE } from "./preview-snippet";
@@ -67,7 +67,7 @@ function buildCodeOverride(overrides: PreviewOverrides | undefined): TextStyle {
 function buildContentOverride(overrides: PreviewOverrides | undefined): TextStyle {
   const fontSize = resolveSizeOverride(overrides?.contentFontSize);
   if (fontSize === undefined) return {};
-  return inlineUnistylesStyle({ fontSize, lineHeight: Math.round(fontSize * 1.4) });
+  return inlineUnistylesStyle({ fontSize, lineHeight: getContentLineHeight(fontSize) });
 }
 
 interface KeyedToken {
@@ -207,6 +207,7 @@ const styles = StyleSheet.create((theme) => ({
   codeLine: {
     fontFamily: theme.fontFamily.mono,
     fontSize: theme.fontSize.code,
+    ...(theme.codeFontWeight ? { fontWeight: theme.codeFontWeight } : null),
     lineHeight: theme.lineHeight.diff,
     color: theme.colors.foreground,
     ...(isWeb ? { whiteSpace: "pre", overflowWrap: "normal" } : null),
@@ -214,7 +215,8 @@ const styles = StyleSheet.create((theme) => ({
   contentSample: {
     color: theme.colors.foreground,
     fontSize: theme.fontSize.content,
-    lineHeight: Math.round(theme.fontSize.content * 1.4),
+    ...(theme.contentFontWeight ? { fontWeight: theme.contentFontWeight } : null),
+    lineHeight: getContentLineHeight(theme.fontSize.content),
     paddingHorizontal: theme.spacing[3],
     paddingBottom: theme.spacing[2],
   },

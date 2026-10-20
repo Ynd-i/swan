@@ -145,6 +145,47 @@ test("HTML usage body is an error", async () => {
   ).rejects.toThrow("Codex usage API returned HTML");
 });
 
+test("preserves missing usage and reset data without inventing zero usage or credits", async () => {
+  const report = await fetchUsage(
+    authInput(fixtureHome),
+    async () =>
+      new Response(
+        JSON.stringify({
+          rate_limit: {
+            primary_window: { used_percent: null, reset_at: null },
+            secondary_window: {},
+          },
+          code_review_rate_limit: { primary_window: { used_percent: 0 } },
+          credits: { balance: null },
+        }),
+        { status: 200 },
+      ),
+  );
+  expect(report.windows).toEqual([
+    expect.objectContaining({
+      id: "unknown_primary",
+      usedPct: null,
+      remainingPct: null,
+      resetsAt: null,
+      tone: "default",
+    }),
+    expect.objectContaining({
+      id: "unknown_secondary",
+      usedPct: null,
+      remainingPct: null,
+      resetsAt: null,
+      tone: "default",
+    }),
+    expect.objectContaining({
+      id: "code_review:unknown_primary",
+      usedPct: 0,
+      remainingPct: 100,
+      tone: "ok",
+    }),
+  ]);
+  expect(report.balances).toEqual([]);
+});
+
 test("401 leaves auth.json byte for byte unchanged and makes no refresh request", async () => {
   const home = await mkdtemp(join(tmpdir(), "usage-codex-"));
   try {

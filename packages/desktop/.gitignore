@@ -1,6 +1,7 @@
 # Build output
 dist/
 release/
+release-custom/
 
 # Dependencies
 node_modules/
