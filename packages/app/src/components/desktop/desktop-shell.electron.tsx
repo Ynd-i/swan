@@ -24,7 +24,7 @@ import {
 import { useTranslation } from "react-i18next";
 import { Text, useWindowDimensions, View } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
-import { WindowSidebarMenuToggle } from "@/components/headers/menu-header";
+import { WindowSidebarMenuToggle } from "@/components/headers/sidebar-menu-toggle";
 import { HeaderToggleButton } from "@/components/headers/header-toggle-button";
 import { SidebarHelpMenu } from "@/components/sidebar/sidebar-help-menu";
 import { HostPicker } from "@/components/hosts/host-picker";

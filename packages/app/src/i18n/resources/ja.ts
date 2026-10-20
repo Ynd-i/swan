@@ -22,6 +22,9 @@ export const ja: TranslationResources = {
     agentError: "使用量を読み込めません: {{reason}}",
     updated: "{{time}}に更新",
     updatedNow: "たった今更新",
+    lastUpdated: "最終更新: {{time}}",
+    lastUpdatedNow: "最終更新: たった今",
+    noSuccessfulUpdate: "まだ更新に成功していません",
     loading: "使用量を読み込み中…",
     empty: "使用量データがありません",
     noHosts: "接続済みホストがありません",
@@ -35,6 +38,7 @@ export const ja: TranslationResources = {
     remainingBalance: "残り {{amount}}",
     resetsIn: "{{duration}}後にリセット",
     resetDue: "リセット予定時刻を経過",
+    resetPassed: "リセット時刻を過ぎています",
     runsOutIn: "{{duration}}後に使い切る見込み",
     runsOutNow: "まもなく使い切る見込み",
     durationMinutes: "{{count}}分",
@@ -137,6 +141,7 @@ export const ja: TranslationResources = {
     back: "戻る",
     loading: "読み込み中...",
     actions: {
+      save: "保存",
       back: "戻る",
       cancel: "キャンセル",
       close: "閉じる",
@@ -246,6 +251,8 @@ export const ja: TranslationResources = {
     input: {
       accessibilityLabel: "エージェントにメッセージ...",
       terminalAccessibilityLabel: "Terminal prompt",
+      fullscreen: "全画面表示",
+      exitFullscreen: "全画面表示を終了",
       focusHint: "{{shortcut}}でフォーカス",
       addAttachment: "添付ファイルを追加",
       interruptAgent: "エージェントを中断",
@@ -494,6 +501,7 @@ export const ja: TranslationResources = {
       details: "詳細",
     },
     dictation: {
+      paused: "マイクが中断されました。再開を待っています…",
       start: "音声入力を開始",
       cancel: "音声入力をキャンセル",
       retry: "音声入力を再試行",
@@ -503,6 +511,7 @@ export const ja: TranslationResources = {
       failedRetry: "音声入力に失敗しました。再試行をタップしてください。",
     },
     question: {
+      responseFailed: "回答を送信できませんでした。もう一度お試しください。",
       title: "質問",
       skip: "スキップ",
       send: "送信",
@@ -760,6 +769,9 @@ export const ja: TranslationResources = {
       updateHost: "ネイティブターミナルを使用するにはホストを更新してください。",
       unableToSubscribe: "ターミナルに接続できません",
     },
+    sheet: {
+      openAsTab: "タブで開く",
+    },
     tabs: {
       loading: "読み込み中...",
       modified: "未保存の変更",
@@ -775,7 +787,7 @@ export const ja: TranslationResources = {
       },
       switcher: {
         trigger: "タブを切り替え（{{count}}件開いています）",
-        title: "タブを切り替え",
+        title: "ワークスペースのタブ",
         searchPlaceholder: "タブを検索",
       },
       menu: {
@@ -869,6 +881,7 @@ export const ja: TranslationResources = {
     header: {
       actions: {
         workspaceActions: "ワークスペースアクション",
+        workspaceActionsUnhealthy: "ワークスペースアクション、異常なサービスがあります",
         newAgent: "新しいエージェント",
         newTerminal: "新しいターミナル",
         newBrowser: "新しいブラウザタブ",
@@ -916,6 +929,8 @@ export const ja: TranslationResources = {
         exitCode: "終了コード: {{code}}",
         startFailed: "{{scriptName}}の起動に失敗しました",
         stopFailed: "{{scriptName}}の停止に失敗しました",
+        running: "実行中",
+        runningCount: "{{count}} 件実行中",
       },
     },
     tree: {
@@ -1305,6 +1320,7 @@ export const ja: TranslationResources = {
       done: "完了",
     },
     display: {
+      showBackground: "バックグラウンドを表示",
       trigger: "表示設定",
       heading: "表示",
       grouping: {
@@ -1481,10 +1497,12 @@ export const ja: TranslationResources = {
     },
     fields: {
       project: "プロジェクト",
+      branch: "ブランチ",
       noProject: "プロジェクトなし",
       clearProject: "プロジェクトを外す",
       base: "ベース",
       baseNotApplicable: "該当なし",
+      host: "ホスト",
     },
     titlePlaceholder: "タイトル（任意）",
     errors: {
@@ -2215,6 +2233,18 @@ export const ja: TranslationResources = {
     accessibility: "コンテキストウィンドウ{{percentage}}%使用",
   },
   review: {
+    feedback: {
+      send: "フィードバックを送信 ({{count}})",
+      sending: "フィードバックを送信中 ({{count}})",
+      chooseAgent: "エージェントを選択",
+      sent: "{{recipient}} にフィードバックを送信しました",
+      "no-agents":
+        "フィードバックを送信するには、このワークスペースでエージェントタブを開いてください。",
+      disconnected: "フィードバックを送信するにはホストに接続してください。",
+      "no-context": "保存したコメントはこの差分と一致しなくなりました。",
+      failed: "フィードバックを送信できませんでした。もう一度お試しください。",
+      prompt: "このコードレビューに対応してください。",
+    },
     comment: {
       add: "レビューコメントを追加",
       edit: "レビューコメントを編集",

@@ -1,3 +1,4 @@
+import { Alert } from "@/components/ui/alert";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { useState, useCallback, useMemo, useRef, type RefObject } from "react";
 import {
@@ -18,6 +19,7 @@ import { getIsElectronMac, isWeb } from "@/constants/platform";
 import type { Theme } from "@/styles/theme";
 import { EditingTextInput as TextInput } from "@/components/ui/text-input";
 import type { EditingTextInputHandle } from "@/components/ui/text-input/types";
+import { ScrollableCodeSurface } from "@/components/ui/scrollable-code-surface";
 import { isImeComposingKeyboardEvent } from "@/utils/keyboard-ime";
 import {
   areQuestionsAnswered,
@@ -35,9 +37,13 @@ interface QuestionFormCardProps {
   permission: PendingPermission;
   onRespond: (response: AgentPermissionResponse) => void;
   isResponding: boolean;
+  responseError: string | null;
 }
 
 const IS_WEB = isWeb;
+// Native previews are uncapped: inside the option's Pressable, Android never hands a
+// drag to the preview's nested scroll, so lines past a cap would be unreachable.
+const OPTION_PREVIEW_MAX_HEIGHT = IS_WEB ? 240 : undefined;
 // The Mac card only renders in Electron: the textarea grows with the answer up to its
 // maxHeight, then scrolls.
 const MAC_GROWING_INPUT_STYLE = { fieldSizing: "content" };
@@ -170,6 +176,20 @@ function QuestionOptionRow({
           <Text style={optionLabelStyle}>{option.label}</Text>
           {option.description ? (
             <Text style={optionDescriptionStyle}>{option.description}</Text>
+          ) : null}
+          {option.preview ? (
+            // Shown for every option at once so they can be compared before picking.
+            // Long lines wrap, as in Claude Code, since most previews are prose.
+            <ScrollableCodeSurface
+              tone="surface0"
+              maxHeight={OPTION_PREVIEW_MAX_HEIGHT}
+              horizontal={false}
+              selectable={false}
+              textStyle={styles.optionPreviewText}
+              testID="question-form-option-preview"
+            >
+              {option.preview}
+            </ScrollableCodeSurface>
           ) : null}
         </View>
         {isMacPresentation && isSelected && !multiSelect ? (
@@ -541,7 +561,13 @@ function QuestionFormActions({
   );
 }
 
-export function QuestionFormCard({ permission, onRespond, isResponding }: QuestionFormCardProps) {
+// oxlint-disable-next-line complexity -- upstream card plus the Mac presentation branches
+export function QuestionFormCard({
+  permission,
+  onRespond,
+  isResponding,
+  responseError,
+}: QuestionFormCardProps) {
   const { theme } = useUnistyles();
   const { t } = useTranslation();
   const isMobile = useIsCompactFormFactor();
@@ -641,7 +667,7 @@ export function QuestionFormCard({ permission, onRespond, isResponding }: Questi
   ]);
 
   const handleDeny = useCallback(() => {
-    if (!questions) return;
+    if (!questions || isResponding) return;
     setRespondingAction("dismiss");
     if (shouldSubmitEmptyOnDismiss(questions)) {
       onRespond({
@@ -657,7 +683,7 @@ export function QuestionFormCard({ permission, onRespond, isResponding }: Questi
       behavior: "deny",
       message: "Dismissed by user",
     });
-  }, [questions, onRespond, otherTexts, permission.request.input, selections]);
+  }, [questions, isResponding, onRespond, otherTexts, permission.request.input, selections]);
 
   const handleSelectQuestion = useCallback((index: number) => {
     setActiveQuestionIndex(index);
@@ -678,6 +704,7 @@ export function QuestionFormCard({ permission, onRespond, isResponding }: Questi
     handleSubmit();
   }, [activeQuestionAnswered, handleSubmit, isLastQuestion, isResponding, questions?.length]);
 
+  const pendingAction = isResponding ? respondingAction : null;
   const primaryDisabled = isResponding || (isLastQuestion ? !allAnswered : !activeQuestionAnswered);
   const primaryActionLabel = isLastQuestion
     ? t("message.question.submit")
@@ -711,7 +738,7 @@ export function QuestionFormCard({ permission, onRespond, isResponding }: Questi
   );
   const selected = selections[resolvedActiveQuestionIndex] ?? new Set<number>();
   const otherText = otherTexts[resolvedActiveQuestionIndex] ?? "";
-  const showTextInput = activeQuestion ? questionShowsTextInput(activeQuestion) : false;
+  const showTextInput = questionShowsTextInput(questions[resolvedActiveQuestionIndex]);
 
   return (
     <View style={containerStyle} testID="question-form-card">
@@ -774,12 +801,14 @@ export function QuestionFormCard({ permission, onRespond, isResponding }: Questi
         </View>
       ) : null}
 
+      {responseError ? <Alert variant="error" description={responseError} size="sm" /> : null}
+
       <QuestionFormActions
         theme={theme}
         isMacPresentation={isMacPresentation}
         isMobile={isMobile}
         isResponding={isResponding}
-        respondingAction={respondingAction}
+        respondingAction={pendingAction}
         dismissLabel={dismissLabel}
         primaryDisabled={primaryDisabled}
         primaryActionLabel={primaryActionLabel}
@@ -921,6 +950,10 @@ const styles = StyleSheet.create((theme, rt) => ({
   optionDescription: {
     fontSize: theme.fontSize.base,
     lineHeight: 20,
+  },
+  optionPreviewText: {
+    lineHeight: 20,
+    ...(isWeb ? { whiteSpace: "pre-wrap", overflowWrap: "break-word" } : null),
   },
   selectionControl: {
     width: 18,

@@ -3,7 +3,7 @@ import { i18n } from "@/i18n/i18next";
 import { usageCopy } from "./copy";
 import { formatUsageTimeAgo } from "./format";
 import type { UsageDisplayAs } from "./preferences";
-import type { UsageReportEntry, UsageView, UsageWindow } from "./types";
+import type { UsageReport, UsageReportEntry, UsageView, UsageWindow } from "./types";
 
 export function usedPercent(window: UsageWindow): number | null {
   if (window.usedPct != null) return window.usedPct;
@@ -42,8 +42,9 @@ export function formatUsageFreshness(
   compactTimeAgo: string,
   t: TFunction = i18n.t,
   fetchedAt?: string,
+  retained = false,
 ): string {
-  if (compactTimeAgo === "now") return t("usage.updatedNow");
+  if (compactTimeAgo === "now") return t(retained ? "usage.lastUpdatedNow" : "usage.updatedNow");
   let time = formatUsageTimeAgo(compactTimeAgo, t);
   if (time === compactTimeAgo && fetchedAt && Number.isFinite(new Date(fetchedAt).getTime())) {
     time = new Date(fetchedAt).toLocaleDateString(i18n.resolvedLanguage, {
@@ -51,7 +52,7 @@ export function formatUsageFreshness(
       day: "numeric",
     });
   }
-  return t("usage.updated", { time });
+  return t(retained ? "usage.lastUpdated" : "usage.updated", { time });
 }
 
 /** A user-requested refresh of one report. The previous report stays on screen throughout. */
@@ -100,17 +101,24 @@ export function upsertReport(
 }
 
 /**
- * The list a finished request leaves: its reports, dropping any the host no longer has, except
- * that a copy on screen fetched after the request's copy stays.
+ * Keep displayed reports in place: the finished list is in fetch-completion order, which can
+ * change on every refresh. Drop missing reports, append new ones, and keep newer fetched copies.
  */
 export function settleReports(
   shown: readonly UsageReportEntry[] | undefined,
   finished: readonly UsageReportEntry[],
 ): UsageReportEntry[] {
-  return finished.map((report) => {
-    const copy = shown?.find((entry) => entry.id === report.id);
-    return copy ? laterFetched(copy, report) : report;
-  });
+  const remaining = new Map(finished.map((report) => [report.id, report]));
+  const settled: UsageReportEntry[] = [];
+  for (const report of shown ?? []) {
+    const arriving = remaining.get(report.id);
+    if (!arriving) {
+      continue;
+    }
+    settled.push(laterFetched(report, arriving));
+    remaining.delete(report.id);
+  }
+  return [...settled, ...remaining.values()];
 }
 
 export interface UsageQueryState {
@@ -202,4 +210,41 @@ export function resolveUsageModalHostId(choice: UsageHostChoice): string | null 
   const connected = choice.hosts.filter((host) => host.isConnected);
   const picked = connected.find((host) => host.serverId === choice.pickedServerId);
   return picked?.serverId ?? resolveUsageHostId(choice) ?? connected[0]?.serverId ?? null;
+}
+
+/** Current outcome owns messages; only a successful poll owns values and freshness. */
+export function resolveUsageReport(entry: UsageReportEntry) {
+  const available = entry.report.status === "available";
+  // COMPAT(usageLastSuccessful): added in v0.12.0, remove after 2027-04-17 once daemon floor >= v0.12.0.
+  // Older daemons cannot provide history; a failed attempt is never a successful update.
+  const snapshot = available ? null : (entry.lastSuccessful ?? null);
+  const content = entry.report.status === "available" ? entry.report : (snapshot?.report ?? null);
+  const messages: string[] = [];
+  if (!available) {
+    if (entry.loginErrors)
+      messages.push(
+        ...entry.loginErrors.map((login) => `${login.harness}: ${usageProblemText(login.report)}`),
+      );
+    // COMPAT(usageLoginErrors): added in v0.11.0, remove after 2027-04-05 once daemon floor >= v0.11.0.
+    else messages.push(usageProblemText(entry.report));
+  }
+  return {
+    windows: content?.windows ?? [],
+    balances: content?.balances ?? [],
+    details: content?.details ?? [],
+    planLabel: content?.planLabel ?? null,
+    // COMPAT(usageSuccessfulAt): added in v0.12.0, remove after 2027-04-17 once daemon floor >= v0.12.0.
+    // Old daemons expose only attempt time for available reports, never for failures.
+    successfulAt: available
+      ? (entry.successfulAt ?? entry.fetchedAt)
+      : (snapshot?.fetchedAt ?? null),
+    retained: snapshot !== null,
+    messages,
+  };
+}
+
+function usageProblemText(report: UsageReport): string {
+  if (report.status === "error") return report.error;
+  if (report.status === "unavailable") return usageCopy.problem(report.problem);
+  return "";
 }

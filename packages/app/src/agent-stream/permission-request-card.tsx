@@ -345,6 +345,7 @@ export function PermissionRequestCard({
         permission={permission}
         onRespond={handleQuestionResponse}
         isResponding={isResponding}
+        responseError={responseError}
       />
     );
   }

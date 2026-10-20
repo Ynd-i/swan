@@ -23,19 +23,22 @@ export function formatDisplayPct(
     : t("usage.remainingBalance", { amount: formatPct(value) });
 }
 
-export function formatResetLabel(iso: string | null | undefined): string | null {
-  return formatUsageDeadline(iso);
+export function formatResetLabel(iso: string | null | undefined, retained = false): string | null {
+  return formatUsageDeadline(iso, "reset", i18n.t, retained);
 }
 
+/** A retained report is an old snapshot, so a reset time it names may already have passed. */
 export function formatUsageDeadline(
   iso: string | null | undefined,
   kind: "reset" | "runOut" = "reset",
   t: TFunction = i18n.t,
+  retained = false,
 ): string | null {
   if (!iso) return null;
   const diffMs = new Date(iso).getTime() - Date.now();
   if (!Number.isFinite(diffMs)) return null;
-  if (diffMs <= 0) return t(kind === "reset" ? "usage.resetDue" : "usage.runsOutNow");
+  if (diffMs <= 0 && kind === "reset") return t(retained ? "usage.resetPassed" : "usage.resetDue");
+  if (diffMs <= 0) return t("usage.runsOutNow");
   const diffMinutes = Math.floor(diffMs / 60_000);
   const diffHours = Math.floor(diffMinutes / 60);
   const diffDays = Math.floor(diffHours / 24);

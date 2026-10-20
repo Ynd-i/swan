@@ -97,7 +97,6 @@ describe("macOS supporting views", () => {
     ).toBe(true);
     const file = openPreferredWorkspaceTarget({
       workspaceKey: WORKSPACE_KEY,
-      isCompact: false,
       target: { kind: "file", path: "/repo/a.ts" },
       source: "chatFiles",
       preferences: DEFAULT_APP_SETTINGS.openInSidePane,

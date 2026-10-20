@@ -262,9 +262,6 @@ export function ProjectEditSheet({
       desktopMaxWidth={isMac ? 520 : 440}
       contentStyle={isMac ? styles.macContent : undefined}
       footerContainerStyle={isMac ? styles.macFooter : undefined}
-      // Bound the compact scroller to the live snap height so the footer stays
-      // on screen instead of being pushed past the bottom of the sheet.
-      sizeContentToCurrentSnapPoint
       testID="project-edit-sheet"
     >
       <ProjectNameField

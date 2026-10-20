@@ -22,6 +22,9 @@ export const es: TranslationResources = {
     agentError: "No se pudo cargar el uso: {{reason}}",
     updated: "Actualizado {{time}}",
     updatedNow: "Actualizado ahora mismo",
+    lastUpdated: "Última actualización {{time}}",
+    lastUpdatedNow: "Última actualización ahora mismo",
+    noSuccessfulUpdate: "Ninguna actualización correcta",
     loading: "Cargando uso…",
     empty: "No hay datos de uso",
     noHosts: "No hay equipos conectados",
@@ -35,6 +38,7 @@ export const es: TranslationResources = {
     remainingBalance: "Quedan {{amount}}",
     resetsIn: "se restablece en {{duration}}",
     resetDue: "Restablecimiento pendiente",
+    resetPassed: "La hora de restablecimiento ya pasó",
     runsOutIn: "se agota en {{duration}}",
     runsOutNow: "Se agota ahora",
     durationMinutes: "{{count}} min",
@@ -137,6 +141,7 @@ export const es: TranslationResources = {
     back: "Atrás",
     loading: "Cargando...",
     actions: {
+      save: "Guardar",
       back: "Atrás",
       cancel: "Cancelar",
       close: "Cerrar",
@@ -246,6 +251,8 @@ export const es: TranslationResources = {
     input: {
       accessibilityLabel: "Agente de mensajes...",
       terminalAccessibilityLabel: "Terminal prompt",
+      fullscreen: "Pantalla completa",
+      exitFullscreen: "Salir de pantalla completa",
       focusHint: "{{shortcut}}para enfocar",
       addAttachment: "Agregar archivo adjunto",
       interruptAgent: "agente de interrupción",
@@ -494,6 +501,7 @@ export const es: TranslationResources = {
       details: "Detalles",
     },
     dictation: {
+      paused: "Micrófono interrumpido. Esperando para reanudar…",
       start: "Iniciar dictado de voz",
       cancel: "Cancelar dictado",
       retry: "Reintentar el dictado",
@@ -503,6 +511,7 @@ export const es: TranslationResources = {
       failedRetry: "El dictado falló. Toca reintentar.",
     },
     question: {
+      responseFailed: "No se pudo enviar tu respuesta. Inténtalo de nuevo.",
       title: "Pregunta",
       skip: "Omitir",
       send: "Enviar",
@@ -760,6 +769,9 @@ export const es: TranslationResources = {
       updateHost: "Actualiza el host para usar el renderizador de terminal nativo.",
       unableToSubscribe: "No se puede suscribir al terminal",
     },
+    sheet: {
+      openAsTab: "Abrir como pestaña",
+    },
     tabs: {
       loading: "Cargando...",
       modified: "Cambios sin guardar",
@@ -775,7 +787,7 @@ export const es: TranslationResources = {
       },
       switcher: {
         trigger: "Cambiar pestañas ({{count}}abierto)",
-        title: "Cambiar pestaña",
+        title: "Pestañas del workspace",
         searchPlaceholder: "Pestañas de búsqueda",
       },
       menu: {
@@ -871,6 +883,7 @@ export const es: TranslationResources = {
     header: {
       actions: {
         workspaceActions: "AccionesWorkspace",
+        workspaceActionsUnhealthy: "Acciones del workspace, hay un servicio con problemas",
         newAgent: "Nuevo agente",
         newTerminal: "Nueva terminal",
         newBrowser: "Nueva pestaña del navegador",
@@ -919,6 +932,8 @@ export const es: TranslationResources = {
         exitCode: "salir de{{code}}",
         startFailed: "No se pudo iniciar{{scriptName}}",
         stopFailed: "No se pudo detener{{scriptName}}",
+        running: "En ejecución",
+        runningCount: "{{count}} en ejecución",
       },
     },
     tree: {
@@ -1327,6 +1342,7 @@ export const es: TranslationResources = {
       done: "Terminado",
     },
     display: {
+      showBackground: "Mostrar espacios en segundo plano",
       trigger: "Preferencias de visualización",
       heading: "Visualización",
       grouping: {
@@ -1502,10 +1518,12 @@ export const es: TranslationResources = {
     },
     fields: {
       project: "Proyecto",
+      branch: "Rama",
       noProject: "Sin proyecto",
       clearProject: "Quitar proyecto",
       base: "Base",
       baseNotApplicable: "No aplicable",
+      host: "Host",
     },
     titlePlaceholder: "Título (opcional)",
     errors: {
@@ -2242,6 +2260,17 @@ export const es: TranslationResources = {
     accessibility: "Ventana de contexto{{percentage}}% utilizada",
   },
   review: {
+    feedback: {
+      send: "Enviar comentarios ({{count}})",
+      sending: "Enviando comentarios ({{count}})",
+      chooseAgent: "Elegir un agente",
+      sent: "Comentarios enviados a {{recipient}}",
+      "no-agents": "Abre una pestaña de agente en este espacio de trabajo para enviar comentarios.",
+      disconnected: "Conéctate al host para enviar comentarios.",
+      "no-context": "Los comentarios guardados ya no coinciden con este diff.",
+      failed: "No se pudieron enviar los comentarios. Inténtalo de nuevo.",
+      prompt: "Por favor, atiende esta revisión de código.",
+    },
     comment: {
       add: "Agregar comentario de revisión",
       edit: "Editar comentario de revisión",

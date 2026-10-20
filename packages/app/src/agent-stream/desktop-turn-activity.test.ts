@@ -18,8 +18,7 @@ const items: StreamItem[] = [
   },
   {
     kind: "assistant_message",
-    id: "intro:0",
-    blockGroupId: "intro",
+    id: "intro",
     turnId: "turn",
     text: "I will inspect it.",
     timestamp: new Date(1000),
@@ -60,16 +59,14 @@ const items: StreamItem[] = [
   },
   {
     kind: "assistant_message",
-    id: "answer:0",
-    blockGroupId: "answer",
+    id: "answer",
     turnId: "turn",
     text: "Here is the result.",
     timestamp: new Date(5000),
   },
   {
     kind: "assistant_message",
-    id: "answer:1",
-    blockGroupId: "answer",
+    id: "explanation",
     turnId: "turn",
     text: "And its explanation.",
     timestamp: new Date(5000),
@@ -104,7 +101,7 @@ describe("desktop turn activity", () => {
     expect(projection.hiddenItemIds.size).toBe(0);
     expect(projectDesktopActivityItems(turn, projection)).toBe(turn);
   });
-  it("folds completed activity while retaining every reply block and warning", () => {
+  it("folds completed activity while retaining every reply and warning", () => {
     const project = createDesktopTurnActivityProjection();
     const input = {
       scope: "host:agent",
@@ -122,13 +119,13 @@ describe("desktop turn activity", () => {
     const collapsed = project(input);
     expect(projectDesktopActivityItems(items, collapsed).map((item) => item.id)).toEqual([
       "user",
-      "intro:0",
+      "intro",
       "error",
-      "answer:0",
-      "answer:1",
+      "answer",
+      "explanation",
     ]);
-    expect([...collapsed.hiddenItemIds]).toEqual(["intro:0", "thought", "read"]);
-    const activity = collapsed.byHostId.get("intro:0")!;
+    expect([...collapsed.hiddenItemIds]).toEqual(["intro", "thought", "read"]);
+    const activity = collapsed.byHostId.get("intro")!;
     expect(activity.state).toMatchObject({ kind: "complete", timing: { durationMs: 5000 } });
     expect(collapsed.groupByMessageId.get("intro")).toBe(activity.id);
     const expanded = project({ ...input, expanded: new Set([activity.id]) });
@@ -142,7 +139,7 @@ describe("desktop turn activity", () => {
       expanded: new Set([activity.id]),
     });
     expect(otherChat.hiddenItemIds.size).toBe(3);
-    expect(items[1].id).toBe("intro:0");
+    expect(items[1].id).toBe("intro");
   });
 
   it("keeps active text visible without revising completed headers on every delta", () => {
@@ -230,18 +227,18 @@ describe("desktop turn activity", () => {
     const projection = createDesktopTurnActivityProjection()(input);
     expect(projectDesktopActivityItems(turn, projection).map((item) => item.id)).toEqual([
       "user",
-      "intro:0",
+      "intro",
       "plan",
       "error",
-      "answer:0",
-      "answer:1",
+      "answer",
+      "explanation",
     ]);
-    expect(projection.byHostId.get("intro:0")?.state).toMatchObject({
+    expect(projection.byHostId.get("intro")?.state).toMatchObject({
       kind: "complete",
       failedCount: 1,
     });
     const unfolded = createDesktopTurnActivityProjection()(inputFor(items));
-    expect(unfolded.byHostId.get("intro:0")?.state).toMatchObject({ failedCount: 0 });
+    expect(unfolded.byHostId.get("intro")?.state).toMatchObject({ failedCount: 0 });
   });
 
   it("keeps a final reply that is only a chat proposal visible after its folded activity", () => {
@@ -256,8 +253,7 @@ describe("desktop turn activity", () => {
       ...items.slice(0, 4),
       {
         kind: "assistant_message",
-        id: "answer:0",
-        blockGroupId: "answer",
+        id: "answer",
         turnId: "turn",
         text: "",
         timestamp: new Date(5000),
@@ -265,9 +261,9 @@ describe("desktop turn activity", () => {
       },
     ];
     const projection = createDesktopTurnActivityProjection()(inputFor(turn));
-    expect([...projection.hiddenItemIds]).toEqual(["intro:0", "thought", "read"]);
+    expect([...projection.hiddenItemIds]).toEqual(["intro", "thought", "read"]);
     expect(projectDesktopActivityItems(turn, projection).at(-1)).toMatchObject({
-      id: "answer:0",
+      id: "answer",
       proposals: [proposal],
     });
   });
@@ -305,21 +301,21 @@ describe("desktop turn activity while the turn is working", () => {
 
   it("folds steps behind the latest one and keeps progress text visible", () => {
     const projection = createDesktopTurnActivityProjection()(inputFor(working, true));
-    const activity = projection.byHostId.get("intro:0")!;
+    const activity = projection.byHostId.get("intro")!;
     expect(activity.state).toEqual({ kind: "working", latestStep: working[4] });
     expect([...projection.hiddenItemIds]).toEqual(["thought", "read", "fetch"]);
     expect(projectDesktopActivityItems(working, projection).map((item) => item.id)).toEqual([
       "user",
-      "intro:0",
+      "intro",
     ]);
   });
 
   it("keeps failed calls visible and the expand id stable as steps arrive", () => {
     const project = createDesktopTurnActivityProjection();
-    const first = project(inputFor(working, true)).byHostId.get("intro:0")!;
+    const first = project(inputFor(working, true)).byHostId.get("intro")!;
     const next = [...working, shell("broken", "failed")];
     const projection = project(inputFor(next, true));
-    expect(projection.byHostId.get("intro:0")?.id).toBe(first.id);
+    expect(projection.byHostId.get("intro")?.id).toBe(first.id);
     expect(projection.hiddenItemIds.has("broken")).toBe(false);
   });
 
@@ -354,7 +350,7 @@ describe("desktop turn activity while the turn is working", () => {
       }),
     );
     const projection = createDesktopTurnActivityProjection()(input);
-    expect(projection.byHostId.get("intro:0")?.state).toEqual({
+    expect(projection.byHostId.get("intro")?.state).toEqual({
       kind: "working",
       latestStep: thought,
     });

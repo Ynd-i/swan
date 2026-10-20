@@ -39,11 +39,11 @@
   <img src="https://paseo.sh/mobile-mockup.png" alt="Paseo mobile app" width="100%">
 </p>
 
-Paseo is a desktop, mobile, web, and CLI app for coding agents. Open the desktop app and work: agents, editor, terminals, diffs, pull requests, and a browser in one window. Run many agents at once, each in its own worktree, on one machine or several. The mobile app is the full app, native on iOS and Android.
+Paseo is an open source agentic development environment for desktop, mobile, web, and CLI. Open the desktop app and work: agents, editor, terminals, diffs, pull requests, and a browser in one window. Run many agents at once, each in its own worktree, on one machine or several. The mobile app is the full app, native on iOS and Android.
 
 - **Parallel agents:** Run many agents at once, each in its own worktree.
 - **Built-in orchestration:** Agents in Paseo can create worktrees, launch other agents, and talk to them, across providers.
-- **Full IDE:** Edit files, review diffs, open pull requests, and run terminals, in split panes you arrange how you want.
+- **Complete development workflow:** Edit files, review diffs, open pull requests, and run terminals, in split panes you arrange how you want.
 - **Self-hosted:** Agents run on your machine with your full dev environment. Use your tools, your configs, and your skills.
 - **Multi-provider:** Claude Code, Codex, Copilot, OpenCode, Pi, Antigravity, and Muse Code through the same interface. Pick the right model for each job.
 - **Voice control:** Dictate tasks or talk through problems in voice mode. Hands-free when you need it.
@@ -51,6 +51,17 @@ Paseo is a desktop, mobile, web, and CLI app for coding agents. Open the desktop
 - **Privacy-first:** Paseo doesn't have any telemetry, tracking, or forced log-ins.
 
 [Run parallel tasks in Paseo](https://paseo.sh/docs/parallel-development): start agents in separate worktrees, review their diffs, run each app, and check it in the built-in browser.
+
+## Sponsors
+
+<!-- Sponsors: one cell per sponsor in the order of packages/website/src/data/sponsors.ts, then "become a sponsor" cells up to three. -->
+<table>
+  <tr>
+    <td align="center" width="33%"><a href="https://hoplite.sh/?utm_source=paseo&utm_medium=readme&utm_campaign=sponsor"><picture><source media="(prefers-color-scheme: dark)" srcset="packages/website/public/sponsors/hoplite-on-dark.svg"><img src="packages/website/public/sponsors/hoplite-on-light.svg" alt="Hoplite" height="56"></picture></a><br><sub>Cloud coding agents</sub></td>
+    <td align="center" width="33%"><a href="https://paseo.sh/sponsor">Become a sponsor</a></td>
+    <td align="center" width="33%"><a href="https://paseo.sh/sponsor">Become a sponsor</a></td>
+  </tr>
+</table>
 
 ## Plugins
 
@@ -207,11 +218,9 @@ npm run build:server
 npm run typecheck
 ```
 
-## Sponsors
+## Support Paseo
 
-Paseo is an independent project used by tens of thousands of developers daily, built by one person and funded by the people who use it. Support the work on [GitHub Sponsors](https://github.com/sponsors/boudra). Companies can [sponsor Paseo](https://paseo.sh/sponsor#spot) monthly and have their logo shown here and on the paseo.sh homepage.
-
-<!-- Sponsor logos go here, in the same order as packages/website/src/data/sponsors.ts -->
+Paseo is an independent project used by tens of thousands of developers daily, built by one person and funded by the people who use it. Support the work on [GitHub Sponsors](https://github.com/sponsors/boudra). Companies can [sponsor Paseo](https://paseo.sh/sponsor#spot) monthly and have their logo shown at the top of this README and on the paseo.sh homepage and docs.
 
 ## Related projects
 

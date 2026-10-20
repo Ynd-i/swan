@@ -6,24 +6,16 @@ import type { AgentSnapshotPayload, CreationSnapshot } from "@getpaseo/protocol/
 import { encodeImages } from "@/utils/encode-images";
 import { getHostRuntimeStore } from "@/runtime/host-runtime";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
-import type { ReactElement, ReactNode, RefObject } from "react";
+import type { ReactNode, RefObject } from "react";
 import { useTranslation } from "react-i18next";
-import type { TFunction } from "i18next";
-import { Pressable, Text, View } from "react-native";
-import type { PressableStateCallbackType } from "react-native";
-import { StyleSheet, useUnistyles, withUnistyles } from "react-native-unistyles";
+import { router } from "expo-router";
+import { Text, View } from "react-native";
+import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { createNameId } from "mnemonic-id";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  ChevronDown,
-  CircleX,
-  Folder,
-  FolderPlus,
-  GitBranch,
-  GitPullRequest,
-} from "lucide-react-native";
 import { Composer } from "@/composer";
 import { ComposerDock } from "@/composer/dock";
+import { useComposerEditingSession, useComposerFullscreen } from "@/composer/editing-session";
 import { PaseoLogo } from "@/components/icons/paseo-logo";
 import { getIsElectron, getIsElectronMac } from "@/constants/platform";
 import { BROWSER_NEW_TAB_URL } from "@/desktop/browser/new-tab-url";
@@ -35,17 +27,8 @@ import {
   resolveComposerAttachmentSubmitFormat,
   splitComposerAttachmentsForSubmit,
 } from "@/composer/attachments/submit";
-import { HostStatusDot } from "@/components/host-status-dot";
-import { HostPicker } from "@/components/hosts/host-picker";
-import { ProjectIconView } from "@/components/project-icon-view";
-import { Combobox, ComboboxItem } from "@/components/ui/combobox";
-import type { ComboboxOption as ComboboxOptionType, ComboboxProps } from "@/components/ui/combobox";
-import { ComboboxTrigger } from "@/components/ui/combobox-trigger";
-import { Shortcut } from "@/components/ui/shortcut";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { TitlebarDragRegion } from "@/components/desktop/titlebar-drag-region";
-import { SidebarMenuToggle } from "@/components/headers/menu-header";
-import { ScreenHeader } from "@/components/headers/screen-header";
+import { MenuHeader } from "@/components/headers/menu-header";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { useToast } from "@/contexts/toast-context";
 import { useBranchSwitcher } from "@/hooks/use-branch-switcher";
@@ -56,7 +39,6 @@ import { ensureCheckoutStatus } from "@/git/checkout-status-cache";
 import { useDaemonConfig } from "@/hooks/use-daemon-config";
 import { resolveTerminalProfiles } from "@getpaseo/protocol/terminal-profiles";
 import type { TerminalProfile } from "@getpaseo/protocol/messages";
-import { LaunchControl } from "@/new-workspace-launch/launch-control";
 import {
   CHAT_LAUNCH_TARGET,
   resolveLaunchTarget,
@@ -101,12 +83,10 @@ import {
 import { useKeyboardActionHandler } from "@/hooks/use-keyboard-action-handler";
 import type { KeyboardActionId } from "@/keyboard/keyboard-action-dispatcher";
 import { useFormPreferences } from "@/hooks/use-form-preferences";
-import { useShortcutKeys } from "@/hooks/use-shortcut-keys";
 import type { CreateAgentInitialValues } from "@/hooks/use-agent-form-state";
 import { toErrorMessage } from "@/utils/error-messages";
-import { projectIconPlaceholderLabelFromDisplayName } from "@/utils/project-display-name";
+import { buildSettingsAddHostRoute } from "@/utils/host-routes";
 import {
-  getHostProjectSourceDirectory,
   getHostProjectId,
   getWorktreeSupportForHostProject,
   hostProjectFromRoute,
@@ -117,7 +97,7 @@ import {
 } from "@/projects/host-projects";
 import { useProjectIcons } from "@/projects/icons";
 import { chatFolderParentPath } from "@/projects/chat-folder";
-import { ICON_SIZE, type Theme } from "@/styles/theme";
+import type { Theme } from "@/styles/theme";
 import type { ComposerAttachment } from "@/attachments/types";
 import { useDraftWorkspaceAttachmentScopeKey } from "@/attachments/workspace-attachments-store";
 import type { MessagePayload } from "@/composer/types";
@@ -153,6 +133,7 @@ import {
 } from "./new-workspace-initial-context";
 import { buildNewWorkspaceProjectIconTargets } from "./new-workspace/project-icon-targets";
 import { useNewWorkspaceProjectPicker } from "./new-workspace/project-picker";
+import { useNewWorkspaceForm, type NewWorkspaceFormProps } from "./new-workspace/form";
 import { ImportSessionButton } from "./new-workspace/import-session-button";
 import { useImportSession } from "@/hooks/use-import-session";
 import {
@@ -164,13 +145,8 @@ import { captureWorkspaceDraftCleanup } from "./new-workspace/background-handoff
 import { useNewWorkspaceScreenPresence } from "./new-workspace/screen-presence";
 import { NewChatExplorerDock, revealNewChatExplorer } from "./new-workspace/new-chat-explorer";
 
-const ThemedFolderPlus = withUnistyles(FolderPlus);
 const ThemedPaseoLogo = withUnistyles(PaseoLogo);
 const passiveColorMapping = (theme: Theme) => ({ color: theme.colors.foregroundExtraMuted });
-const foregroundMutedColorMapping = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
-const addProjectIcon = (
-  <ThemedFolderPlus size={ICON_SIZE.sm} uniProps={foregroundMutedColorMapping} />
-);
 
 function useIsNewWorkspaceDraftHandoffActive(input: {
   draftId: string | undefined;
@@ -232,539 +208,8 @@ const NO_TERMINAL_ATTACHMENTS: UserComposerAttachment[] = [];
 function noopChangeAttachments() {}
 function noopClearDraft() {}
 
-const PROJECT_ICON_FALLBACK_FONT_SIZE = 10;
-const ThemedChevronDown = withUnistyles(ChevronDown);
-const chevronExtraMutedMapping = (theme: Theme) => ({ color: theme.colors.foregroundExtraMuted });
-
-// Every picker chip on this screen shares one chevron so they stay a single
-// visual family. Extra-muted: the chevron is an affordance, not information,
-// and it should sit behind the label it belongs to.
-function MetaChevron(): ReactElement {
-  return (
-    <View style={styles.chevronContainer}>
-      <ThemedChevronDown size={ICON_SIZE.sm} uniProps={chevronExtraMutedMapping} />
-    </View>
-  );
-}
-
-const metaChevron = <MetaChevron />;
-
 // Stable reference so the keyboard-action handler doesn't re-register each render.
 const PROJECT_PICK_ACTIONS: readonly KeyboardActionId[] = ["workspace.project.pick"];
-// Height of a single picker-trigger badge. The Base-row spacer reserves exactly
-// this so toggling Isolation to Local hides the row without shifting the form.
-const BADGE_HEIGHT = 28;
-// Matches the Mac composer radius, so its corners cover the tray bottom.
-const MAC_SETUP_TRAY_OVERLAP = 24;
-
-function RefPickerBadgeContent({
-  selectedItem,
-  triggerLabel,
-  iconColor,
-  iconSize,
-}: {
-  selectedItem: PickerItem | null;
-  triggerLabel: string;
-  iconColor: string;
-  iconSize: number;
-}) {
-  return (
-    <>
-      <View style={styles.badgeIconBox}>
-        {selectedItem?.kind === "github-pr" ? (
-          <GitPullRequest size={iconSize} color={iconColor} />
-        ) : (
-          <GitBranch size={iconSize} color={iconColor} />
-        )}
-      </View>
-      <Text style={styles.badgeText} numberOfLines={1}>
-        {triggerLabel}
-      </Text>
-    </>
-  );
-}
-
-function RefPickerTrigger({
-  testID = "new-workspace-ref-picker-trigger",
-  pickerAnchorRef,
-  onPress,
-  disabled,
-  badgePressableStyle,
-  selectedItem,
-  triggerLabel,
-  accessibilityLabel,
-  tooltipLabel,
-  iconColor,
-  iconSize,
-}: {
-  pickerAnchorRef: React.RefObject<View | null>;
-  onPress: () => void;
-  disabled: boolean;
-  badgePressableStyle: React.ComponentProps<typeof Pressable>["style"];
-  selectedItem: PickerItem | null;
-  triggerLabel: string;
-  accessibilityLabel: string;
-  tooltipLabel: string;
-  iconColor: string;
-  iconSize: number;
-  testID?: string;
-}) {
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild triggerRefProp="ref">
-        <ComboboxTrigger
-          chevron={metaChevron}
-          ref={pickerAnchorRef}
-          testID={testID}
-          onPress={onPress}
-          disabled={disabled}
-          style={badgePressableStyle}
-          accessibilityRole="button"
-          accessibilityLabel={accessibilityLabel}
-        >
-          <RefPickerBadgeContent
-            selectedItem={selectedItem}
-            triggerLabel={triggerLabel}
-            iconColor={iconColor}
-            iconSize={iconSize}
-          />
-        </ComboboxTrigger>
-      </TooltipTrigger>
-      <TooltipContent side="top" align="center" offset={8}>
-        <Text style={styles.tooltipText}>{tooltipLabel}</Text>
-      </TooltipContent>
-    </Tooltip>
-  );
-}
-
-function ProjectPickerTrigger({
-  pickerAnchorRef,
-  onPress,
-  disabled,
-  badgePressableStyle,
-  label,
-  tooltipLabel,
-  projectViewKey,
-  iconDataUri,
-  iconColor,
-  iconSize,
-  onClear,
-  clearLabel,
-}: {
-  pickerAnchorRef: React.RefObject<View | null>;
-  onPress: () => void;
-  disabled: boolean;
-  badgePressableStyle: React.ComponentProps<typeof Pressable>["style"];
-  label: string;
-  tooltipLabel: string;
-  projectViewKey: string | null;
-  iconDataUri: string | null;
-  iconColor: string;
-  iconSize: number;
-  /** Set while the chip is hovered and a project can be removed. */
-  onClear?: () => void;
-  clearLabel: string;
-}) {
-  const placeholderLabel = projectIconPlaceholderLabelFromDisplayName(label);
-  const placeholderInitial = placeholderLabel.charAt(0).toUpperCase() || "?";
-  let icon: ReactElement;
-  if (onClear) {
-    icon = (
-      <Pressable
-        testID="new-workspace-project-clear"
-        onPress={onClear}
-        accessibilityRole="button"
-        accessibilityLabel={clearLabel}
-      >
-        <CircleX size={iconSize} color={iconColor} />
-      </Pressable>
-    );
-  } else if (projectViewKey && (iconDataUri || !getIsElectronMac())) {
-    icon = (
-      <ProjectIconView
-        iconDataUri={iconDataUri}
-        initial={placeholderInitial}
-        projectViewKey={projectViewKey}
-        size={ICON_SIZE.md}
-        textStyle={styles.projectIconFallbackText}
-      />
-    );
-  } else {
-    icon = <Folder size={iconSize} color={iconColor} />;
-  }
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild triggerRefProp="ref">
-        <ComboboxTrigger
-          chevron={metaChevron}
-          ref={pickerAnchorRef}
-          testID="new-workspace-project-picker-trigger"
-          onPress={onPress}
-          disabled={disabled}
-          style={badgePressableStyle}
-          accessibilityRole="button"
-          accessibilityLabel="Workspace project"
-        >
-          <View style={styles.badgeIconBox}>{icon}</View>
-          <Text style={styles.badgeText} numberOfLines={1}>
-            {label}
-          </Text>
-        </ComboboxTrigger>
-      </TooltipTrigger>
-      <TooltipContent side="top" align="center" offset={8}>
-        <Text style={styles.tooltipText}>{tooltipLabel}</Text>
-      </TooltipContent>
-    </Tooltip>
-  );
-}
-
-function PickerOptionItem({
-  testID,
-  label,
-  description,
-  selected,
-  active,
-  disabled,
-  onPress,
-  isBranch,
-  trailingLabel,
-  accessibilityLabel,
-  iconColor,
-  iconSize,
-}: {
-  testID: string;
-  label: string;
-  description: string | undefined;
-  selected: boolean;
-  active: boolean;
-  disabled: boolean;
-  onPress: () => void;
-  isBranch: boolean;
-  trailingLabel?: string;
-  accessibilityLabel?: string;
-  iconColor: string;
-  iconSize: number;
-}) {
-  const leadingSlot = useMemo(
-    () => (
-      <View style={styles.rowIconBox}>
-        {isBranch ? (
-          <GitBranch size={iconSize} color={iconColor} />
-        ) : (
-          <GitPullRequest size={iconSize} color={iconColor} />
-        )}
-      </View>
-    ),
-    [isBranch, iconSize, iconColor],
-  );
-  const trailingSlot = useMemo(
-    () =>
-      trailingLabel ? <Text style={styles.refDivergenceLabel}>{trailingLabel}</Text> : undefined,
-    [trailingLabel],
-  );
-  return (
-    <ComboboxItem
-      testID={testID}
-      label={label}
-      description={description}
-      selected={selected}
-      active={active}
-      disabled={disabled}
-      onPress={onPress}
-      leadingSlot={leadingSlot}
-      trailingSlot={trailingSlot}
-      accessibilityLabel={accessibilityLabel}
-    />
-  );
-}
-
-function IsolationOptionItem({
-  optionId,
-  label,
-  selected,
-  active,
-  disabled,
-  onPress,
-  iconColor,
-  iconSize,
-}: {
-  optionId: string;
-  label: string;
-  selected: boolean;
-  active: boolean;
-  disabled: boolean;
-  onPress: () => void;
-  iconColor: string;
-  iconSize: number;
-}) {
-  const leadingSlot = useMemo(
-    () => (
-      <View style={styles.rowIconBox}>
-        {optionId === "worktree" ? (
-          <GitBranch size={iconSize} color={iconColor} />
-        ) : (
-          <Folder size={iconSize} color={iconColor} />
-        )}
-      </View>
-    ),
-    [optionId, iconSize, iconColor],
-  );
-  return (
-    <ComboboxItem
-      testID={`workspace-create-isolation-${optionId}`}
-      label={label}
-      selected={selected}
-      active={active}
-      disabled={disabled}
-      onPress={onPress}
-      leadingSlot={leadingSlot}
-    />
-  );
-}
-
-function ProjectOptionItem({
-  testID,
-  projectViewKey,
-  iconDataUri,
-  label,
-  description,
-  selected,
-  active,
-  disabled,
-  onPress,
-  iconColor,
-  iconSize,
-}: {
-  testID: string;
-  projectViewKey: string;
-  iconDataUri: string | null;
-  label: string;
-  description: string | undefined;
-  selected: boolean;
-  active: boolean;
-  disabled: boolean;
-  onPress: () => void;
-  iconColor: string;
-  iconSize: number;
-}) {
-  // Like Codex, the Mac desktop shows a project's favicon or a folder, and only its name.
-  const desktopChat = getIsElectronMac();
-  const placeholderLabel = projectIconPlaceholderLabelFromDisplayName(label);
-  const placeholderInitial = placeholderLabel.charAt(0).toUpperCase() || "?";
-  const leadingSlot = useMemo(
-    () => (
-      <View style={styles.rowIconBox}>
-        {desktopChat && !iconDataUri ? (
-          <Folder size={iconSize} color={iconColor} />
-        ) : (
-          <ProjectIconView
-            iconDataUri={iconDataUri}
-            initial={placeholderInitial}
-            projectViewKey={projectViewKey}
-            size={ICON_SIZE.md}
-            textStyle={styles.projectIconFallbackText}
-          />
-        )}
-      </View>
-    ),
-    [desktopChat, iconColor, iconDataUri, iconSize, placeholderInitial, projectViewKey],
-  );
-
-  return (
-    <ComboboxItem
-      testID={testID}
-      label={label}
-      description={desktopChat ? undefined : description}
-      selected={selected}
-      active={active}
-      disabled={disabled}
-      onPress={onPress}
-      leadingSlot={leadingSlot}
-    />
-  );
-}
-
-function NewWorkspacePickerOption({
-  option,
-  selected,
-  active,
-  onPress,
-  itemById,
-  isPending,
-}: {
-  option: ComboboxOptionType;
-  selected: boolean;
-  active: boolean;
-  onPress: () => void;
-  itemById: Map<string, PickerItem>;
-  isPending: boolean;
-}) {
-  const { theme } = useUnistyles();
-  const { t } = useTranslation();
-  const item = itemById.get(option.id);
-  if (!item) return <View key={option.id} />;
-
-  const isBranch = item.kind === "branch";
-  const testID = isBranch
-    ? `new-workspace-ref-picker-branch-${item.name}`
-    : `new-workspace-ref-picker-pr-${item.item.number}`;
-  const description =
-    !isBranch && item.item.baseRefName
-      ? t("newWorkspace.refPicker.intoBase", { baseRef: item.item.baseRefName })
-      : undefined;
-
-  return (
-    <PickerOptionItem
-      testID={testID}
-      label={pickerItemLabel(item)}
-      description={description}
-      selected={selected}
-      active={active}
-      disabled={isPending}
-      onPress={onPress}
-      isBranch={isBranch}
-      trailingLabel={isBranch ? item.divergenceLabel : undefined}
-      accessibilityLabel={isBranch ? item.accessibilityLabel : undefined}
-      iconColor={theme.colors.foregroundMuted}
-      iconSize={theme.iconSize.sm}
-    />
-  );
-}
-
-function NewWorkspaceProjectPickerOption({
-  option,
-  selected,
-  active,
-  onPress,
-  projectByOptionId,
-  projectIconDataByProjectViewKey,
-  selectedServerId,
-  isPending,
-  supportsWorkspaceMultiplicity,
-}: {
-  option: ComboboxOptionType;
-  selected: boolean;
-  active: boolean;
-  onPress: () => void;
-  projectByOptionId: Map<string, HostProjectListItem>;
-  projectIconDataByProjectViewKey: Map<string, string | null>;
-  selectedServerId: string;
-  isPending: boolean;
-  supportsWorkspaceMultiplicity: boolean;
-}) {
-  const { theme } = useUnistyles();
-  const project = projectByOptionId.get(option.id);
-  if (!project) return <View key={option.id} />;
-  const sourceDirectory =
-    getHostProjectSourceDirectory(project, selectedServerId) ?? project.iconWorkingDir;
-
-  return (
-    <ProjectOptionItem
-      testID={`new-workspace-project-picker-option-${project.viewKey}`}
-      projectViewKey={project.viewKey}
-      iconDataUri={projectIconDataByProjectViewKey.get(project.viewKey) ?? null}
-      label={project.projectName}
-      description={sourceDirectory}
-      selected={selected}
-      active={active}
-      disabled={
-        isPending ||
-        (!supportsWorkspaceMultiplicity &&
-          !project.hosts.some((host) => host.worktreeSupport !== "unsupported"))
-      }
-      onPress={onPress}
-      iconColor={theme.colors.foregroundMuted}
-      iconSize={theme.iconSize.sm}
-    />
-  );
-}
-
-function AddProjectPickerAction({ onPress }: { onPress: () => void }) {
-  const { t } = useTranslation();
-  const openProjectKeys = useShortcutKeys("new-agent");
-  const shortcut = useMemo(
-    () => (openProjectKeys ? <Shortcut chord={openProjectKeys} /> : null),
-    [openProjectKeys],
-  );
-
-  return (
-    <ComboboxItem
-      testID="new-workspace-project-picker-add-project"
-      label={t("sidebar.actions.addProject")}
-      onPress={onPress}
-      leadingSlot={addProjectIcon}
-      trailingSlot={shortcut}
-    />
-  );
-}
-
-function newWorkspaceHostOptionTestID(serverId: string): string {
-  return `new-workspace-host-picker-option-${serverId}`;
-}
-
-function IsolationPickerTrigger({
-  pickerAnchorRef,
-  onPress,
-  disabled,
-  badgePressableStyle,
-  isolation,
-  label,
-  tooltipLabel,
-  iconColor,
-  iconSize,
-}: {
-  pickerAnchorRef: React.RefObject<View | null>;
-  onPress: () => void;
-  disabled: boolean;
-  badgePressableStyle: React.ComponentProps<typeof Pressable>["style"];
-  isolation: "local" | "worktree";
-  label: string;
-  tooltipLabel: string;
-  iconColor: string;
-  iconSize: number;
-}) {
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild triggerRefProp="ref">
-        <ComboboxTrigger
-          chevron={metaChevron}
-          ref={pickerAnchorRef}
-          testID="workspace-create-isolation-trigger"
-          onPress={onPress}
-          disabled={disabled}
-          style={badgePressableStyle}
-          accessibilityRole="button"
-          accessibilityLabel="Workspace isolation"
-        >
-          <View style={styles.badgeIconBox}>
-            {isolation === "worktree" ? (
-              <GitBranch size={iconSize} color={iconColor} />
-            ) : (
-              <Folder size={iconSize} color={iconColor} />
-            )}
-          </View>
-          <Text style={styles.badgeText} numberOfLines={1}>
-            {label}
-          </Text>
-        </ComboboxTrigger>
-      </TooltipTrigger>
-      <TooltipContent side="top" align="center" offset={8}>
-        <Text style={styles.tooltipText}>{tooltipLabel}</Text>
-      </TooltipContent>
-    </Tooltip>
-  );
-}
-
-// Wraps a single argument control in the mobile vertical stack. On desktop the
-// controls are laid out in one horizontal row, so no per-control wrapper is used.
-// Decorative padding must not block the dock background from iOS hit testing.
-function FormRow({ children }: { children: React.ReactNode }) {
-  return (
-    <View style={styles.row} pointerEvents="box-none">
-      {children}
-    </View>
-  );
-}
 
 interface WorkspaceIsolationState {
   isolation: "local" | "worktree";
@@ -816,7 +261,7 @@ function useLocalBranchControl(input: {
   checkoutStatus: { currentBranch: string | null } | null;
   anchorRef: RefObject<View | null>;
   isPending: boolean;
-}): NewWorkspaceFormStackInput["localBranch"] {
+}): NewWorkspaceFormProps["localBranch"] {
   const { enabled, serverId, sourceDirectory, anchorRef, isPending } = input;
   const currentBranch =
     enabled && sourceDirectory ? (input.checkoutStatus?.currentBranch ?? null) : null;
@@ -851,12 +296,6 @@ function useLocalBranchControl(input: {
     options: branchOptions,
     onSelect: handleBranchSelect,
   };
-}
-
-function isolationLabel(t: TFunction, isolation: "local" | "worktree"): string {
-  return isolation === "worktree"
-    ? t("newWorkspace.isolation.worktree")
-    : t("newWorkspace.isolation.local");
 }
 
 function normalizeBranchDetails(
@@ -1058,7 +497,7 @@ function buildWorkspaceDraftSetupFromComposer(input: {
   return {
     provider: input.provider,
     cwd: input.cwd,
-    modeId: input.composerState.selectedMode || null,
+    modeId: input.composerState.effectiveModeId || null,
     model: input.composerState.effectiveModelId || null,
     thinkingOptionId: input.composerState.effectiveThinkingOptionId || null,
     featureValues: input.composerState.featureValues ?? {},
@@ -1138,7 +577,7 @@ async function createWorkspaceChatAgent(input: CreateChatAgentInput): Promise<Su
     config: {
       provider,
       cwd,
-      modeId: composerState.selectedMode || undefined,
+      modeId: composerState.effectiveModeId || undefined,
       model: composerState.effectiveModelId || undefined,
       thinkingOptionId: composerState.effectiveThinkingOptionId || undefined,
       featureValues: composerState.featureValues,
@@ -1261,7 +700,7 @@ function resolveWorkspaceDraftSubmissionConfig(input: {
   return {
     cwd: workspaceDirectory,
     provider,
-    modeId: composerState.selectedMode || null,
+    modeId: composerState.effectiveModeId || null,
     model: composerState.effectiveModelId || null,
     thinkingOptionId: composerState.effectiveThinkingOptionId || null,
     featureValues: composerState.featureValues,
@@ -1534,375 +973,7 @@ function useNewWorkspaceInitialContext({
   };
 }
 
-type RefPickerRenderOption = NonNullable<ComboboxProps["renderOption"]>;
-
-interface FormPickerControl {
-  anchorRef: RefObject<View | null>;
-  open: () => void;
-  openState: boolean;
-  onOpenChange: (open: boolean) => void;
-}
-
-interface NewWorkspaceFormStackInput {
-  isCompact: boolean;
-  isPending: boolean;
-  project: FormPickerControl & {
-    options: ComboboxOptionType[];
-    triggerLabel: string;
-    selectedProject: HostProjectListItem | null;
-    iconDataByProjectViewKey: Map<string, string | null>;
-    selectedOptionId: string;
-    onSelect: (id: string) => void;
-    onAddProject: () => void;
-    /** No project chosen: the chat gets its own folder. */
-    cleared: boolean;
-    canClear: boolean;
-    onClear: () => void;
-    renderOption: RefPickerRenderOption;
-  };
-  host: FormPickerControl & {
-    allHosts: HostProfile[];
-    selectedServerId: string;
-    onSelect: (id: string) => void;
-  };
-  isolation: FormPickerControl & {
-    effectiveIsolation: "local" | "worktree";
-    options: ComboboxOptionType[];
-    onSelect: (id: string) => void;
-    renderOption: RefPickerRenderOption;
-    canCreateWorktree: boolean;
-  };
-  base: FormPickerControl & {
-    selectedSourceDirectory: string | null;
-    selectedItem: PickerItem | null;
-    triggerLabel: string;
-    options: ComboboxOptionType[];
-    selectedOptionId: string;
-    onSelect: (id: string) => void;
-    setSearchQuery: (query: string) => void;
-    emptyText: string;
-    renderOption: RefPickerRenderOption;
-    showRefPicker: boolean;
-  };
-  /** Local isolation: switches the project checkout's branch. Null when not on a branch. */
-  localBranch:
-    | (FormPickerControl & {
-        currentBranch: string;
-        /** The current branch, or the target branch while a switch is in flight. */
-        triggerLabel: string;
-        disabled: boolean;
-        options: ComboboxOptionType[];
-        onSelect: (id: string) => void;
-      })
-    | null;
-  launch: {
-    serverId: string;
-    target: LaunchTarget;
-    onChange: (target: LaunchTarget) => void;
-    profiles: readonly TerminalProfile[];
-    disabled: boolean;
-  };
-}
-
-function NewWorkspaceProjectControl({
-  project,
-  isPending,
-  style,
-  badgePressableStyle,
-  desktopPlacement,
-  iconColor,
-  iconSize,
-}: {
-  project: NewWorkspaceFormStackInput["project"];
-  isPending: boolean;
-  style: React.ComponentProps<typeof View>["style"];
-  badgePressableStyle: React.ComponentProps<typeof Pressable>["style"];
-  desktopPlacement: "top-start" | "bottom-start";
-  iconColor: string;
-  iconSize: number;
-}) {
-  const { t } = useTranslation();
-  // Hover lives on the plain wrapper (docs/hover.md) so the clear button inside the chip keeps it.
-  const [hovered, setHovered] = useState(false);
-  const handlePointerEnter = useCallback(() => setHovered(true), []);
-  const handlePointerLeave = useCallback(() => setHovered(false), []);
-  const addProjectAction = useMemo(
-    () => <AddProjectPickerAction onPress={project.onAddProject} />,
-    [project.onAddProject],
-  );
-  const { selectedProject } = project;
-  // Chat folders are only hidden from the Mac desktop sidebar.
-  const showClear =
-    project.canClear && getIsElectronMac() && hovered && !isPending && selectedProject !== null;
-  return (
-    <View style={style} onPointerEnter={handlePointerEnter} onPointerLeave={handlePointerLeave}>
-      <ProjectPickerTrigger
-        pickerAnchorRef={project.anchorRef}
-        onPress={project.open}
-        disabled={isPending}
-        badgePressableStyle={badgePressableStyle}
-        label={project.cleared ? t("newWorkspace.fields.noProject") : project.triggerLabel}
-        tooltipLabel={t("newWorkspace.tooltips.project")}
-        projectViewKey={selectedProject?.viewKey ?? null}
-        iconDataUri={
-          selectedProject
-            ? (project.iconDataByProjectViewKey.get(selectedProject.viewKey) ?? null)
-            : null
-        }
-        iconColor={iconColor}
-        iconSize={iconSize}
-        onClear={showClear ? project.onClear : undefined}
-        clearLabel={t("newWorkspace.fields.clearProject")}
-      />
-      <Combobox
-        options={project.options}
-        value={project.selectedOptionId}
-        onSelect={project.onSelect}
-        searchable
-        searchPlaceholder="Search projects"
-        title="Project"
-        open={project.openState}
-        onOpenChange={project.onOpenChange}
-        desktopPlacement={desktopPlacement}
-        desktopMinWidth={360}
-        anchorRef={project.anchorRef}
-        emptyText="No projects available."
-        renderOption={project.renderOption}
-        footer={addProjectAction}
-      />
-    </View>
-  );
-}
-
-function useNewWorkspaceFormStack(input: NewWorkspaceFormStackInput): ReactElement {
-  const { theme } = useUnistyles();
-  const { t } = useTranslation();
-  const { isCompact, isPending, project, host, isolation, base, localBranch, launch } = input;
-  const desktopPlacement = getIsElectronMac() ? "top-start" : "bottom-start";
-
-  const selectedHostLabel =
-    host.allHosts.find((h) => h.serverId === host.selectedServerId)?.label ?? "Host";
-  const showHostControl = host.allHosts.length > 1;
-  const isolationTriggerLabel = isolationLabel(t, isolation.effectiveIsolation);
-  const badgePressableStyle = useCallback(
-    ({ pressed, hovered }: PressableStateCallbackType & { hovered?: boolean }) => [
-      styles.badge,
-      Boolean(hovered) && !isPending && styles.badgeHovered,
-      pressed && !isPending && styles.badgePressed,
-      isPending && styles.badgeDisabled,
-    ],
-    [isPending],
-  );
-
-  const desktopControlStyle = isCompact ? undefined : styles.desktopControl;
-
-  const projectControl = (
-    <NewWorkspaceProjectControl
-      project={project}
-      isPending={isPending}
-      style={desktopControlStyle}
-      badgePressableStyle={badgePressableStyle}
-      desktopPlacement={desktopPlacement}
-      iconColor={theme.colors.foregroundMuted}
-      iconSize={theme.iconSize.sm}
-    />
-  );
-
-  const hostControl = showHostControl ? (
-    <View style={desktopControlStyle}>
-      <HostPicker
-        hosts={host.allHosts}
-        value={host.selectedServerId}
-        onSelect={host.onSelect}
-        open={host.openState}
-        onOpenChange={host.onOpenChange}
-        anchorRef={host.anchorRef}
-        searchable={false}
-        title="Host"
-        desktopPlacement={desktopPlacement}
-        desktopMinWidth={200}
-        hostOptionTestID={newWorkspaceHostOptionTestID}
-      >
-        <Tooltip>
-          <TooltipTrigger asChild triggerRefProp="ref">
-            <Pressable
-              ref={host.anchorRef}
-              accessibilityRole="button"
-              accessibilityLabel="Host"
-              onPress={host.open}
-              disabled={isPending || host.allHosts.length === 0}
-              style={badgePressableStyle}
-              testID="host-picker-trigger"
-            >
-              <View style={styles.badgeIconBox}>
-                <HostStatusDot serverId={host.selectedServerId} />
-              </View>
-              <Text style={styles.badgeText} numberOfLines={1}>
-                {selectedHostLabel}
-              </Text>
-              {metaChevron}
-            </Pressable>
-          </TooltipTrigger>
-          <TooltipContent side="top" align="center" offset={8}>
-            <Text style={styles.tooltipText}>{t("newWorkspace.tooltips.host")}</Text>
-          </TooltipContent>
-        </Tooltip>
-      </HostPicker>
-    </View>
-  ) : null;
-
-  const isolationControl = isolation.canCreateWorktree ? (
-    <View style={desktopControlStyle}>
-      <IsolationPickerTrigger
-        pickerAnchorRef={isolation.anchorRef}
-        onPress={isolation.open}
-        disabled={isPending}
-        badgePressableStyle={badgePressableStyle}
-        isolation={isolation.effectiveIsolation}
-        label={isolationTriggerLabel}
-        tooltipLabel={t("newWorkspace.tooltips.isolation")}
-        iconColor={theme.colors.foregroundMuted}
-        iconSize={theme.iconSize.sm}
-      />
-      <Combobox
-        options={isolation.options}
-        value={isolation.effectiveIsolation}
-        onSelect={isolation.onSelect}
-        title={t("newWorkspace.isolation.label")}
-        open={isolation.openState}
-        onOpenChange={isolation.onOpenChange}
-        desktopPlacement={desktopPlacement}
-        anchorRef={isolation.anchorRef}
-        renderOption={isolation.renderOption}
-      />
-    </View>
-  ) : null;
-
-  const renderLocalBranchOption = useCallback<RefPickerRenderOption>(
-    ({ option, selected, active, onPress }) => (
-      <PickerOptionItem
-        testID={`new-workspace-local-branch-${option.id}`}
-        label={option.label}
-        description={undefined}
-        selected={selected}
-        active={active}
-        disabled={isPending}
-        onPress={onPress}
-        isBranch
-        iconColor={theme.colors.foregroundMuted}
-        iconSize={theme.iconSize.sm}
-      />
-    ),
-    [isPending, theme.colors.foregroundMuted, theme.iconSize.sm],
-  );
-
-  const localBranchControl = localBranch ? (
-    <View style={desktopControlStyle}>
-      <RefPickerTrigger
-        testID="new-workspace-local-branch-trigger"
-        pickerAnchorRef={localBranch.anchorRef}
-        onPress={localBranch.open}
-        disabled={localBranch.disabled}
-        badgePressableStyle={badgePressableStyle}
-        selectedItem={null}
-        triggerLabel={localBranch.triggerLabel}
-        accessibilityLabel={t("branchSwitcher.currentBranch", {
-          branchName: localBranch.triggerLabel,
-        })}
-        tooltipLabel={t("branchSwitcher.triggerTooltip")}
-        iconColor={theme.colors.foregroundMuted}
-        iconSize={theme.iconSize.sm}
-      />
-      <Combobox
-        options={localBranch.options}
-        value={localBranch.currentBranch}
-        onSelect={localBranch.onSelect}
-        searchable
-        searchPlaceholder={t("branchSwitcher.searchPlaceholder")}
-        emptyText={t("branchSwitcher.empty")}
-        title={t("branchSwitcher.title")}
-        open={localBranch.openState}
-        onOpenChange={localBranch.onOpenChange}
-        desktopPlacement={desktopPlacement}
-        anchorRef={localBranch.anchorRef}
-        renderOption={renderLocalBranchOption}
-      />
-    </View>
-  ) : null;
-
-  const baseControl = base.showRefPicker ? (
-    <View style={desktopControlStyle}>
-      <RefPickerTrigger
-        pickerAnchorRef={base.anchorRef}
-        onPress={base.open}
-        disabled={isPending || !base.selectedSourceDirectory}
-        badgePressableStyle={badgePressableStyle}
-        selectedItem={base.selectedItem}
-        triggerLabel={base.triggerLabel}
-        accessibilityLabel={t("newWorkspace.refPicker.startingRef")}
-        tooltipLabel={t("newWorkspace.tooltips.startingRef")}
-        iconColor={theme.colors.foregroundMuted}
-        iconSize={theme.iconSize.sm}
-      />
-      <Combobox
-        options={base.options}
-        value={base.selectedOptionId}
-        onSelect={base.onSelect}
-        searchable
-        searchPlaceholder={t("newWorkspace.refPicker.searchPlaceholder")}
-        title={t("newWorkspace.refPicker.title")}
-        open={base.openState}
-        onOpenChange={base.onOpenChange}
-        onSearchQueryChange={base.setSearchQuery}
-        desktopPlacement={desktopPlacement}
-        anchorRef={base.anchorRef}
-        emptyText={base.emptyText}
-        renderOption={base.renderOption}
-      />
-    </View>
-  ) : (
-    localBranchControl
-  );
-
-  // Like Codex, the Mac desktop always launches a chat, so it has no Chat/Terminal choice.
-  const launchControl = getIsElectronMac() ? null : (
-    <LaunchControl
-      serverId={launch.serverId}
-      target={launch.target}
-      onChange={launch.onChange}
-      profiles={launch.profiles}
-      disabled={launch.disabled}
-      badgePressableStyle={badgePressableStyle}
-    />
-  );
-
-  return isCompact ? (
-    <View testID="new-workspace-ref-picker-row" style={styles.formStack} pointerEvents="box-none">
-      <FormRow>{projectControl}</FormRow>
-      {hostControl ? <FormRow>{hostControl}</FormRow> : null}
-      {isolationControl ? <FormRow>{isolationControl}</FormRow> : null}
-      {baseControl ? <FormRow>{baseControl}</FormRow> : null}
-      {launchControl ? <FormRow>{launchControl}</FormRow> : null}
-      {/* Keep fixed stack height without separating the visible controls. */}
-      {isolationControl ? null : <View style={styles.baseSpacer} pointerEvents="none" />}
-      {baseControl ? null : <View style={styles.baseSpacer} pointerEvents="none" />}
-    </View>
-  ) : (
-    <View
-      testID="new-workspace-ref-picker-row"
-      style={styles.formStackDesktop}
-      pointerEvents="box-none"
-    >
-      {projectControl}
-      {hostControl}
-      {isolationControl}
-      {baseControl}
-      {launchControl ? <View style={styles.launchSpacer} pointerEvents="none" /> : null}
-      {launchControl}
-    </View>
-  );
-}
-
+// oxlint-disable-next-line complexity -- upstream screen plus the Mac new chat layout branches
 export function NewWorkspaceScreen({
   serverId,
   sourceDirectory: sourceDirectoryProp,
@@ -1911,10 +982,11 @@ export function NewWorkspaceScreen({
   draftId,
 }: NewWorkspaceScreenProps) {
   const queryClient = useQueryClient();
-  const { theme } = useUnistyles();
   const { t } = useTranslation();
   const isCompact = useIsCompactFormFactor();
   const toast = useToast();
+  const composerEditing = useNewWorkspaceComposerEditing();
+  const { leaveFullscreen } = composerEditing;
   const mergeWorkspaces = useCallback(
     (targetServerId: string, workspaces: Iterable<WorkspaceDescriptor>) => {
       getHostRuntimeStore().acceptWorkspaceSnapshots(targetServerId, Array.from(workspaces));
@@ -2009,7 +1081,7 @@ export function NewWorkspaceScreen({
     [terminalComposerValue],
   );
   const terminalTextReplacement = useMemo(
-    () => ({ key: launchFocusKey, text: terminalComposerValue }),
+    () => ({ kind: "replace" as const, key: launchFocusKey, text: terminalComposerValue }),
     [launchFocusKey, terminalComposerValue],
   );
 
@@ -2245,6 +1317,10 @@ export function NewWorkspaceScreen({
     openAddProjectPicker(selectedServerId);
   }, [openAddProjectPicker, selectedServerId]);
 
+  const handleAddHost = useCallback(() => {
+    router.push(buildSettingsAddHostRoute(Date.now()));
+  }, []);
+
   const openPicker = useCallback(() => {
     setPickerOpen(true);
   }, []);
@@ -2276,50 +1352,6 @@ export function NewWorkspaceScreen({
   const handleIsolationPickerOpenChange = useCallback((nextOpen: boolean) => {
     setIsolationPickerOpen(nextOpen);
   }, []);
-
-  // "New worktree" is omitted entirely (not disabled) when the project isn't a
-  // git checkout, since worktree isolation is impossible there.
-  const isolationOptions = useMemo<ComboboxOptionType[]>(() => {
-    const localOption = { id: "local", label: isolationLabel(t, "local") };
-    if (!canCreateWorktree) return [localOption];
-    return [localOption, { id: "worktree", label: isolationLabel(t, "worktree") }];
-  }, [canCreateWorktree, t]);
-
-  const handleSelectIsolationOption = useCallback(
-    (id: string) => {
-      setIsolation(id === "worktree" ? "worktree" : "local");
-      setIsolationPickerOpen(false);
-    },
-    [setIsolation],
-  );
-
-  const renderIsolationOption = useCallback(
-    ({
-      option,
-      selected,
-      active,
-      onPress,
-    }: {
-      option: ComboboxOptionType;
-      selected: boolean;
-      active: boolean;
-      onPress: () => void;
-    }) => {
-      return (
-        <IsolationOptionItem
-          optionId={option.id}
-          label={option.label}
-          selected={selected}
-          active={active}
-          disabled={isPending}
-          onPress={onPress}
-          iconColor={theme.colors.foregroundMuted}
-          iconSize={theme.iconSize.sm}
-        />
-      );
-    },
-    [isPending, theme.colors.foregroundMuted, theme.iconSize.sm],
-  );
 
   const handleClearDraft = useCallback(() => {
     // No-op: screen navigates away on success, text should stay for retry on error
@@ -2458,6 +1490,7 @@ export function NewWorkspaceScreen({
                 return;
               }
               outcome = "navigated";
+              leaveFullscreen();
               navigateToWorkspace({ serverId: targetServerId, workspaceId });
               revealNewChatExplorer(targetServerId, workspaceId);
             },
@@ -2509,6 +1542,7 @@ export function NewWorkspaceScreen({
       forkDraftSetup,
       isStillOnCreateScreen,
       launchTarget,
+      leaveFullscreen,
       selectedServerId,
       supportsForgeSearch,
       t,
@@ -2570,6 +1604,7 @@ export function NewWorkspaceScreen({
             return;
           }
           outcome = "navigated";
+          leaveFullscreen();
           navigateToWorkspace({ serverId: targetServerId, workspaceId, target });
           revealNewChatExplorer(targetServerId, workspaceId);
         },
@@ -2593,6 +1628,7 @@ export function NewWorkspaceScreen({
     selectedTerminalProfile,
     terminalPromptText,
     toast,
+    leaveFullscreen,
     updateFormPreferences,
     withConnectedClient,
   ]);
@@ -2688,41 +1724,6 @@ export function NewWorkspaceScreen({
     [handleOpenExplorerTool, isPending, projectCleared, worktreeSupport],
   );
 
-  const renderPickerOption = useCallback(
-    (props: {
-      option: ComboboxOptionType;
-      selected: boolean;
-      active: boolean;
-      onPress: () => void;
-    }) => <NewWorkspacePickerOption {...props} itemById={itemById} isPending={isPending} />,
-    [isPending, itemById],
-  );
-
-  const renderProjectOption = useCallback(
-    (props: {
-      option: ComboboxOptionType;
-      selected: boolean;
-      active: boolean;
-      onPress: () => void;
-    }) => (
-      <NewWorkspaceProjectPickerOption
-        {...props}
-        projectByOptionId={projectByOptionId}
-        projectIconDataByProjectViewKey={projectIconDataByProjectViewKey}
-        selectedServerId={selectedServerId}
-        isPending={isPending}
-        supportsWorkspaceMultiplicity={supportsWorkspaceMultiplicity}
-      />
-    ),
-    [
-      isPending,
-      projectByOptionId,
-      projectIconDataByProjectViewKey,
-      selectedServerId,
-      supportsWorkspaceMultiplicity,
-    ],
-  );
-
   const agentControlsWithDisabled = useMemo(
     () =>
       composerState
@@ -2739,60 +1740,61 @@ export function NewWorkspaceScreen({
       ? t("newWorkspace.refPicker.searching")
       : t("newWorkspace.refPicker.noMatchingRefs");
 
-  const formStack = useNewWorkspaceFormStack({
+  const formStack = useNewWorkspaceForm({
     isCompact,
     isPending,
     project: {
       anchorRef: projectPickerAnchorRef,
       open: openProjectPicker,
+      openState: projectPickerOpen,
+      onOpenChange: handleProjectPickerOpenChange,
       options: projectPickerOptions,
-      triggerLabel: projectTriggerLabel,
-      selectedProject,
+      projectByOptionId,
       iconDataByProjectViewKey: projectIconDataByProjectViewKey,
+      selectedProject,
       selectedOptionId: selectedProjectOptionId,
+      triggerLabel: projectTriggerLabel,
+      selectedServerId,
+      supportsWorkspaceMultiplicity,
       onSelect: handleSelectProjectOption,
       onAddProject: handleAddProject,
       cleared: projectCleared,
       canClear: supportsChatFolders,
       onClear: handleClearProject,
-      openState: projectPickerOpen,
-      onOpenChange: handleProjectPickerOpenChange,
-      renderOption: renderProjectOption,
     },
     host: {
+      anchorRef: hostPickerAnchorRef,
+      open: openHostPicker,
+      openState: hostPickerOpen,
+      onOpenChange: handleHostPickerOpenChange,
       allHosts,
       selectedServerId,
       onSelect: handleSelectWorkspaceHost,
-      openState: hostPickerOpen,
-      onOpenChange: handleHostPickerOpenChange,
-      anchorRef: hostPickerAnchorRef,
-      open: openHostPicker,
+      onAddHost: handleAddHost,
     },
     isolation: {
       anchorRef: isolationPickerAnchorRef,
       open: openIsolationPicker,
-      effectiveIsolation,
-      options: isolationOptions,
-      onSelect: handleSelectIsolationOption,
       openState: isolationPickerOpen,
       onOpenChange: handleIsolationPickerOpenChange,
-      renderOption: renderIsolationOption,
+      effectiveIsolation,
       canCreateWorktree,
+      onSelect: setIsolation,
     },
     base: {
       anchorRef: pickerAnchorRef,
       open: openPicker,
+      openState: pickerOpen,
+      onOpenChange: handlePickerOpenChange,
       selectedSourceDirectory,
       selectedItem,
       triggerLabel,
       options,
+      itemById,
       selectedOptionId,
       onSelect: handleSelectOption,
-      openState: pickerOpen,
-      onOpenChange: handlePickerOpenChange,
       setSearchQuery: setPickerSearchQuery,
       emptyText: pickerEmptyText,
-      renderOption: renderPickerOption,
       showRefPicker,
     },
     localBranch,
@@ -2806,10 +1808,13 @@ export function NewWorkspaceScreen({
   });
 
   const importSession = useImportSession({ serverId: selectedServerId });
+
+  const isComposerFullscreen = composerEditing.isFullscreen(isTerminalLaunch);
   const composer = isTerminalLaunch ? (
     <Composer
       key="terminal"
       inputMode="terminal"
+      editingSession={composerEditing.terminal}
       readOnly={!terminalTakesPrompt}
       placeholder={terminalPlaceholder}
       submitLabel={terminalSubmitLabel}
@@ -2836,6 +1841,7 @@ export function NewWorkspaceScreen({
   ) : (
     <Composer
       key="chat"
+      editingSession={composerEditing.chat}
       agentId={draftKey}
       serverId={selectedServerId}
       isPaneFocused={true}
@@ -2865,112 +1871,133 @@ export function NewWorkspaceScreen({
     />
   );
   return (
-    <>
+    <FileDropZone style={styles.container}>
       <NewWorkspaceLayout
         isCompact={isCompact}
+        fullscreen={isComposerFullscreen}
         project={selectedProject}
         serverId={selectedServerId}
         title={t("newWorkspace.title")}
         formStack={formStack}
-        errorMessage={errorMessage}
         onImportSession={importSession.open}
         explorerLauncher={explorerLauncher}
       >
         {composer}
+        {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
       </NewWorkspaceLayout>
       {importSession.sheet}
-    </>
+    </FileDropZone>
   );
+}
+
+/** Terminal and chat launches edit in separate sessions; the screen follows the mounted one. */
+function useNewWorkspaceComposerEditing() {
+  const terminal = useComposerEditingSession("terminal");
+  const chat = useComposerEditingSession("chat");
+  const isTerminalFullscreen = useComposerFullscreen(terminal);
+  const isChatFullscreen = useComposerFullscreen(chat);
+  // The sessions outlive the screen (its draft keeps them), so a launch that leaves
+  // the screen also leaves fullscreen; the next draft starts inline.
+  const leaveFullscreen = useCallback(() => {
+    terminal.setFullscreen(false);
+    chat.setFullscreen(false);
+  }, [chat, terminal]);
+  return {
+    terminal,
+    chat,
+    leaveFullscreen,
+    isFullscreen: (isTerminalLaunch: boolean) =>
+      isTerminalLaunch ? isTerminalFullscreen : isChatFullscreen,
+  };
 }
 
 function NewWorkspaceLayout({
   isCompact,
+  fullscreen,
   project,
   serverId,
   title,
   formStack,
-  errorMessage,
   onImportSession,
   explorerLauncher,
   children,
 }: {
   isCompact: boolean;
+  /** The composer covers the screen; the header leaves and the dock fills the content. */
+  fullscreen: boolean;
   project: Pick<HostProjectListItem, "projectName"> | null;
   serverId: string | null;
   title: string;
   formStack: ReactNode;
-  errorMessage: string | null;
   onImportSession: () => void;
   explorerLauncher: NewTabLauncher;
   children: ReactNode;
 }) {
   const { t } = useTranslation();
-  const screenHeaderLeft = useMemo(() => <SidebarMenuToggle />, []);
-  const desktopChat = getIsElectronMac() && !isCompact;
-  const projectName = project?.projectName;
-  const importSessionButton = <ImportSessionButton compact={isCompact} onPress={onImportSession} />;
-  const composer = (
-    <>
-      {children}
-      {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
-    </>
-  );
-  let content;
-  if (desktopChat) {
-    content = (
-      <View style={styles.desktopRow}>
-        <View style={styles.desktopLayout}>
-          <View style={styles.desktopHero} pointerEvents="none">
-            <View aria-hidden>
-              <ThemedPaseoLogo size={56} uniProps={passiveColorMapping} />
+  if (getIsElectronMac() && !isCompact) {
+    const projectName = project?.projectName;
+    return (
+      <View style={styles.content}>
+        <View style={styles.desktopRow}>
+          <View style={styles.desktopLayout}>
+            <View style={styles.desktopHero} pointerEvents="none">
+              <View aria-hidden>
+                <ThemedPaseoLogo size={56} uniProps={passiveColorMapping} />
+              </View>
+              <Text
+                style={styles.desktopHeroTitle}
+                accessibilityRole="header"
+                testID="desktop-new-chat-hero"
+              >
+                {projectName
+                  ? t("desktopChat.startInProject", { project: projectName })
+                  : t("desktopChat.startWork")}
+              </Text>
             </View>
-            <Text
-              style={styles.desktopHeroTitle}
-              accessibilityRole="header"
-              testID="desktop-new-chat-hero"
-            >
-              {projectName
-                ? t("desktopChat.startInProject", { project: projectName })
-                : t("desktopChat.startWork")}
-            </Text>
+            <View style={styles.desktopSetupRail}>
+              <View style={styles.desktopSetup}>{formStack}</View>
+            </View>
+            {/* Mac imports through History and Cmd+K, like Codex keeping this area clear. */}
+            {children}
           </View>
-          <View style={styles.desktopSetupRail}>
-            <View style={styles.desktopSetup}>{formStack}</View>
-          </View>
-          {/* Mac imports through History and Cmd+K, like Codex keeping this area clear. */}
-          {composer}
+          <NewChatExplorerDock serverId={serverId ?? ""} launcher={explorerLauncher} />
         </View>
-        <NewChatExplorerDock serverId={serverId ?? ""} launcher={explorerLauncher} />
       </View>
-    );
-  } else {
-    const setupFields = (
-      <>
-        {isCompact ? <View style={styles.compactTopActions}>{importSessionButton}</View> : null}
-        <View style={styles.composerTitleContainer} pointerEvents="none">
-          <Text style={styles.composerTitle}>{title}</Text>
-        </View>
-        {formStack}
-      </>
-    );
-    content = (
-      <ComposerDock centered={!isCompact}>
-        {setupFields}
-        <>
-          {composer}
-          {isCompact ? null : importSessionButton}
-        </>
-      </ComposerDock>
     );
   }
-  return (
-    <FileDropZone style={styles.container}>
-      {desktopChat ? null : <ScreenHeader left={screenHeaderLeft} borderless />}
-      <View style={styles.content}>
-        {desktopChat ? null : <TitlebarDragRegion />}
-        {content}
+  // In the header on compact layouts, under the composer otherwise.
+  const importSessionButton = <ImportSessionButton compact={isCompact} onPress={onImportSession} />;
+  // Compact has no title: the fields name themselves. The free space above pushes them down onto
+  // the composer, where the thumb is.
+  const setupFields = isCompact ? (
+    <>
+      <View style={styles.compactSetupSpace} pointerEvents="none" />
+      {formStack}
+    </>
+  ) : (
+    <>
+      <View style={styles.composerTitleContainer} pointerEvents="none">
+        <Text style={styles.composerTitle}>{title}</Text>
       </View>
-    </FileDropZone>
+      {formStack}
+    </>
+  );
+  return (
+    <>
+      {fullscreen ? null : (
+        <MenuHeader borderless rightContent={isCompact ? importSessionButton : undefined} />
+      )}
+      <View style={styles.content}>
+        <TitlebarDragRegion />
+        <ComposerDock centered={!isCompact} fullscreen={fullscreen}>
+          {setupFields}
+          <>
+            {children}
+            {isCompact || fullscreen ? null : importSessionButton}
+          </>
+        </ComposerDock>
+      </View>
+    </>
   );
 }
 
@@ -3009,11 +2036,8 @@ const styles = StyleSheet.create((theme) => ({
     position: "relative",
     flex: 1,
   },
-  // Takes the free space above the setup fields, so its button sits at the top of the screen.
-  // The inset puts the ghost button's icon on the setup rows' icon rail.
-  compactTopActions: {
+  compactSetupSpace: {
     flex: 1,
-    paddingHorizontal: theme.spacing[3],
   },
   composerTitleContainer: {
     marginBottom: theme.spacing[8],
@@ -3029,120 +2053,5 @@ const styles = StyleSheet.create((theme) => ({
     fontSize: theme.fontSize.base,
     color: theme.colors.destructive,
     lineHeight: 20,
-  },
-  formStack: {
-    marginBottom: theme.spacing[8],
-    gap: theme.spacing[2],
-  },
-  formStackDesktop: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: theme.spacing[4],
-    // The badge adds its own left padding; offset it so the project icon's left
-    // edge lands exactly on the "New workspace" title's left edge. The trailing
-    // inset mirrors it so the launch chip stops on the composer's inner content
-    // rather than running out to the composer's border.
-    paddingLeft: theme.spacing[4],
-    paddingRight: theme.spacing[4],
-    gap: theme.spacing[2],
-    // Like Codex, a narrower tray tucked behind the composer: the inset keeps its
-    // edges inside the composer's 24pt corners and the overlap hides its bottom.
-    ...(getIsElectronMac()
-      ? {
-          marginHorizontal: theme.spacing[3],
-          marginBottom: -MAC_SETUP_TRAY_OVERLAP,
-          backgroundColor: theme.colors.surface1,
-          borderTopLeftRadius: 16,
-          borderTopRightRadius: 16,
-          paddingLeft: theme.spacing[1],
-          paddingRight: theme.spacing[1],
-          paddingTop: theme.spacing[1],
-          paddingBottom: theme.spacing[1] + MAC_SETUP_TRAY_OVERLAP,
-        }
-      : {}),
-  },
-  desktopControl: {
-    minWidth: 0,
-    flexShrink: 1,
-  },
-  // The row's left inset matches the heading's text x (composerTitleContainer
-  // paddingLeft) so the control aligns with the "New workspace" glyph. The badge
-  // adds its own left padding, so the row inset is reduced by that amount.
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingLeft: theme.spacing[4],
-    gap: theme.spacing[1],
-  },
-  baseSpacer: {
-    height: BADGE_HEIGHT,
-  },
-  // Pushes the launch control to the trailing edge of the desktop meta row,
-  // next to project/host/branch. The row's own right inset (formStackDesktop)
-  // lands it on the composer's inner content, matching the left chips.
-  launchSpacer: {
-    flex: 1,
-  },
-  badge: {
-    flexDirection: "row",
-    alignItems: "center",
-    height: BADGE_HEIGHT,
-    maxWidth: 240,
-    overflow: "hidden",
-    paddingHorizontal: theme.spacing[2],
-    borderRadius: theme.borderRadius["2xl"],
-    gap: theme.spacing[1],
-  },
-  badgeHovered: {
-    backgroundColor: theme.colors.surface2,
-  },
-  badgePressed: {
-    backgroundColor: theme.colors.surface0,
-  },
-  badgeDisabled: {
-    opacity: 0.6,
-  },
-  badgeText: {
-    minWidth: 0,
-    fontSize: theme.fontSize.base,
-    color: theme.colors.foregroundMuted,
-    flexShrink: 1,
-  },
-  tooltipText: {
-    fontSize: theme.fontSize.base,
-    color: theme.colors.popoverForeground,
-  },
-  refDivergenceLabel: {
-    fontSize: theme.fontSize.sm,
-    color: theme.colors.foregroundMuted,
-    fontVariant: ["tabular-nums"],
-  },
-  chevronContainer: {
-    flexShrink: 0,
-    transform: [{ translateY: 1 }],
-  },
-  badgeIconBox: {
-    width: theme.iconSize.md,
-    height: theme.iconSize.md,
-    alignItems: "center",
-    justifyContent: "center",
-    flexShrink: 0,
-  },
-  projectIconFallbackText: {
-    // Single uppercase initial inside an iconSize.md (16px) square — below the
-    // smallest font-size token, so it stays a literal sized to the box.
-    fontSize: PROJECT_ICON_FALLBACK_FONT_SIZE,
-    fontWeight: "600",
-  },
-  rowIconBox: {
-    width: theme.iconSize.md,
-    height: theme.iconSize.md,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  hostStatusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
   },
 }));

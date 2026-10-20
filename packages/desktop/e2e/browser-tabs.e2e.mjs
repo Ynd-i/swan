@@ -307,7 +307,6 @@ async function createCallerAgent(
         provider: "mock/ten-second-stream",
         settings: { modeId: "load-test", features },
         initialPrompt,
-        background: true,
       },
     });
     const result = response.structuredContent;

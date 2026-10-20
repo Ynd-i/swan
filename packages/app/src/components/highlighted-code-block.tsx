@@ -1,15 +1,14 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Pressable,
-  Text,
   View,
+  Text,
   type StyleProp,
   type TextStyle,
   type ViewStyle,
 } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { ScrollView } from "@/components/ui/scroll-view";
-import { MarkdownTextSpan } from "@/components/markdown-text";
 import * as Clipboard from "expo-clipboard";
 import { ArrowRightToLine, Check, Copy, Code, Play, WrapText } from "lucide-react-native";
 import { useTranslation } from "react-i18next";
@@ -113,12 +112,12 @@ export const HighlightedCodeBlock = React.memo(function HighlightedCodeBlock({
   );
 
   const codeText = (
-    <MarkdownTextSpan
+    <Text
       style={[innerTextStyle, isMac && (wrap ? macStyles.wrappedText : macStyles.scrollingText)]}
-      copyTag="code"
+      dataSet={markdownCopyDataSet.code}
     >
       {keyedLines ? renderCodeSegments(keyedLines) : renderedCode}
-    </MarkdownTextSpan>
+    </Text>
   );
   return (
     <View
@@ -185,12 +184,7 @@ interface TokenSpanProps {
 
 const TokenSpan = React.memo(function TokenSpan({ token }: TokenSpanProps) {
   return (
-    <MarkdownTextSpan
-      monoSurface
-      style={token.style ? syntaxTokenStyleFor(token.style) : undefined}
-    >
-      {token.text}
-    </MarkdownTextSpan>
+    <Text style={token.style ? syntaxTokenStyleFor(token.style) : undefined}>{token.text}</Text>
   );
 });
 
@@ -199,7 +193,7 @@ interface CodeTextSpanProps {
 }
 
 const CodeTextSpan = React.memo(function CodeTextSpan({ text }: CodeTextSpanProps) {
-  return <MarkdownTextSpan monoSurface>{text}</MarkdownTextSpan>;
+  return <Text>{text}</Text>;
 });
 
 interface SplitStyles {

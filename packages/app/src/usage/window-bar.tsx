@@ -29,7 +29,9 @@ export function UsageWindowBar({
   onTogglePin,
   pinLabel,
   pinTestID,
+  retained = false,
 }: {
+  retained?: boolean;
   window: UsageWindow;
   overview?: boolean;
   displayAs: UsageDisplayAs;
@@ -46,10 +48,14 @@ export function UsageWindowBar({
   const tone = windowTone(window);
 
   const fillWidth = clampPct(shownPct ?? 0);
-  const isAtRisk = window.runsOutAt != null && window.shortfallPct != null;
+  // A retained report is an old snapshot; a run-out time it names may already have passed.
+  const isAtRisk =
+    window.runsOutAt != null &&
+    window.shortfallPct != null &&
+    (!retained || Date.parse(window.runsOutAt) > Date.now());
   const deadline = isAtRisk ? window.runsOutAt : window.resetsAt;
   const deadlineKind = isAtRisk ? "runOut" : "reset";
-  const trailing = formatUsageDeadline(deadline, deadlineKind, t);
+  const trailing = formatUsageDeadline(deadline, deadlineKind, t, retained);
   let value = "—";
   let complement: string | null = null;
   if (shownPct != null) {
@@ -77,6 +83,7 @@ export function UsageWindowBar({
     value,
     deadline,
     deadlineKind,
+    retained,
     isAtRisk,
     tone,
     overview,
@@ -124,6 +131,7 @@ function WindowRowContent({
   value,
   deadline,
   deadlineKind,
+  retained,
   isAtRisk,
   tone,
   overview,
@@ -138,6 +146,7 @@ function WindowRowContent({
   value: string;
   deadline: string | null | undefined;
   deadlineKind: "reset" | "runOut";
+  retained: boolean;
   isAtRisk: boolean;
   tone: UsageTone;
   overview: boolean;
@@ -163,6 +172,7 @@ function WindowRowContent({
                 <UsageDeadline
                   at={deadline}
                   kind={deadlineKind}
+                  retained={retained}
                   prefix=" · "
                   style={deadlineStyle}
                 />
@@ -172,7 +182,12 @@ function WindowRowContent({
           {overview && (complement || deadline) ? (
             <View style={styles.labelRow}>
               <View style={styles.deadlineSlot}>
-                <UsageDeadline at={deadline} kind={deadlineKind} style={deadlineStyle} />
+                <UsageDeadline
+                  at={deadline}
+                  kind={deadlineKind}
+                  retained={retained}
+                  style={deadlineStyle}
+                />
               </View>
               {complement ? <Text style={styles.value}>{complement}</Text> : null}
             </View>

@@ -1,5 +1,5 @@
 import { createHook } from "node:async_hooks";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawn, type ChildProcess } from "node:child_process";
 import {
   mkdtempSync,
   mkdirSync,
@@ -697,6 +697,105 @@ describe("absolute directory-path configuration", () => {
   });
 });
 
+describe("home search with excluded discovery paths", () => {
+  let homeDir: string;
+  let libraryDir: string;
+
+  beforeEach(() => {
+    homeDir = realpathSync.native(mkdtempSync(path.join(tmpdir(), "directory-excluded-")));
+    libraryDir = path.join(homeDir, "Library");
+    mkdirSync(path.join(libraryDir, "sub", "match-me"), { recursive: true });
+    mkdirSync(path.join(homeDir, "projects", "other"), { recursive: true });
+  });
+
+  afterEach(() => {
+    rmSync(homeDir, { recursive: true, force: true });
+  });
+
+  function searchHome(query: string) {
+    return searchDirectoryEntries({
+      root: homeDir,
+      query,
+      pathFormat: "absolute",
+      includeDirectories: true,
+      includeFiles: false,
+      pathQueryPolicy: "rooted",
+      rootAliases: ["~"],
+      blankQueryBehavior: "none",
+      confidentResultScanThreshold: 5_000,
+      excludedDiscoveryPaths: [libraryDir],
+    }).then((entries) => entries.map((entry) => entry.path));
+  }
+
+  it("does not discover entries inside an excluded path", async () => {
+    await expect(searchHome("match")).resolves.toEqual([]);
+    await expect(searchHome("~")).resolves.toEqual([path.join(homeDir, "projects")]);
+  });
+
+  it("excludes by path, so a nested directory with the same name is still discovered", async () => {
+    const nested = path.join(homeDir, "projects", "game", "Library", "match-me");
+    mkdirSync(nested, { recursive: true });
+
+    await expect(searchHome("match")).resolves.toEqual([nested]);
+  });
+
+  // POSIX-only: creates and follows a symlink fixture.
+  it.skipIf(isWindows)("does not discover an excluded path through a symlink", async () => {
+    symlinkSync(path.join(libraryDir, "sub"), path.join(homeDir, "link"), "dir");
+
+    await expect(searchHome("match")).resolves.toEqual([]);
+  });
+
+  it("resolves an exact typed path inside an excluded path", async () => {
+    await expect(searchHome("~/Library/sub/match-me")).resolves.toEqual([
+      path.join(libraryDir, "sub", "match-me"),
+    ]);
+  });
+
+  it("lists one level when browsing inside an excluded path", async () => {
+    await expect(searchHome("~/Library/")).resolves.toEqual([
+      libraryDir,
+      path.join(libraryDir, "sub"),
+    ]);
+    await expect(searchHome("~/Library/su")).resolves.toEqual([path.join(libraryDir, "sub")]);
+  });
+});
+
+describe("rooted queries with a typed parent", () => {
+  let homeDir: string;
+
+  beforeEach(() => {
+    homeDir = realpathSync.native(mkdtempSync(path.join(tmpdir(), "directory-typed-parent-")));
+    mkdirSync(path.join(homeDir, "Developer", "pasta"), { recursive: true });
+    mkdirSync(path.join(homeDir, "Archive", "Developer", "pasta"), { recursive: true });
+  });
+
+  afterEach(() => {
+    rmSync(homeDir, { recursive: true, force: true });
+  });
+
+  it("walks only under the typed parent when it exists", async () => {
+    await expect(
+      searchAbsoluteDirectoryPaths({ homeDir, query: "~/Developer/pas" }),
+    ).resolves.toEqual([path.join(homeDir, "Developer", "pasta")]);
+  });
+
+  it("matches the whole tree when the typed parent does not exist", async () => {
+    await expect(searchAbsoluteDirectoryPaths({ homeDir, query: "~/Devel/pas" })).resolves.toEqual([
+      path.join(homeDir, "Developer", "pasta"),
+      path.join(homeDir, "Archive", "Developer", "pasta"),
+    ]);
+  });
+
+  it("returns the typed directory first", async () => {
+    mkdirSync(path.join(homeDir, "Developer", "pasta-extra"));
+
+    const results = await searchAbsoluteDirectoryPaths({ homeDir, query: "~/Developer/pasta" });
+
+    expect(results[0]).toBe(path.join(homeDir, "Developer", "pasta"));
+  });
+});
+
 describe("relative typed-entry configuration", () => {
   let tempRoot: string;
   let workspaceDir: string;
@@ -967,6 +1066,16 @@ describe("relative typed-entry configuration", () => {
   });
 });
 
+interface SearchProcessExit {
+  code: number | null;
+  signal: string | null;
+}
+
+interface SearchProcess {
+  child: ChildProcess;
+  exited: Promise<SearchProcessExit>;
+}
+
 // Reading a tree is cheap; re-deriving each entry's path state is not. A scan that asks whether
 // every ancestor of every entry is inside the root, or is Git-ignored, costs multiples of the
 // read and is what made large home directories exceed the client request timeout.
@@ -974,6 +1083,7 @@ describe("home-tree scan cost", () => {
   const DEPTH = 8;
   const CHAINS = 40;
   let scanRoot: string;
+  let searchProcess: SearchProcess | null = null;
 
   beforeEach(() => {
     scanRoot = realpathSync.native(mkdtempSync(path.join(tmpdir(), "directory-scan-cost-")));
@@ -984,8 +1094,16 @@ describe("home-tree scan cost", () => {
     }
   });
 
-  afterEach(() => {
-    rmSync(scanRoot, { recursive: true, force: true });
+  afterEach(async () => {
+    try {
+      if (searchProcess) {
+        searchProcess.child.kill();
+        await searchProcess.exited;
+      }
+    } finally {
+      searchProcess = null;
+      rmSync(scanRoot, { recursive: true, force: true });
+    }
   });
 
   // Nothing matches, so the scan walks the whole tree instead of stopping at a confident result.
@@ -1002,6 +1120,82 @@ describe("home-tree scan cost", () => {
     await run();
     return stopPathContainmentMetrics();
   }
+
+  // Creating the 27,000-directory fixture alone takes about 20 s on Windows
+  // runners under parallel load, and it has crossed the default 30 s deadline.
+  // The heap bound is enforced by the child's --max-old-space-size and its own
+  // 20 s timeout, so the test deadline only has to cover fixture setup.
+  it("finishes overlapping broad-tree searches within a bounded heap", async () => {
+    const broadRoot = path.join(scanRoot, "broad");
+    mkdirSync(broadRoot);
+    for (let branch = 0; branch < 30; branch += 1) {
+      const branchRoot = path.join(broadRoot, `branch-${branch}`);
+      mkdirSync(branchRoot);
+      for (let group = 0; group < 30; group += 1) {
+        const groupRoot = path.join(branchRoot, `group-${group}`);
+        mkdirSync(groupRoot);
+        for (let leaf = 0; leaf < 30; leaf += 1) {
+          mkdirSync(path.join(groupRoot, `leaf-${leaf}`));
+        }
+      }
+    }
+    // A smaller real tree and explicit heap budget keep the million-directory repro cheap in CI.
+    const moduleUrl = new URL("./directory-suggestions.ts", import.meta.url).href;
+    const source = `
+      const { searchDirectoryEntries } = await import(${JSON.stringify(moduleUrl)});
+      const results = await Promise.all(Array.from({ length: 14 }, (_, index) =>
+        searchDirectoryEntries({
+          root: ${JSON.stringify(broadRoot)},
+          query: "z".repeat(index + 1),
+          pathFormat: "absolute",
+          includeFiles: false,
+          includeDirectories: true,
+          pathQueryPolicy: "rooted",
+          rootAliases: ["~"],
+          blankQueryBehavior: "none",
+          confidentResultScanThreshold: 5000,
+          maxEntriesScanned: 2000,
+          limit: 30,
+        })
+      ));
+      process.stdout.write(JSON.stringify(results));
+    `;
+    const child = spawn(
+      process.execPath,
+      [
+        "--max-old-space-size=128",
+        "--conditions=source",
+        "--import",
+        "tsx",
+        "--input-type=module",
+        "--eval",
+        source,
+      ],
+      { stdio: ["ignore", "pipe", "pipe"], timeout: 20_000 },
+    );
+    let stdout = "";
+    let stderr = "";
+    child.stdout.setEncoding("utf8");
+    child.stderr.setEncoding("utf8");
+    child.stdout.on("data", (chunk: string) => {
+      stdout += chunk;
+    });
+    child.stderr.on("data", (chunk: string) => {
+      stderr += chunk;
+    });
+    const exited = new Promise<SearchProcessExit>((resolve, reject) => {
+      child.on("error", reject);
+      child.on("close", (code, signal) => resolve({ code, signal }));
+    });
+    searchProcess = { child, exited };
+    const exit = await exited;
+    expect({ ...exit, outOfMemory: stderr.includes("heap out of memory") }).toEqual({
+      code: 0,
+      signal: null,
+      outOfMemory: false,
+    });
+    expect(JSON.parse(stdout)).toEqual(Array.from({ length: 14 }, () => []));
+  }, 120_000);
 
   it("derives no containment for a tree that cannot leave the root", async () => {
     const checks = await countContainmentChecks(scanWholeTree);

@@ -1,3 +1,4 @@
+import type { AgentMessage } from "@getpaseo/protocol/agent-message";
 import type {
   AgentProvider,
   AgentTimelineItem,
@@ -7,7 +8,6 @@ import type {
 import { timelineItemIdentity } from "@getpaseo/protocol/timeline-identity";
 import type { AgentAttachment, AgentStreamEventPayload } from "@getpaseo/protocol/messages";
 import type { AttachmentMetadata } from "@/attachments/types";
-import type { MarkdownBlockKind } from "@/utils/split-markdown-blocks";
 import type { ChatBrief, ChatProposal, StartedChatReport } from "@/chat-proposals/proposal";
 import { extractTaskEntriesFromToolCall } from "../utils/tool-call-parsers";
 
@@ -717,10 +717,7 @@ export interface AssistantMessageItem {
   text: string;
   timestamp: Date;
   /** Display-only fields, assigned after source-item plugin transforms. */
-  blockGroupId?: string;
-  blockIndex?: number;
-  blockKind?: MarkdownBlockKind;
-  /** The chats the message proposes, on its last block. */
+  /** The chats the message proposes. */
   proposals?: ChatProposal[];
 }
 
@@ -754,6 +751,7 @@ interface OrchestratorToolCallData {
 }
 
 export interface AgentToolCallData {
+  agentMessage?: AgentMessage;
   provider: AgentProvider;
   callId: string;
   name: string;
@@ -811,6 +809,8 @@ export interface CompactionItem {
 export interface PluginTimelineStreamItem {
   kind: "plugin";
   id: string;
+  /** The id of the stream item a timeline transformer replaced; set only by projection. */
+  sourceId?: string;
   timelineCursor?: TimelinePosition;
   turnId?: string;
   timestamp: Date;
@@ -1496,6 +1496,7 @@ function reduceTimelineToolCall(
       error: item.error,
       detail: item.detail,
       metadata: item.metadata,
+      ...(item.agentMessage ? { agentMessage: item.agentMessage } : {}),
     },
     timestamp,
     timelineCursor,

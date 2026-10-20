@@ -1,7 +1,6 @@
 import type { TurnTiming } from "@/timeline/turn-time";
-import { getIsElectronMac } from "@/constants/platform";
 import type { StreamItem } from "@/types/stream";
-import { getAssistantBlockSpacing, getGapBetweenStreamItems } from "./spacing";
+import { getAssistantMessageSpacing, getGapBetweenStreamItems } from "./spacing";
 import type { StreamFrameChildOrder, StreamStrategy } from "./strategy";
 import { continuesResponse, continuesTurn, isResponseBoundary } from "./turn-membership";
 
@@ -312,10 +311,8 @@ function layoutSegmentItem(
     boundaryAboveItems: input.boundaryAboveItems,
     boundaryAboveIndex: input.boundaryAboveIndex,
   });
-  const assistantSpacing = getAssistantBlockSpacing({
+  const assistantSpacing = getAssistantMessageSpacing({
     item,
-    aboveItem,
-    belowItem,
     hasFooterBelow: completedFooter !== null || (input.hasAuxiliaryFooter && belowItem === null),
   });
 
@@ -323,7 +320,7 @@ function layoutSegmentItem(
     item,
     aboveItem,
     belowItem,
-    gapBelow: completedFooter ? 0 : getGapBetweenStreamItems(item, belowItem, getIsElectronMac()),
+    gapBelow: completedFooter ? 0 : getGapBetweenStreamItems(item, belowItem),
     assistantSpacing,
     completedFooter,
     toolSequence: getToolSequence({ item, aboveItem, belowItem }),
@@ -339,18 +336,8 @@ function layoutSegmentItem(
 
 // Keyed by history array identity; inner key encodes the inputs that affect history layout.
 // History layout is stable across text-chunk flushes because the liveHead boundary item's
-// kind and id don't change when only its text grows within the same Markdown construct.
+// kind and id don't change when only its text grows.
 const historyLayoutCache = new WeakMap<StreamItem[], Map<string, StreamLayoutItem[]>>();
-
-function getBoundaryLayoutKey(item: StreamItem | null): string {
-  if (!item) return "none";
-  return [
-    item.id,
-    item.kind,
-    item.turnId ?? "null",
-    item.kind === "assistant_message" ? (item.blockKind ?? "unknown") : "none",
-  ].join(":");
-}
 
 export function layoutStream(input: StreamLayoutInput): StreamLayout {
   const auxiliaryTurnFooter = resolveAuxiliaryTurnFooter(input);
@@ -370,7 +357,9 @@ export function layoutStream(input: StreamLayoutInput): StreamLayout {
     const historyCacheKey = [
       frameOrder,
       historyBoundaryIndex ?? "null",
-      getBoundaryLayoutKey(liveHeadBoundaryItem),
+      liveHeadBoundaryItem?.id ?? "null",
+      liveHeadBoundaryItem?.kind ?? "null",
+      liveHeadBoundaryItem?.turnId ?? "null",
       auxiliaryTurnFooter?.itemId ?? "null",
       hasAuxiliaryFooter ? "footer" : "no-footer",
     ].join(":");

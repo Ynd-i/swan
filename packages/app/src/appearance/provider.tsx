@@ -21,6 +21,7 @@ import {
 } from "@/plugins/themes";
 import { PLUGIN_THEME_NAMES, PLUGIN_THEME_PREFERENCE, THEME_TO_UNISTYLES } from "@/styles/theme";
 import { applyAppearance } from "./apply";
+import { AppearanceSystemBars } from "./system-bars";
 import { AppReducedMotionProvider } from "./reduced-motion";
 
 interface ContributedThemes {
@@ -120,6 +121,7 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
   return (
     <AppReducedMotionProvider preference={settings.reducedMotion}>
       <ContributedThemesContext.Provider value={value}>
+        <AppearanceSystemBars />
         {children}
       </ContributedThemesContext.Provider>
     </AppReducedMotionProvider>

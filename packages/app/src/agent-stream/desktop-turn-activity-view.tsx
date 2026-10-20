@@ -91,15 +91,28 @@ export function useDesktopTurnActivity({
     }),
     [historyVirtualized, historyMounted, liveHead],
   );
-  const visibleMessageIds = useMemo(
+  // Chat find and the chat outline address messages, never rows, and skip what a collapsed
+  // activity hides.
+  const mountedHistoryMessageIds = useMemo(
     () =>
       new Set(
-        [...model.history, ...model.segments.liveHead]
+        model.history
           .filter((item) => !projection.hiddenItemIds.has(item.id))
           .map(getStreamItemMessageId),
       ),
-    [model.history, model.segments.liveHead, projection.hiddenItemIds],
+    [model.history, projection.hiddenItemIds],
   );
+  const mountedMessageIds = useMemo(() => {
+    const liveHeadMessageIds = new Set(
+      model.segments.liveHead
+        .filter((item) => !projection.hiddenItemIds.has(item.id))
+        .map(getStreamItemMessageId),
+    );
+    return {
+      has: (messageId: string) =>
+        mountedHistoryMessageIds.has(messageId) || liveHeadMessageIds.has(messageId),
+    };
+  }, [model.segments.liveHead, mountedHistoryMessageIds, projection.hiddenItemIds]);
   const toggle = useCallback(
     (activity: DesktopTurnActivity) => {
       if (!activity.expanded) {
@@ -124,7 +137,15 @@ export function useDesktopTurnActivity({
     },
     [projection.groupByMessageId, revealLoadedHistory],
   );
-  return { projection, segments, boundary, visibleMessageIds, toggle, revealLoadedMessage };
+  return {
+    projection,
+    segments,
+    boundary,
+    mountedHistoryMessageIds,
+    mountedMessageIds,
+    toggle,
+    revealLoadedMessage,
+  };
 }
 
 const Disclosure = withUnistyles(ChevronRight);

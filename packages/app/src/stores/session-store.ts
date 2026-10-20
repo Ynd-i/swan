@@ -15,7 +15,7 @@ import {
 import {
   acceptMessageSubmission,
   beginMessageSubmission,
-  getActiveMessageSubmissions,
+  hasActiveMessageSubmission,
   observeMessageSubmissionCanonical,
   rejectMessageSubmission,
   type MessageSubmissionRecord,
@@ -115,6 +115,7 @@ export interface WorkspaceDescriptor {
   worktreeSlug?: WorkspaceDescriptorPayload["worktreeSlug"];
   projectKind: WorkspaceDescriptorPayload["projectKind"];
   workspaceKind: WorkspaceDescriptorPayload["workspaceKind"];
+  background?: boolean;
   name: string;
   title?: string | null;
   pinnedAt?: string | null;
@@ -152,6 +153,7 @@ export function normalizeWorkspaceDescriptor(
     worktreeSlug: payload.worktreeSlug,
     projectKind: payload.projectKind,
     workspaceKind: payload.workspaceKind,
+    background: payload.background ?? false,
     name: payload.name,
     title: payload.title ?? null,
     pinnedAt: payload.pinnedAt ?? null,
@@ -348,7 +350,7 @@ export function selectAgentTurnPresentation(
     session?.agents.get(agentId)?.turn ??
       session?.agentDetails.get(agentId)?.turn ??
       TURN_LIVENESS_IDLE,
-    getActiveMessageSubmissions(session?.messageSubmissions.get(agentId)).length > 0,
+    hasActiveMessageSubmission(session?.messageSubmissions.get(agentId)),
   );
 }
 

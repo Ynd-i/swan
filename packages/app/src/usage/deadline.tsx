@@ -8,23 +8,25 @@ import { formatUsageDeadline } from "./format";
 export function UsageDeadline({
   at,
   kind = "reset",
+  retained = false,
   prefix = "",
   style,
 }: {
   at: string | null | undefined;
   kind?: "reset" | "runOut";
+  retained?: boolean;
   prefix?: string;
   style: StyleProp<TextStyle>;
 }) {
   const { t } = useTranslation();
-  const [label, setLabel] = useState(() => formatUsageDeadline(at, kind, t));
+  const [label, setLabel] = useState(() => formatUsageDeadline(at, kind, t, retained));
   useEffect(() => {
-    const update = () => setLabel(formatUsageDeadline(at, kind, t));
+    const update = () => setLabel(formatUsageDeadline(at, kind, t, retained));
     update();
     if (!at || !Number.isFinite(new Date(at).getTime()) || new Date(at).getTime() <= Date.now())
       return;
     return subscribeToRelativeTimeTick("minute", update);
-  }, [at, kind, t]);
+  }, [at, kind, retained, t]);
   return label ? (
     <Text style={style}>
       {prefix}

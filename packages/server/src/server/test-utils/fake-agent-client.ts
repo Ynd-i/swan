@@ -59,7 +59,9 @@ interface FakeAgentSessionOptions {
   sessionId?: string;
   memoryMarker?: string | null;
   closeSession?: () => Promise<void>;
-  onStartTurn?: (prompt: AgentPromptInput) => void;
+  onStartTurn?: (prompt: AgentPromptInput, config: AgentSessionConfig) => void;
+  beforeTurnComplete?: (prompt: AgentPromptInput) => Promise<void>;
+  historyEvents?: readonly AgentStreamEvent[];
   respond?: FakeTurnScript;
 }
 
@@ -69,11 +71,13 @@ export type FakeTurnScript = (
 ) => { text?: string; usage?: AgentUsage; subagent?: ProviderSubagentInputEvent } | undefined;
 
 export interface TestAgentClientOptions {
-  beforeCreateSession?: () => Promise<void>;
+  beforeCreateSession?: (config: AgentSessionConfig) => Promise<void>;
   closeSession?: () => Promise<void>;
-  onStartTurn?: (prompt: AgentPromptInput) => void;
+  onStartTurn?: (prompt: AgentPromptInput, config: AgentSessionConfig) => void;
+  beforeTurnComplete?: (prompt: AgentPromptInput) => Promise<void>;
   respond?: FakeTurnScript;
   supportsMcpServers?: boolean;
+  historyEvents?: readonly AgentStreamEvent[];
 }
 
 function createDeferred<T>(): Deferred<T> {
@@ -345,7 +349,9 @@ class FakeAgentSession implements AgentSession {
   private activeForegroundTurnId: string | null = null;
 
   private readonly closeSession: (() => Promise<void>) | undefined;
-  private readonly onStartTurn: ((prompt: AgentPromptInput) => void) | undefined;
+  private readonly onStartTurn: TestAgentClientOptions["onStartTurn"];
+  private readonly beforeTurnComplete: ((prompt: AgentPromptInput) => Promise<void>) | undefined;
+  private readonly historyEvents: readonly AgentStreamEvent[] | undefined;
   private readonly respond: FakeTurnScript | undefined;
 
   constructor(options: FakeAgentSessionOptions) {
@@ -359,6 +365,8 @@ class FakeAgentSession implements AgentSession {
     this.memoryMarker = options.memoryMarker ?? null;
     this.closeSession = options.closeSession;
     this.onStartTurn = options.onStartTurn;
+    this.beforeTurnComplete = options.beforeTurnComplete;
+    this.historyEvents = options.historyEvents;
     this.respond = options.respond;
     this.historyPath = path.join(
       tmpdir(),
@@ -450,7 +458,7 @@ class FakeAgentSession implements AgentSession {
 
     const turnId = `fake-turn-${this.nextTurnOrdinal++}`;
     this.activeForegroundTurnId = turnId;
-    this.onStartTurn?.(prompt);
+    this.onStartTurn?.(prompt, this.config);
 
     void this.emitTurnEvents(prompt);
 
@@ -716,6 +724,17 @@ class FakeAgentSession implements AgentSession {
     return false;
   }
 
+  private async emitScriptedSubagent(event: ProviderSubagentInputEvent | undefined): Promise<void> {
+    if (!event) return;
+    const subagent: AgentStreamEvent = {
+      type: "provider_subagent",
+      provider: this.providerName,
+      event,
+    };
+    await this.appendHistoryEvent(subagent);
+    this.notifySubscribers(subagent);
+  }
+
   private async emitTurnEvents(prompt: AgentPromptInput): Promise<void> {
     this.interruptSignal = createDeferred<void>();
     const slashCommand = await this.resolveSlashCommandInput(prompt);
@@ -798,15 +817,7 @@ class FakeAgentSession implements AgentSession {
       }
 
       const scripted = this.respond?.(textPrompt);
-      if (scripted?.subagent) {
-        const subagent: AgentStreamEvent = {
-          type: "provider_subagent",
-          provider: this.providerName,
-          event: scripted.subagent,
-        };
-        await this.appendHistoryEvent(subagent);
-        this.notifySubscribers(subagent);
-      }
+      await this.emitScriptedSubagent(scripted?.subagent);
       const assistantText = scripted?.text ?? this.buildAssistantText(textPrompt);
       const assistantChunkA: AgentStreamEvent = {
         type: "timeline",
@@ -827,6 +838,7 @@ class FakeAgentSession implements AgentSession {
         this.notifySubscribers(assistantChunkB);
       }
 
+      await this.beforeTurnComplete?.(prompt);
       const completed: AgentStreamEvent = {
         type: "turn_completed",
         provider: this.providerName,
@@ -840,6 +852,10 @@ class FakeAgentSession implements AgentSession {
   }
 
   async *streamHistory(): AsyncGenerator<AgentStreamEvent> {
+    if (this.historyEvents) {
+      yield* this.historyEvents;
+      return;
+    }
     let contents: string;
     try {
       contents = await readFile(this.historyPath, "utf8");
@@ -1241,13 +1257,15 @@ class FakeAgentClient implements AgentClient {
     config: AgentSessionConfig,
     _launchContext?: AgentLaunchContext,
   ): Promise<AgentSession> {
-    await this.options.beforeCreateSession?.();
+    await this.options.beforeCreateSession?.(config);
     return new FakeAgentSession({
       providerName: this.provider,
       config: { ...config },
       supportsMcpServers: this.options.supportsMcpServers,
       closeSession: this.options.closeSession,
       onStartTurn: this.options.onStartTurn,
+      beforeTurnComplete: this.options.beforeTurnComplete,
+      historyEvents: this.options.historyEvents,
       respond: this.options.respond,
     });
   }
@@ -1274,6 +1292,8 @@ class FakeAgentClient implements AgentClient {
       memoryMarker: typeof marker === "string" ? marker : null,
       closeSession: this.options.closeSession,
       onStartTurn: this.options.onStartTurn,
+      beforeTurnComplete: this.options.beforeTurnComplete,
+      historyEvents: this.options.historyEvents,
       respond: this.options.respond,
     });
   }

@@ -22,6 +22,9 @@ export const ko: TranslationResources = {
     agentError: "사용량을 불러올 수 없습니다: {{reason}}",
     updated: "{{time}} 업데이트",
     updatedNow: "방금 업데이트",
+    lastUpdated: "마지막 업데이트: {{time}}",
+    lastUpdatedNow: "마지막 업데이트: 방금",
+    noSuccessfulUpdate: "성공한 업데이트 없음",
     loading: "사용량을 불러오는 중…",
     empty: "사용량 데이터가 없습니다",
     noHosts: "연결된 호스트가 없습니다",
@@ -35,6 +38,7 @@ export const ko: TranslationResources = {
     remainingBalance: "{{amount}} 남음",
     resetsIn: "{{duration}} 후 초기화",
     resetDue: "초기화 예정 시간 지남",
+    resetPassed: "초기화 시간이 지남",
     runsOutIn: "{{duration}} 후 소진 예상",
     runsOutNow: "곧 소진 예상",
     durationMinutes: "{{count}}분",
@@ -136,6 +140,7 @@ export const ko: TranslationResources = {
     back: "뒤로",
     loading: "불러오는 중...",
     actions: {
+      save: "저장",
       back: "뒤로",
       cancel: "취소",
       close: "닫기",
@@ -245,6 +250,8 @@ export const ko: TranslationResources = {
     input: {
       accessibilityLabel: "에이전트에게 메시지...",
       terminalAccessibilityLabel: "Terminal prompt",
+      fullscreen: "전체 화면",
+      exitFullscreen: "전체 화면 종료",
       focusHint: "{{shortcut}}로 포커스",
       addAttachment: "첨부 추가",
       interruptAgent: "에이전트 중단",
@@ -490,6 +497,7 @@ export const ko: TranslationResources = {
       details: "세부 정보",
     },
     dictation: {
+      paused: "마이크가 중단되었습니다. 재개를 기다리는 중…",
       start: "음성 받아쓰기 시작",
       cancel: "받아쓰기 취소",
       retry: "받아쓰기 다시 시도",
@@ -499,6 +507,7 @@ export const ko: TranslationResources = {
       failedRetry: "받아쓰기에 실패했습니다. 다시 시도하려면 누르세요.",
     },
     question: {
+      responseFailed: "응답을 보내지 못했습니다. 다시 시도해 주세요.",
       title: "질문",
       skip: "건너뛰기",
       send: "보내기",
@@ -755,6 +764,9 @@ export const ko: TranslationResources = {
       updateHost: "기본 터미널 렌더러를 사용하도록 호스트를 업데이트합니다.",
       unableToSubscribe: "터미널을 구독할 수 없습니다",
     },
+    sheet: {
+      openAsTab: "탭으로 열기",
+    },
     tabs: {
       loading: "불러오는 중...",
       modified: "저장되지 않은 변경사항",
@@ -770,7 +782,7 @@ export const ko: TranslationResources = {
       },
       switcher: {
         trigger: "탭 전환 ({{count}}개 열림)",
-        title: "탭 전환",
+        title: "워크스페이스 탭",
         searchPlaceholder: "탭 검색",
       },
       menu: {
@@ -865,6 +877,7 @@ export const ko: TranslationResources = {
     header: {
       actions: {
         workspaceActions: "워크스페이스 작업",
+        workspaceActionsUnhealthy: "워크스페이스 작업, 비정상 서비스가 있습니다",
         newAgent: "새 에이전트",
         newTerminal: "새 터미널",
         newBrowser: "새 브라우저 탭",
@@ -912,6 +925,8 @@ export const ko: TranslationResources = {
         exitCode: "종료 {{code}}",
         startFailed: "{{scriptName}}을(를) 시작하지 못했습니다",
         stopFailed: "{{scriptName}}를 중지하지 못했습니다.",
+        running: "실행 중",
+        runningCount: "{{count}}개 실행 중",
       },
     },
     tree: {
@@ -1299,6 +1314,7 @@ export const ko: TranslationResources = {
       done: "완료",
     },
     display: {
+      showBackground: "백그라운드 표시",
       trigger: "표시 설정",
       heading: "표시",
       grouping: {
@@ -1474,10 +1490,12 @@ export const ko: TranslationResources = {
     },
     fields: {
       project: "프로젝트",
+      branch: "브랜치",
       noProject: "프로젝트 없음",
       clearProject: "프로젝트 제거",
       base: "기준",
       baseNotApplicable: "해당 없음",
+      host: "호스트",
     },
     titlePlaceholder: "제목(선택 사항)",
     errors: {
@@ -2205,6 +2223,17 @@ export const ko: TranslationResources = {
     accessibility: "컨텍스트 윈도우 {{percentage}}% 사용됨",
   },
   review: {
+    feedback: {
+      send: "피드백 보내기 ({{count}})",
+      sending: "피드백 전송 중 ({{count}})",
+      chooseAgent: "에이전트 선택",
+      sent: "{{recipient}}에게 피드백을 보냈습니다",
+      "no-agents": "피드백을 보내려면 이 작업 공간에서 에이전트 탭을 여세요.",
+      disconnected: "피드백을 보내려면 호스트에 연결하세요.",
+      "no-context": "저장된 댓글이 더 이상 이 변경 사항과 일치하지 않습니다.",
+      failed: "피드백 전송에 실패했습니다. 다시 시도하세요.",
+      prompt: "이 코드 리뷰를 반영해 주세요.",
+    },
     comment: {
       add: "리뷰 댓글 추가",
       edit: "리뷰 댓글 편집",

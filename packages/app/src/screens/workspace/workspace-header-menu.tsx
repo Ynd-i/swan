@@ -9,7 +9,6 @@ import {
   Globe,
   Import as ImportIcon,
   Settings,
-  SquarePen,
 } from "lucide-react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import type { TerminalProfile } from "@getpaseo/protocol/messages";
@@ -25,6 +24,7 @@ import {
   extraMutedIconColorMapping,
   iconButtonChromeGlyphSize,
   iconButtonChromeStyle,
+  useIconButtonChromeStyle,
 } from "@/components/ui/icon-button-chrome";
 import { TerminalProfileIcon } from "@/components/terminal-profile-icon";
 import { useDaemonConfig } from "@/hooks/use-daemon-config";
@@ -34,20 +34,21 @@ import {
 } from "@getpaseo/protocol/terminal-profiles";
 import { buildSettingsHostSectionRoute } from "@/utils/host-routes";
 import type { Theme } from "@/styles/theme";
+import {
+  useWorkspaceScriptsMenuPages,
+  type UseWorkspaceScriptsMenuPagesInput,
+} from "@/screens/workspace/scripts";
 
 const ThemedEllipsis = withUnistyles(Ellipsis);
 const ThemedFolderOpen = withUnistyles(FolderOpen);
 const ThemedCopy = withUnistyles(Copy);
-const ThemedSquarePen = withUnistyles(SquarePen);
 const ThemedGlobe = withUnistyles(Globe);
 const ThemedImport = withUnistyles(ImportIcon);
 const ThemedSettings = withUnistyles(Settings);
 
 const mutedColorMapping = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
 
-const MENU_NEW_AGENT_ICON = <ThemedSquarePen size={16} uniProps={mutedColorMapping} />;
 const MENU_NEW_BROWSER_ICON = <ThemedGlobe size={16} uniProps={mutedColorMapping} />;
-const MENU_NEW_TERMINAL_ICON = <TerminalProfileIcon iconKey={undefined} size={16} />;
 const MENU_IMPORT_ICON = <ThemedImport size={16} uniProps={mutedColorMapping} />;
 const MENU_COPY_ICON = <ThemedCopy size={16} uniProps={mutedColorMapping} />;
 const MENU_SETTINGS_ICON = <ThemedSettings size={16} uniProps={mutedColorMapping} />;
@@ -57,6 +58,16 @@ function WorkspaceHeaderMenuTriggerIcon() {
       size={iconButtonChromeGlyphSize("large")}
       uniProps={extraMutedIconColorMapping}
     />
+  );
+}
+
+/** The ⋯ with a dot on it, for when something inside the menu needs looking at. */
+function WorkspaceHeaderMenuAttentionTriggerIcon() {
+  return (
+    <View>
+      <WorkspaceHeaderMenuTriggerIcon />
+      <View style={styles.attentionDot} testID="workspace-header-menu-attention" />
+    </View>
   );
 }
 
@@ -215,30 +226,32 @@ function HeaderMenuProfileItem({
 
 export interface WorkspaceHeaderMenuMobileProps extends WorkspaceHeaderWorkspaceActions {
   normalizedServerId: string;
+  scripts: UseWorkspaceScriptsMenuPagesInput;
   showCreateBrowserTab: boolean;
   createTerminalDisabled: boolean;
-  onCreateDraftTab: () => void;
-  onCreateTerminal: () => void;
   onCreateTerminalWithProfile: (profile: TerminalProfile) => void;
   onCreateBrowser: () => void;
 }
 
 /**
- * Compact layouts have no tab strip to launch from, so new tabs live here alongside the workspace
- * actions.
+ * Compact layouts have no tab strip. New agent and New terminal sit in the tab switcher's footer;
+ * the rarer launches stay here alongside the workspace actions.
+ *
+ * The header has no room for a scripts button either, so scripts are a page of this menu, and the
+ * ⋯ carries a dot while a running service is unhealthy.
  */
 export function WorkspaceHeaderMenuMobile({
   normalizedServerId,
+  scripts,
   showCreateBrowserTab,
   createTerminalDisabled,
-  onCreateDraftTab,
-  onCreateTerminal,
   onCreateTerminalWithProfile,
   onCreateBrowser,
   ...workspaceActions
 }: WorkspaceHeaderMenuMobileProps) {
   const { t } = useTranslation();
   const router = useRouter();
+  const triggerStyle = useIconButtonChromeStyle({ size: "large" });
   const { config } = useDaemonConfig(normalizedServerId);
   const profiles = useMemo(
     () => resolveTerminalProfiles(config?.terminalProfiles),
@@ -248,31 +261,35 @@ export function WorkspaceHeaderMenuMobile({
   const handleEditProfiles = useCallback(() => {
     router.push(buildSettingsHostSectionRoute(normalizedServerId, "terminals") as Href);
   }, [normalizedServerId, router]);
+  const scriptsMenu = useWorkspaceScriptsMenuPages(scripts);
 
   return (
     <DropdownMenu compactMode="sheet">
       <DropdownMenuTrigger
         testID="workspace-header-menu-trigger"
-        style={workspaceHeaderMenuButtonStyle}
+        style={triggerStyle}
         hitSlop={COMPACT_HEADER_BUTTON_HIT_SLOP}
         accessibilityRole="button"
-        accessibilityLabel={t("workspace.header.actions.workspaceActions")}
+        accessibilityLabel={
+          scriptsMenu.needsAttention
+            ? t("workspace.header.actions.workspaceActionsUnhealthy")
+            : t("workspace.header.actions.workspaceActions")
+        }
       >
-        <WorkspaceHeaderMenuTriggerIcon />
+        {scriptsMenu.needsAttention ? (
+          <WorkspaceHeaderMenuAttentionTriggerIcon />
+        ) : (
+          <WorkspaceHeaderMenuTriggerIcon />
+        )}
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align="start"
         width={220}
         testID="workspace-header-menu"
+        pages={scriptsMenu.pages}
         sheetTitle={t("workspace.header.actions.workspaceActions")}
       >
-        <DropdownMenuItem
-          testID="workspace-header-new-agent"
-          leading={MENU_NEW_AGENT_ICON}
-          onSelect={onCreateDraftTab}
-        >
-          {t("workspace.header.actions.newAgent")}
-        </DropdownMenuItem>
+        {scriptsMenu.trigger}
         {showCreateBrowserTab ? (
           <DropdownMenuItem
             testID="workspace-header-new-browser"
@@ -285,14 +302,6 @@ export function WorkspaceHeaderMenuMobile({
         <WorkspaceHeaderWorkspaceActionItems {...workspaceActions} />
         <DropdownMenuSeparator />
         <DropdownMenuLabel>{t("workspace.tabs.actions.terminalProfilesMenu")}</DropdownMenuLabel>
-        <DropdownMenuItem
-          testID="workspace-header-new-terminal"
-          leading={MENU_NEW_TERMINAL_ICON}
-          disabled={createTerminalDisabled}
-          onSelect={onCreateTerminal}
-        >
-          {t("workspace.header.actions.newTerminal")}
-        </DropdownMenuItem>
         {profiles.map((profile) => (
           <HeaderMenuProfileItem
             key={profile.id}
@@ -313,9 +322,21 @@ export function WorkspaceHeaderMenuMobile({
   );
 }
 
-const styles = StyleSheet.create({
+const ATTENTION_DOT_SIZE = 6;
+
+const styles = StyleSheet.create((theme) => ({
   headerMenuProfileIconWrapper: {
     width: 16,
     height: 16,
   },
-});
+  // Same red as the Scripts row's unhealthy ▶, so the dot and the row it leads to agree.
+  attentionDot: {
+    position: "absolute",
+    top: -1,
+    right: -2,
+    width: ATTENTION_DOT_SIZE,
+    height: ATTENTION_DOT_SIZE,
+    borderRadius: theme.borderRadius.full,
+    backgroundColor: theme.colors.palette.red[500],
+  },
+}));

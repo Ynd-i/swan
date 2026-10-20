@@ -392,7 +392,7 @@ interface FontFamilyRowProps {
   withBorder: boolean;
   children?: ReactNode;
   onChangeDraft: (value: string) => void;
-  onCommit: (value: string) => void;
+  onCommit: (value: string) => string;
 }
 
 function FontFamilyRow({
@@ -408,20 +408,21 @@ function FontFamilyRow({
   onChangeDraft,
   onCommit,
 }: FontFamilyRowProps) {
-  const input = useRef<EditingTextInputHandle>(null);
+  const inputRef = useRef<EditingTextInputHandle>(null);
   const handleCommit = useCallback(() => {
-    onCommit(draft);
+    const committed = onCommit(draft);
+    inputRef.current?.replaceText(committed);
   }, [draft, onCommit]);
 
   // Resync from the committed value when it changes elsewhere.
   useEffect(() => {
     onChangeDraft(value);
-    input.current?.replaceText(value);
+    inputRef.current?.replaceText(value);
   }, [value, resetKey, onChangeDraft]);
 
   const familyInput = (
     <TextInput
-      ref={input}
+      ref={inputRef}
       initialValue={draft}
       onChangeText={onChangeDraft}
       onBlur={handleCommit}
@@ -875,12 +876,13 @@ export function AppearanceSection() {
       const sanitized = sanitizeFontFamily(value);
       if (sanitized === null) {
         setUiFontDraft(settings.uiFontFamily);
-        return;
+        return settings.uiFontFamily;
       }
       setUiFontDraft(sanitized);
       if (sanitized !== settings.uiFontFamily) {
         void updateSettings({ uiFontFamily: sanitized });
       }
+      return sanitized;
     },
     [settings.uiFontFamily, updateSettings],
   );
@@ -890,12 +892,13 @@ export function AppearanceSection() {
       const sanitized = sanitizeFontFamily(value);
       if (sanitized === null) {
         setContentFontDraft(settings.contentFontFamily);
-        return;
+        return settings.contentFontFamily;
       }
       setContentFontDraft(sanitized);
       if (sanitized !== settings.contentFontFamily) {
         void updateSettings({ contentFontFamily: sanitized });
       }
+      return sanitized;
     },
     [settings.contentFontFamily, updateSettings],
   );
@@ -932,12 +935,13 @@ export function AppearanceSection() {
       const sanitized = sanitizeFontFamily(value);
       if (sanitized === null) {
         setMonoFontDraft(settings.monoFontFamily);
-        return;
+        return settings.monoFontFamily;
       }
       setMonoFontDraft(sanitized);
       if (sanitized !== settings.monoFontFamily) {
         void updateSettings({ monoFontFamily: sanitized });
       }
+      return sanitized;
     },
     [settings.monoFontFamily, updateSettings],
   );

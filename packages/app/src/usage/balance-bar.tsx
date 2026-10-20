@@ -46,7 +46,13 @@ function fillToneStyle(tone: UsageTone) {
   }
 }
 
-export function UsageBalanceBar({ balance }: { balance: UsageBalance }) {
+export function UsageBalanceBar({
+  balance,
+  retained = false,
+}: {
+  balance: UsageBalance;
+  retained?: boolean;
+}) {
   const { t, i18n } = useTranslation();
   const { amountText, usedPct } = resolveBalance(balance, i18n.language, t);
   const tone = balance.tone ?? "default";
@@ -64,7 +70,12 @@ export function UsageBalanceBar({ balance }: { balance: UsageBalance }) {
         </Text>
         <Text style={styles.value}>
           {amountText}
-          <UsageDeadline at={balance.resetsAt} prefix=" · " style={styles.reset} />
+          <UsageDeadline
+            at={balance.resetsAt}
+            retained={retained}
+            prefix=" · "
+            style={styles.reset}
+          />
         </Text>
       </View>
       {usedPct != null ? (

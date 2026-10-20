@@ -25,7 +25,7 @@ function userMessage(id: string, seed: number): Extract<StreamItem, { kind: "use
 function assistantMessage(
   id: string,
   seed: number,
-  block?: { groupId: string; index: number },
+  _block?: { groupId: string; index: number },
   turnId?: string,
 ): Extract<StreamItem, { kind: "assistant_message" }> {
   return {
@@ -33,7 +33,6 @@ function assistantMessage(
     id,
     text: id,
     timestamp: timestamp(seed),
-    ...(block ? { blockGroupId: block.groupId, blockIndex: block.index } : {}),
     ...(turnId ? { turnId } : {}),
   };
 }
@@ -149,31 +148,6 @@ function findLayoutItem(layout: StreamLayout, id: string): StreamLayoutItem {
 }
 
 describe("layoutStream", () => {
-  it("revises the history boundary when growing Markdown changes block kind", () => {
-    const previous = {
-      ...assistantMessage("previous", 1, { groupId: "reply", index: 0 }),
-      blockKind: "paragraph" as const,
-    };
-    const history = [previous];
-    const liveHead: StreamItem[] = [
-      { ...assistantMessage("head", 2, { groupId: "reply", index: 1 }), blockKind: "paragraph" },
-    ];
-    const input = {
-      strategy: strategyFor("web"),
-      isTurnActive: true,
-      history,
-      liveHead,
-      timingByAssistantId: new Map(),
-    };
-    const first = layoutStream(input);
-    liveHead[0] = {
-      ...assistantMessage("head", 2, { groupId: "reply", index: 1 }),
-      blockKind: "list",
-    };
-    const second = layoutStream(input);
-    expect(second.history).not.toBe(first.history);
-    expect(second.history[0]?.belowItem).toMatchObject({ blockKind: "list" });
-  });
   it("places one response footer after an adjacent tagged tool-only turn", () => {
     const priorAssistant = assistantMessage("prior", 1, undefined, "turn-1");
     const nextTool = toolCall("next-tool", 2, "turn-2");
@@ -343,7 +317,7 @@ describe("layoutStream", () => {
     expect(assistantRow.frameOrder).toBe("content-then-footer");
   });
 
-  it("compacts assistant block spacing across the history and live-head boundary", () => {
+  it("keeps separate messages spaced across history and the live head", () => {
     const historyBlock = assistantMessage("turn:block:0", 2, { groupId: "turn", index: 0 });
     const headBlock = assistantMessage("turn:head", 3, { groupId: "turn", index: 1 });
     const layout = layoutFor({
@@ -353,8 +327,8 @@ describe("layoutStream", () => {
       timingIds: [historyBlock.id, headBlock.id],
     });
 
-    expect(findLayoutItem(layout, historyBlock.id).assistantSpacing).toBe("compactBottom");
-    expect(findLayoutItem(layout, headBlock.id).assistantSpacing).toBe("compactBoth");
+    expect(findLayoutItem(layout, historyBlock.id).assistantSpacing).toBe("default");
+    expect(findLayoutItem(layout, headBlock.id).assistantSpacing).toBe("compactBottom");
   });
 
   it.each(["web", "android"] as const)(
