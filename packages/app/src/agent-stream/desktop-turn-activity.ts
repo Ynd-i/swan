@@ -5,16 +5,12 @@ import { describeToolCall, isGroupableToolCall } from "@/tool-calls/detail-level
 import { getStreamItemMessageId } from "./presentation";
 import { startsNewTurn } from "./turn-membership";
 
-/** A finished turn folds behind its duration and failure count; a running turn shows its latest step. */
-export type DesktopTurnActivityState =
-  | { kind: "complete"; timing: TurnTiming; failedCount: number }
-  | { kind: "working"; latestStep: StreamItem };
-
 export interface DesktopTurnActivity {
   id: string;
   source: StreamItem;
   row: StreamItem;
-  state: DesktopTurnActivityState;
+  timing: TurnTiming;
+  failedCount: number;
   expanded: boolean;
   collapsibleItemIds: ReadonlySet<string>;
   messageIds: ReadonlySet<string>;
@@ -30,7 +26,6 @@ interface ProjectionInput {
   scope: string;
   items: StreamItem[];
   timingByAssistantId: ReadonlyMap<string, TurnTiming>;
-  isTurnActive: boolean;
   expanded: ReadonlySet<string>;
   toolGroups: ToolCallDetailProjection["groupsByHostId"];
 }
@@ -55,89 +50,41 @@ function isFailed(call: ToolCallItem): boolean {
   return Boolean(detail.error) || detail.status === "failed";
 }
 
-// While working, replies in progress stay readable, unfinished steps fold and failures stay out.
-// A finished turn folds its failures too; the header counts them.
-function canCollapse(
-  item: StreamItem,
-  groups: ProjectionInput["toolGroups"],
-  working: boolean,
-): boolean {
-  if (item.kind === "assistant_message") return !working;
-  if (item.kind === "thought") return working || item.status === "ready";
+// Failures fold with the rest; the header counts them.
+function canCollapse(item: StreamItem, groups: ProjectionInput["toolGroups"]): boolean {
+  if (item.kind === "assistant_message") return true;
+  if (item.kind === "thought") return item.status === "ready";
   if (!isGroupableToolCall(item)) return false;
-  return callsOf(item, groups).every((call) => {
-    if (isFailed(call)) return !working;
-    const detail = describeToolCall(call);
-    if (detail.status === "completed") return true;
-    return working && (detail.status === "running" || detail.status === "executing");
-  });
-}
-
-function latestStepOf(item: StreamItem, groups: ProjectionInput["toolGroups"]): StreamItem {
-  return groups.get(item.id)?.run.items.at(-1) ?? item;
+  return callsOf(item, groups).every(
+    (call) => isFailed(call) || describeToolCall(call).status === "completed",
+  );
 }
 
 function sameIds(left: ReadonlySet<string>, right: ReadonlySet<string>): boolean {
   return left.size === right.size && [...left].every((id) => right.has(id));
 }
 
-function sameState(left: DesktopTurnActivityState, right: DesktopTurnActivityState): boolean {
-  if (left.kind === "complete" && right.kind === "complete") {
-    return (
-      left.timing.completedAt.getTime() === right.timing.completedAt.getTime() &&
-      left.timing.durationMs === right.timing.durationMs &&
-      left.failedCount === right.failedCount
-    );
-  }
-  if (left.kind === "working" && right.kind === "working") {
-    const [a, b] = [left.latestStep, right.latestStep];
-    // A streaming thought keeps the same label, so its deltas must not revise the row.
-    return a === b || (a.kind === "thought" && b.kind === "thought" && a.id === b.id);
-  }
-  return false;
-}
-
-function collectComplete(turn: StreamItem[], input: ProjectionInput) {
-  const assistant = turn.find((item) => input.timingByAssistantId.has(item.id));
-  const timing = assistant && input.timingByAssistantId.get(assistant.id);
-  // Tool-only/error-only responses stay fully visible.
-  if (!timing) return null;
-  const boundary = turn.findLastIndex(isStep);
-  if (boundary < 0 && !turn.some((item) => item.kind === "tool_call")) return null;
-  const hasReply = turn.slice(boundary + 1).some((item) => item.kind === "assistant_message");
-  const collapsible = hasReply
-    ? turn.slice(0, boundary + 1).filter((item) => canCollapse(item, input.toolGroups, false))
-    : [];
-  const failedCount = collapsible
-    .flatMap((item) => (item.kind === "tool_call" ? callsOf(item, input.toolGroups) : []))
-    .filter(isFailed).length;
-  return { state: { kind: "complete", timing, failedCount } as const, collapsible };
-}
-
-function collectWorking(turn: StreamItem[], input: ProjectionInput) {
-  const steps = turn.filter(isStep);
-  const latest = steps.at(-1);
-  if (!latest) return null;
-  return {
-    state: { kind: "working", latestStep: latestStepOf(latest, input.toolGroups) } as const,
-    collapsible: steps.filter((item) => canCollapse(item, input.toolGroups, true)),
-  };
-}
-
 function buildActivity(
   turn: StreamItem[],
-  working: boolean,
   input: ProjectionInput,
   previous: DesktopTurnActivityProjection,
 ): DesktopTurnActivity | null {
   const source = turn.find((item) => item.kind !== "user_message");
-  if (!source) return null;
-  const collected = working ? collectWorking(turn, input) : collectComplete(turn, input);
-  if (!collected) return null;
-  const { state, collapsible } = collected;
+  const assistant = turn.find((item) => input.timingByAssistantId.has(item.id));
+  const timing = assistant && input.timingByAssistantId.get(assistant.id);
+  // Active turns have no timing yet; they and tool-only/error-only responses stay fully visible.
+  if (!source || !timing) return null;
+  const boundary = turn.findLastIndex(isStep);
+  if (boundary < 0 && !turn.some((item) => item.kind === "tool_call")) return null;
+  const hasReply = turn.slice(boundary + 1).some((item) => item.kind === "assistant_message");
+  const collapsible = hasReply
+    ? turn.slice(0, boundary + 1).filter((item) => canCollapse(item, input.toolGroups))
+    : [];
+  const failedCount = collapsible
+    .flatMap((item) => (item.kind === "tool_call" ? callsOf(item, input.toolGroups) : []))
+    .filter(isFailed).length;
   const collapsibleItemIds = new Set(collapsible.map((item) => item.id));
   const messageIds = new Set(collapsible.map(getStreamItemMessageId));
-  // The first row keeps the id stable while a running turn keeps appending.
   const turnId = turn.find((item) => item.turnId)?.turnId ?? getStreamItemMessageId(turn[0]!);
   const id = `${input.scope}:${turnId}`;
   const expanded = input.expanded.has(id);
@@ -147,13 +94,24 @@ function buildActivity(
     old.source === source &&
     old.id === id &&
     old.expanded === expanded &&
-    sameState(old.state, state) &&
+    old.timing.completedAt.getTime() === timing.completedAt.getTime() &&
+    old.timing.durationMs === timing.durationMs &&
+    old.failedCount === failedCount &&
     sameIds(old.collapsibleItemIds, collapsibleItemIds) &&
     sameIds(old.messageIds, messageIds)
   ) {
     return old;
   }
-  return { id, source, row: { ...source }, state, expanded, collapsibleItemIds, messageIds };
+  return {
+    id,
+    source,
+    row: { ...source },
+    timing,
+    failedCount,
+    expanded,
+    collapsibleItemIds,
+    messageIds,
+  };
 }
 
 /** Display rows only: the full layout, copy and fork inputs remain untouched. */
@@ -168,11 +126,10 @@ export function createDesktopTurnActivityProjection() {
       previousItem = item;
     }
     const byHostId = new Map<string, DesktopTurnActivity>();
-    turns.forEach((turn, index) => {
-      const working = input.isTurnActive && index === turns.length - 1;
-      const activity = buildActivity(turn, working, input, previous);
+    for (const turn of turns) {
+      const activity = buildActivity(turn, input, previous);
       if (activity) byHostId.set(activity.source.id, activity);
-    });
+    }
     // A live text delta must not revise already completed history headers.
     if (
       byHostId.size === previous.byHostId.size &&

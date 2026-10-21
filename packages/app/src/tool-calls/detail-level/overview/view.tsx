@@ -10,10 +10,12 @@ import { ScrollView } from "react-native";
 import { useTranslation } from "react-i18next";
 import { BookOpen, Pencil, Search, Sparkles, SquareTerminal, Wrench } from "lucide-react-native";
 import { StyleSheet } from "react-native-unistyles";
-import { ExpandableBadge } from "@/components/message";
+import { ExpandableBadge, toolCallLabel } from "@/components/message";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { getIsElectronMac } from "@/constants/platform";
 import { PaseoLogo } from "@/components/icons/paseo-logo";
+import { buildToolCallDisplayModel } from "@/utils/tool-call-display";
+import { describeToolCall, type ToolCallRunItem } from "../grouping";
 import { type OverviewCategory, type OverviewToolCallGroup } from "./model";
 import { OverviewToolCallGroupSheet } from "./sheet";
 
@@ -52,11 +54,29 @@ const CATEGORY_ICONS: Record<OverviewCategory, ComponentType<{ size?: number; co
   other: Wrench,
 };
 
+function latestStepLabel(t: (key: string) => string, step: ToolCallRunItem): string {
+  if (step.kind === "thought") return t("desktopChat.thinking");
+  const { name, status, error, detail, metadata } = describeToolCall(step);
+  const display = buildToolCallDisplayModel({
+    name,
+    status: status === "executing" ? "running" : status,
+    error: error ?? null,
+    detail,
+    metadata,
+  });
+  const label = toolCallLabel(t, status, detail, display.displayName);
+  return display.summary ? `${label} ${display.summary}` : label;
+}
+
 function useOverviewSummary(group: OverviewToolCallGroup, codexStyle: boolean): string {
   const { t } = useTranslation();
-  const { summary, categories } = group;
   return useMemo(() => {
-    // Codex style on Mac desktop: verb-only parts, no counts, joined per locale.
+    const { summary, categories, run } = group;
+    // Codex style on Mac desktop: a live run names its latest step, as Codex's working row does.
+    if (codexStyle && !run.isSealed) {
+      return latestStepLabel(t, run.items.at(-1) ?? run.latest);
+    }
+    // Sealed runs use verb-only parts, no counts, joined per locale.
     if (codexStyle) {
       const joined = categories
         .map((category) => t(`toolCallGroup.verbs.${category}`))
@@ -79,7 +99,7 @@ function useOverviewSummary(group: OverviewToolCallGroup, codexStyle: boolean): 
       }
     }
     return joinSummaryParts(parts, t("toolCallGroup.and"));
-  }, [summary, categories, codexStyle, t]);
+  }, [group, codexStyle, t]);
 }
 
 export const OverviewToolCallGroupView = memo(function OverviewToolCallGroupView({

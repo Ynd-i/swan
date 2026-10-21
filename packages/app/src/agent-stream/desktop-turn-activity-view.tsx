@@ -1,15 +1,11 @@
 import { useCallback, useMemo, useState, type RefObject } from "react";
-import { Pressable, Text } from "react-native";
+import { Text } from "react-native";
 import { ChevronRight } from "lucide-react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { useTranslation } from "react-i18next";
 import { getIsElectronMac } from "@/constants/platform";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { STREAM_METADATA_FONT_SIZE, toolCallLabel } from "@/components/message";
-import { describeToolCall } from "@/tool-calls/detail-level/grouping";
-import { buildToolCallDisplayModel } from "@/utils/tool-call-display";
-import type { TurnTiming } from "@/timeline/turn-time";
-import type { StreamItem } from "@/types/stream";
+import { STREAM_METADATA_FONT_SIZE } from "@/components/message";
 import { formatDuration, formatMessageTimestamp } from "@/utils/time";
 import type { Theme } from "@/styles/theme";
 import type { ToolCallDetailProjection } from "@/tool-calls/detail-level/projection";
@@ -27,7 +23,6 @@ export function useDesktopTurnActivity({
   model,
   scope,
   isMobile,
-  isTurnActive,
   toolGroups,
   revealLoadedHistory,
   viewportRef,
@@ -35,7 +30,6 @@ export function useDesktopTurnActivity({
   model: AgentStreamRenderModel;
   scope: string;
   isMobile: boolean;
-  isTurnActive: boolean;
   toolGroups: ToolCallDetailProjection["groupsByHostId"];
   revealLoadedHistory: (messageId: string) => boolean;
   viewportRef: RefObject<StreamViewportHandle | null>;
@@ -50,7 +44,6 @@ export function useDesktopTurnActivity({
             scope,
             items: [...model.history, ...model.segments.liveHead],
             timingByAssistantId: model.turnTiming.byAssistantId,
-            isTurnActive,
             expanded,
             toolGroups,
           })
@@ -62,7 +55,6 @@ export function useDesktopTurnActivity({
       model.history,
       model.segments.liveHead,
       model.turnTiming.byAssistantId,
-      isTurnActive,
       expanded,
       toolGroups,
     ],
@@ -160,79 +152,8 @@ export function DesktopTurnActivityHeader({
   onToggle: (activity: DesktopTurnActivity) => void;
 }) {
   const toggle = useCallback(() => onToggle(activity), [onToggle, activity]);
-  const canExpand = activity.collapsibleItemIds.size > 0;
-  return activity.state.kind === "working" ? (
-    <WorkingHeader
-      latestStep={activity.state.latestStep}
-      expanded={activity.expanded}
-      onToggle={canExpand ? toggle : undefined}
-    />
-  ) : (
-    <CompletedHeader
-      timing={activity.state.timing}
-      failedCount={activity.state.failedCount}
-      expanded={activity.expanded}
-      onToggle={canExpand ? toggle : undefined}
-    />
-  );
-}
-
-function stepLabel(t: (key: string) => string, step: StreamItem): string {
-  if (step.kind !== "tool_call") return t("desktopChat.thinking");
-  const { name, status, error, detail, metadata } = describeToolCall(step);
-  const display = buildToolCallDisplayModel({
-    name,
-    status: status === "executing" ? "running" : status,
-    error: error ?? null,
-    detail,
-    metadata,
-  });
-  const label = toolCallLabel(t, status, detail, display.displayName);
-  return display.summary ? `${label} ${display.summary}` : label;
-}
-
-function WorkingHeader({
-  latestStep,
-  expanded,
-  onToggle,
-}: {
-  latestStep: StreamItem;
-  expanded: boolean;
-  onToggle?: () => void;
-}) {
-  const { t } = useTranslation();
-  const label = useMemo(() => stepLabel(t, latestStep), [t, latestStep]);
-  return (
-    <Pressable
-      onPress={onToggle}
-      accessibilityRole={onToggle ? "button" : undefined}
-      accessibilityLabel={label}
-      aria-expanded={onToggle ? expanded : undefined}
-      style={styles.workingHeader}
-      dataSet={ignoredMetadata}
-      testID="desktop-turn-activity-working"
-    >
-      <Text style={styles.workingLabel} numberOfLines={1}>
-        {label}
-      </Text>
-      {onToggle ? (
-        <Disclosure size={14} uniProps={iconColor} style={expanded ? styles.expanded : undefined} />
-      ) : null}
-    </Pressable>
-  );
-}
-
-function CompletedHeader({
-  timing,
-  failedCount,
-  expanded,
-  onToggle,
-}: {
-  timing: TurnTiming;
-  failedCount: number;
-  expanded: boolean;
-  onToggle?: () => void;
-}) {
+  const onPress = activity.collapsibleItemIds.size > 0 ? toggle : undefined;
+  const { timing, failedCount, expanded } = activity;
   const { t } = useTranslation();
   const duration = timing.durationMs;
   const label =
@@ -244,10 +165,10 @@ function CompletedHeader({
   return (
     <Tooltip enabledOnDesktop enabledOnMobile={false}>
       <TooltipTrigger
-        onPress={onToggle}
-        accessibilityRole={onToggle ? "button" : undefined}
+        onPress={onPress}
+        accessibilityRole={onPress ? "button" : undefined}
         accessibilityLabel={[label, failed, timestamp].filter(Boolean).join(" · ")}
-        aria-expanded={onToggle ? expanded : undefined}
+        aria-expanded={onPress ? expanded : undefined}
         style={styles.header}
         dataSet={ignoredMetadata}
         testID="desktop-turn-activity"
@@ -261,7 +182,7 @@ function CompletedHeader({
             </>
           ) : null}
         </Text>
-        {onToggle ? (
+        {onPress ? (
           <Disclosure
             size={14}
             uniProps={iconColor}
@@ -293,21 +214,6 @@ const styles = StyleSheet.create((theme) => ({
     lineHeight: 20,
   },
   failed: { color: theme.colors.statusDanger },
-  workingHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    alignSelf: "flex-start",
-    maxWidth: "100%",
-    gap: theme.spacing[1],
-    paddingVertical: theme.spacing[1],
-    marginBottom: theme.spacing[2],
-  },
-  workingLabel: {
-    flexShrink: 1,
-    color: theme.colors.foregroundMuted,
-    fontSize: STREAM_METADATA_FONT_SIZE,
-    lineHeight: 20,
-  },
   timestamp: { color: theme.colors.foreground, fontSize: STREAM_METADATA_FONT_SIZE },
   expanded: { transform: [{ rotate: "90deg" }] },
 }));
