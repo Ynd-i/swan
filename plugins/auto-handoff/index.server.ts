@@ -5,12 +5,11 @@ import type {
 } from "@getpaseo/plugin/server";
 import { autoHandoffSettings, type AutoHandoffSettings } from "./shared/settings.js";
 import {
+  briefingReply,
   briefingRequestPrompt,
   childPrompt,
-  finalReplyText,
   handoffTitle,
-  lastUserRequest,
-  looksLikeBriefing,
+  recentUserRequests,
   type BriefingRequest,
 } from "./server/briefing.js";
 import {
@@ -66,7 +65,11 @@ async function spawnHandoff(input: {
       ...(source.thinkingOptionId ? { thinkingOptionId: source.thinkingOptionId } : {}),
       featureValues,
     },
-    prompt: childPrompt(input.briefing, input.usedTokens),
+    prompt: childPrompt({
+      briefing: input.briefing,
+      usedTokens: input.usedTokens,
+      sourceAgentId: source.id,
+    }),
     // The daemon records a first prompt in the timeline only when it carries a message ID.
     clientMessageId: crypto.randomUUID(),
     labels: { [HANDOFF_FROM_LABEL]: source.id, [GENERATION_LABEL]: String(generation) },
@@ -142,7 +145,7 @@ export default function contribute(server: PluginServerContext) {
       used: decision.used,
       max: decision.max,
       threshold: decision.threshold,
-      lastUserRequest: lastUserRequest(event.timeline),
+      userRequests: recentUserRequests(event.timeline),
     };
     await requestBriefing({ agent, attempt: 1, request });
   }
@@ -162,8 +165,8 @@ export default function contribute(server: PluginServerContext) {
       log("deferred", { source: agent.id, outcome: event.outcome.kind, status: snapshot.status });
       return;
     }
-    const briefing = event.outcome.kind === "completed" ? finalReplyText(event.timeline) : "";
-    if (!looksLikeBriefing(briefing)) {
+    const briefing = event.outcome.kind === "completed" ? briefingReply(event.timeline) : null;
+    if (!briefing) {
       const next = afterFailedBriefing(phase, input.config.maxAttempts, "reply was not a briefing");
       if (next.kind === "failed") {
         phases.set(agent.id, next);

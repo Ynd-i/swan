@@ -30,15 +30,25 @@ agent's next turn reports usage.
    `notifyOnFinish` does it for Paseo subagents. The check runs again when that turn ends.
    Background shells and monitors do not hold the handoff yet.
 2. It sends the source agent a briefing request wrapped in `<paseo_auto_handoff>`. The request
-   quotes the user's latest message (skipping earlier requests by that tag) so the briefing is
-   written around what the user asked for last. Its `## Active skills` section lists the skills
-   the user turned on, such as `/poteto-mode`, and the child prompt tells the child to turn them on
-   again. A skill loaded by a slash command lives in the source's context only; a session-start hook
-   that offers the skill runs in the child too, but does not load it.
-3. When that turn ends, the plugin takes the assistant text after the turn's last tool call, checks
-   it has `## Task` and `## Current state`, and creates the new agent in the source's workspace with
-   the same provider, model, mode, thinking option and feature values, such as fast mode. A
-   source without a model gets the provider default, which is what it ran on.
+   quotes the user's latest request so the briefing is written around what the user asked for
+   last. A short follow-up such as "ok, continue" is quoted with the up to two messages before it.
+   Plugin notes are user messages too, so the quote skips this plugin's requests and
+   [report back](chat-proposals.md) by their tags. Finish notifications and other agent messages
+   reach the timeline as tool calls, so they never count. Its `## Active skills` section lists the
+   skills the user turned on, such as `/poteto-mode`, and the child prompt tells the child to turn
+   them on again. A skill loaded by a slash command lives in the source's context only; a
+   session-start hook that offers the skill runs in the child too, but does not load it. The request
+   also asks the agent to link any checkpoint, plan file or decision log the work already keeps
+   under `## Current state`, and to carry its unfinished todos under `## Open todos`. Its only rule
+   on side effects is no edits to tracked files and no commits. It does not ask for a skill's pause
+   step, because pause steps commit and the child works in the same checkout, where uncommitted
+   changes carry over. A skill that wants a checkpoint at handoff writes it on its own side.
+3. When that turn ends, the plugin takes the last run of assistant text between tool calls in that
+   turn that has `## Task` and `## Current state`, so a command run after the briefing does not
+   discard it. It creates the new agent in the source's workspace with the same provider, model,
+   mode, thinking option and feature values, such as fast mode. A source without a model gets the
+   provider default, which is what it ran on. The child prompt names the source agent: its chat
+   stays, and `get_agent_activity` reads its history when the briefing left something out.
 
 The plugin launches the child itself instead of telling the agent to run the `paseo-handoff`
 skill. That works for every provider, with or without Paseo's MCP tools or skills, and the fake
