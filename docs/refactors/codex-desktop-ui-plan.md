@@ -919,10 +919,15 @@ channel, so the display boundary is the last tool/reasoning item: all subsequent
 assistant blocks remain visible. Notifications, plans, plugin content and
 unfinished tool rows/overview groups remain outside the fold. Failed calls fold
 with the rest and the header counts them in `statusDanger`, so a turn with
-denied commands does not leave a stack of error rows above the reply; an active
-turn keeps failures visible. A response with
-no assistant text after its activity stays fully visible. Active turns, compact
-layouts and other platforms retain their existing activity presentation.
+denied commands does not leave a stack of error rows above the reply. A response
+with no assistant text after its activity stays fully visible.
+
+An active turn has no fold, so its progress messages stay between the steps they
+describe. Under the overview level each run of steps between two messages is its
+own group, and the live group names its latest step ("正在运行 git fetch",
+"思考中"). One turn-wide Working row folding every step was tried and removed: it
+hid which message a step belonged to. Compact layouts and other platforms have no
+fold.
 
 This filters viewport segments only. The full layout, message identities,
 copy text and fork cursors stay complete; search expands a hidden message before
@@ -1513,7 +1518,11 @@ changes, and a list of sidebar, composer and transcript fixes. All of it is in
   menu while the pointer hovered another.
 - Tool activity: on Mac, grouped tool runs are labelled with verbs only, without
   counts, plus an icon for the run's first kind of work, and finished steps say
-  "Read …"/"Ran …". Grouping stays the `toolCallDetailLevel: "overview"` choice in
+  "Read …"/"Ran …". Thoughts before, between and after the calls join the run, so
+  reasoning does not split it; thoughts that reach a message before any call stay
+  ungrouped. A leading thought therefore streams as its own row and becomes the
+  run's host when the first call lands; holding it back until then would hide live
+  reasoning. Grouping stays the `toolCallDetailLevel: "overview"` choice in
   Settings › Chat. A Mac-only default was tried and reverted: every saved settings
   blob already stores `"detailed"`, so it reached only fresh profiles, which are the
   renderer specs that expect ungrouped tool rows. Image reads have no thumbnail row

@@ -42,14 +42,12 @@ test("desktop completed activity preserves copy, search and fork content", async
     await submitMessage(page, "Show a synthetic activity sequence.");
     await expect(page.getByTestId("turn-working-indicator")).toBeVisible();
     await expect(page.getByTestId("desktop-turn-activity")).toHaveCount(0);
-    await expect(page.getByTestId("desktop-turn-activity-working")).toBeVisible({
-      timeout: 30_000,
-    });
+    await expect(page.getByTestId("tool-call-badge").first()).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByTestId("desktop-turn-activity")).toHaveCount(0);
     await expect(page.getByTestId("assistant-message").last()).toContainText(
       "(end of synthetic stream)",
       { timeout: 30_000 },
     );
-    await expect(page.getByTestId("desktop-turn-activity-working")).toHaveCount(0);
     const activity = page.getByTestId("desktop-turn-activity").first();
     await expect(activity).toHaveAttribute("aria-expanded", "false");
     await expect(activity).toContainText("Worked for");

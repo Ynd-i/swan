@@ -601,7 +601,6 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
       model: baseRenderModel,
       scope: `${resolvedServerId}:${agentId}`,
       isMobile,
-      isTurnActive,
       toolGroups: presentation.groupsByHostId,
       revealLoadedHistory,
       viewportRef,

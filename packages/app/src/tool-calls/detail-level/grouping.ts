@@ -13,7 +13,7 @@ export type ToolCallRunItem = ToolCallItem | ThoughtItem;
 
 export interface ToolCallRun {
   id: string;
-  /** Calls plus, when thoughts join runs, the thoughts after the first call, in order. */
+  /** Calls plus, when thoughts join runs, the thoughts before, between and after them, in order. */
   items: readonly ToolCallRunItem[];
   calls: readonly ToolCallItem[];
   latest: ToolCallItem;
@@ -74,14 +74,10 @@ export function isGroupableToolCall(item: StreamItem): item is ToolCallItem {
   return descriptor.detail.type !== "plan" && descriptor.name.trim().toLowerCase() !== "speak";
 }
 
-// A run starts with a call; a thought only joins a run that is already open.
-function joinsRun(
-  item: StreamItem,
-  pending: readonly ToolCallRunItem[],
-  absorbThoughts: boolean,
-): item is ToolCallRunItem {
-  if (isGroupableToolCall(item)) return true;
-  return absorbThoughts && item.kind === "thought" && pending.length > 0;
+// A thought joins the open run, or waits to lead the next one. A run still needs a call:
+// thoughts that reach a visible boundary first stay ungrouped.
+function isAbsorbedThought(item: StreamItem, absorbThoughts: boolean): item is ThoughtItem {
+  return absorbThoughts && item.kind === "thought";
 }
 
 function createRun(items: readonly ToolCallRunItem[], isSealed: boolean): ToolCallRun {
@@ -131,10 +127,16 @@ export function prepareGroupedHistory<TGroup>(input: {
   const output: StreamItem[] = [];
   const groups = new Map<string, TGroup>();
   let pending: ToolCallRunItem[] = [];
+  let leadingThoughts: ThoughtItem[] = [];
 
   for (const item of input.tail) {
-    if (joinsRun(item, pending, input.absorbThoughts)) {
-      pending.push(item);
+    if (isGroupableToolCall(item)) {
+      pending.push(...leadingThoughts, item);
+      leadingThoughts = [];
+      continue;
+    }
+    if (isAbsorbedThought(item, input.absorbThoughts)) {
+      (pending.length > 0 ? pending : leadingThoughts).push(item);
       continue;
     }
     appendRun({
@@ -145,7 +147,8 @@ export function prepareGroupedHistory<TGroup>(input: {
       buildGroup: input.buildGroup,
     });
     pending = [];
-    output.push(item);
+    output.push(...leadingThoughts, item);
+    leadingThoughts = [];
   }
 
   appendRun({
@@ -155,6 +158,8 @@ export function prepareGroupedHistory<TGroup>(input: {
     groups,
     buildGroup: input.buildGroup,
   });
+  // A live run carries over to the head only once it has a call.
+  output.push(...leadingThoughts);
 
   return {
     tail: groups.size > 0 ? output : input.tail,
@@ -173,6 +178,7 @@ export function groupLiveToolCalls<TGroup>(input: {
   const head: StreamItem[] = [];
   const liveGroups = new Map<string, TGroup>();
   let pending: ToolCallRunItem[] = [...input.history.pendingItems];
+  let leadingThoughts: ThoughtItem[] = [];
   let hostPlacement: "history" | "head" | null = pending.length > 0 ? "history" : null;
   let pendingIncludesHead = false;
 
@@ -193,16 +199,27 @@ export function groupLiveToolCalls<TGroup>(input: {
   };
 
   for (const item of input.head) {
-    if (joinsRun(item, pending, input.absorbThoughts)) {
+    if (isGroupableToolCall(item)) {
       if (pending.length === 0) {
         hostPlacement = "head";
       }
-      pending.push(item);
+      pending.push(...leadingThoughts, item);
+      leadingThoughts = [];
       pendingIncludesHead = true;
       continue;
     }
+    if (isAbsorbedThought(item, input.absorbThoughts)) {
+      if (pending.length > 0) {
+        pending.push(item);
+        pendingIncludesHead = true;
+      } else {
+        leadingThoughts.push(item);
+      }
+      continue;
+    }
     flush(true);
-    head.push(item);
+    head.push(...leadingThoughts, item);
+    leadingThoughts = [];
   }
   // Tool calls live in retained tail rather than the streaming head. The agent
   // lifecycle snapshot can still be idle while a newly received tool call is
@@ -211,6 +228,7 @@ export function groupLiveToolCalls<TGroup>(input: {
   // sequential tool updates.
   const trailingRunIsActive = input.isTurnActive || pending.some(isRunning);
   flush(!trailingRunIsActive);
+  head.push(...leadingThoughts);
 
   if (liveGroups.size === 0) {
     return {
