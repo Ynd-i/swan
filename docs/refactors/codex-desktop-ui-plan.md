@@ -1518,7 +1518,11 @@ changes, and a list of sidebar, composer and transcript fixes. All of it is in
   menu while the pointer hovered another.
 - Tool activity: on Mac, grouped tool runs are labelled with verbs only, without
   counts, plus an icon for the run's first kind of work, and finished steps say
-  "Read …"/"Ran …". Grouping stays the `toolCallDetailLevel: "overview"` choice in
+  "Read …"/"Ran …". Thoughts before, between and after the calls join the run, so
+  reasoning does not split it; thoughts that reach a message before any call stay
+  ungrouped. A leading thought therefore streams as its own row and becomes the
+  run's host when the first call lands; holding it back until then would hide live
+  reasoning. Grouping stays the `toolCallDetailLevel: "overview"` choice in
   Settings › Chat. A Mac-only default was tried and reverted: every saved settings
   blob already stores `"detailed"`, so it reached only fresh profiles, which are the
   renderer specs that expect ungrouped tool rows. Image reads have no thumbnail row

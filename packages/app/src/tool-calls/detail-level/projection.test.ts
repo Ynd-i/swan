@@ -504,23 +504,61 @@ describe("tool call detail-level projection with thoughts joining runs", () => {
     return { kind: "thought", id, text: id, status, timestamp: new Date(0) };
   }
 
-  it("keeps a thought between calls inside one group and leaves a leading thought out", () => {
+  it("groups the thoughts before, between and after calls into one run hosted by the first", () => {
     const tail = [
       thought("lead"),
       toolCall("1", { type: "shell", command: "one" }),
       thought("between"),
       toolCall("2", { type: "shell", command: "two" }),
+      thought("trail"),
       assistant("reply"),
     ];
     const absorbed = prepareToolCallHistory("overview", tail, true)!.grouped;
-    expect(absorbed.tail.map((item) => item.id)).toEqual(["lead", "1", "reply"]);
-    expect(absorbed.groupsByHostId.get("1")?.run.items.map((item) => item.id)).toEqual([
+    expect(absorbed.tail.map((item) => item.id)).toEqual(["lead", "reply"]);
+    expect(absorbed.tail[0]).toMatchObject({ kind: "tool_call", id: "lead" });
+    expect(absorbed.groupsByHostId.get("lead")?.run.items.map((item) => item.id)).toEqual([
+      "lead",
       "1",
       "between",
       "2",
+      "trail",
     ]);
     const split = prepareToolCallHistory("overview", tail)!.grouped;
-    expect(split.tail.map((item) => item.id)).toEqual(["lead", "1", "between", "2", "reply"]);
+    expect(split.tail.map((item) => item.id)).toEqual(tail.map((item) => item.id));
+  });
+
+  it("leaves thoughts without a following call ungrouped", () => {
+    const tail = [assistant("intro"), thought("only"), assistant("reply"), thought("trailing")];
+    const prepared = prepareToolCallHistory("overview", tail, true)!;
+    expect(prepared.grouped.tail).toBe(tail);
+    expect(prepared.grouped.pendingItems).toEqual([]);
+    const result = projectToolCallDetailLevel({
+      level: "overview",
+      tail,
+      head: [thought("live", "loading")],
+      preparedHistory: prepared,
+      isTurnActive: true,
+    });
+    expect(result.tail).toBe(tail);
+    expect(result.head.map((item) => item.id)).toEqual(["live"]);
+    expect(result.groupsByHostId.size).toBe(0);
+  });
+
+  it("hosts a live head run on its leading thought", () => {
+    const result = projectToolCallDetailLevel({
+      level: "overview",
+      tail: [assistant("intro")],
+      head: [
+        thought("lead"),
+        toolCall("1", { type: "shell", command: "one" }, { status: "running" }),
+      ],
+      preparedHistory: prepareToolCallHistory("overview", [assistant("intro")], true),
+      isTurnActive: true,
+    });
+    expect(result.head.map((item) => item.id)).toEqual(["lead"]);
+    const group = result.groupsByHostId.get("lead");
+    expect(group?.run.items.map((item) => item.id)).toEqual(["lead", "1"]);
+    expect(group?.run.isSealed).toBe(false);
   });
 
   it("folds a streaming head thought into the open history run and keeps it live", () => {
