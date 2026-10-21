@@ -128,6 +128,9 @@ test("a turn past the threshold hands the work to a new root agent once", async 
   await expect.poll(firstPrompt, { timeout: 10_000 }).toMatchObject({
     text: expect.stringMatching(/^## Task\nFinish the login fix\.[\s\S]*reached 1500 tokens\./),
   });
+  expect(await firstPrompt()).toMatchObject({
+    text: expect.stringContaining(`get_agent_activity tool with agentId "${source.id}"`),
+  });
 
   // Still past the threshold: the source is latched. A request sent after either turn would
   // land before the next turn ends, so two turns settle the check.

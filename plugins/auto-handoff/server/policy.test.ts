@@ -8,7 +8,7 @@ import {
 } from "./policy.js";
 
 const settings = autoHandoffSettings.schema.parse({});
-const request = { used: 400_000, max: 1_000_000, threshold: 350_000, lastUserRequest: "Fix it" };
+const request = { used: 400_000, max: 1_000_000, threshold: 350_000, userRequests: ["Fix it"] };
 
 function decide(overrides: Partial<Parameters<typeof shouldHandoff>[0]> = {}) {
   return shouldHandoff({
